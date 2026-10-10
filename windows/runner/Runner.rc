@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.azista.idf" "\0"
-            VALUE "FileDescription", "idf_diaspa" "\0"
+            VALUE "FileDescription", "MDRF" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "idf_diaspa" "\0"
+            VALUE "InternalName", "MDRF" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.azista.idf. All rights reserved." "\0"
-            VALUE "OriginalFilename", "idf_diaspa.exe" "\0"
-            VALUE "ProductName", "idf_diaspa" "\0"
+            VALUE "OriginalFilename", "MDRF.exe" "\0"
+            VALUE "ProductName", "MDRF" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

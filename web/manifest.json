@@ -1,6 +1,6 @@
 {
-    "name": "idf_diaspa",
-    "short_name": "idf_diaspa",
+    "name": "MDRF",
+    "short_name": "MDRF",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#004B93",

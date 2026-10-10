@@ -25,7 +25,7 @@ class IDFDigitalHubApp extends StatelessWidget {
     return BlocProvider(
       create: (context) => AppBloc(),
       child: MaterialApp(
-        title: 'IDF',
+        title: 'MDRF',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         home: const SplashScreen(),

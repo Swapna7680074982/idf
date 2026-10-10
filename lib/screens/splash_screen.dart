@@ -58,8 +58,12 @@ class _SplashScreenState extends State<SplashScreen> {
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const DrMohansLogo(size: 94),
-                  const SizedBox(height: 22),
+                  const DrMohansLogo(
+                    size: 88,
+                    withWhiteBackground: true,
+                    borderRadius: 28,
+                  ),
+                  const SizedBox(height: 24),
                   Text(
                     "Dr. Mohan's",
                     style: GoogleFonts.inter(
