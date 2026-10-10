@@ -19,30 +19,45 @@ class ProgramFilterChips extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final filters = ['All', 'Upcoming', 'Ongoing'];
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      physics: const BouncingScrollPhysics(),
-      child: Row(
-        children: [
-          ...filters.map((filter) {
-            final isSelected = selectedFilter == filter && selectedType == null;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: _buildChip(
-                label: filter,
-                isSelected: isSelected,
-                onTap: () {
-                  onTypeSelected(null);
-                  onFilterSelected(filter);
-                },
-              ),
-            );
-          }),
-          _buildTypeDropdownChip(context),
-        ],
-      ),
+    return Row(
+      children: [
+        Expanded(
+          child: _buildChip(
+            label: 'All',
+            isSelected: selectedFilter == 'All' && selectedType == null,
+            onTap: () {
+              onTypeSelected(null);
+              onFilterSelected('All');
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildChip(
+            label: 'Upcoming',
+            isSelected: selectedFilter == 'Upcoming' && selectedType == null,
+            onTap: () {
+              onTypeSelected(null);
+              onFilterSelected('Upcoming');
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildChip(
+            label: 'Ongoing',
+            isSelected: selectedFilter == 'Ongoing' && selectedType == null,
+            onTap: () {
+              onTypeSelected(null);
+              onFilterSelected('Ongoing');
+            },
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: _buildTypeDropdownChip(context),
+        ),
+      ],
     );
   }
 
@@ -57,7 +72,8 @@ class ProgramFilterChips extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7.5),
           decoration: BoxDecoration(
             color: isSelected ? AppColors.primaryBlue : Colors.white,
             borderRadius: BorderRadius.circular(20),
@@ -68,6 +84,9 @@ class ProgramFilterChips extends StatelessWidget {
           ),
           child: Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
             style: GoogleFonts.inter(
               fontSize: 12.5,
               fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
@@ -91,7 +110,8 @@ class ProgramFilterChips extends StatelessWidget {
         onTap: () => _showTypeSelectionModal(context),
         borderRadius: BorderRadius.circular(20),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 7.5),
           decoration: BoxDecoration(
             color: hasSelectedType ? AppColors.primaryBlue : Colors.white,
             borderRadius: BorderRadius.circular(20),
@@ -100,18 +120,16 @@ class ProgramFilterChips extends StatelessWidget {
               width: 1,
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                typeLabel,
-                style: GoogleFonts.inter(
-                  fontSize: 12.5,
-                  fontWeight: hasSelectedType ? FontWeight.w600 : FontWeight.w500,
-                  color: hasSelectedType ? Colors.white : const Color(0xFF334155),
-                ),
-              ),
-            ],
+          child: Text(
+            typeLabel,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.inter(
+              fontSize: 12.5,
+              fontWeight: hasSelectedType ? FontWeight.w600 : FontWeight.w500,
+              color: hasSelectedType ? Colors.white : const Color(0xFF334155),
+            ),
           ),
         ),
       ),
@@ -140,20 +158,36 @@ class ProgramFilterChips extends StatelessWidget {
   void _showTypeSelectionModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) {
+        final screenHeight = MediaQuery.of(ctx).size.height;
         return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16.0),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: screenHeight * 0.75,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const SizedBox(height: 10),
+                // Drag handle
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+                  padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -171,32 +205,61 @@ class ProgramFilterChips extends StatelessWidget {
                             onTypeSelected(null);
                             Navigator.pop(ctx);
                           },
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.primaryBlue,
+                            textStyle: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           child: const Text('Reset'),
                         ),
                     ],
                   ),
                 ),
-                const Divider(),
-                ...ProgramType.values.map((type) {
-                  final isSelected = selectedType == type;
-                  return ListTile(
-                    title: Text(
-                      _formatType(type),
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                        color: isSelected ? AppColors.primaryBlue : AppColors.textPrimary,
-                      ),
+                const Divider(height: 1, color: AppColors.border),
+                Flexible(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: ProgramType.values.map((type) {
+                        final isSelected = selectedType == type;
+                        return Container(
+                          margin: const EdgeInsets.symmetric(vertical: 2.0),
+                          decoration: BoxDecoration(
+                            color: isSelected ? const Color(0xFFF0F9FF) : Colors.transparent,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ListTile(
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            title: Text(
+                              _formatType(type),
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                color: isSelected ? AppColors.primaryBlue : AppColors.textPrimary,
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? const Icon(Icons.check_circle_rounded, color: AppColors.primaryBlue, size: 20)
+                                : null,
+                            onTap: () {
+                              onTypeSelected(type);
+                              Navigator.pop(ctx);
+                            },
+                          ),
+                        );
+                      }).toList(),
                     ),
-                    trailing: isSelected
-                        ? const Icon(Icons.check_rounded, color: AppColors.primaryBlue)
-                        : null,
-                    onTap: () {
-                      onTypeSelected(type);
-                      Navigator.pop(ctx);
-                    },
-                  );
-                }),
+                  ),
+                ),
+                const SizedBox(height: 10),
               ],
             ),
           ),

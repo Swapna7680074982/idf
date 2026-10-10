@@ -20,7 +20,7 @@ class AuthHeader extends StatelessWidget {
     this.totalSteps,
     this.onBack,
     this.showBackButton = true,
-    this.showLogo = true,
+    this.showLogo = false,
   });
 
   void _handleBack(BuildContext context) {

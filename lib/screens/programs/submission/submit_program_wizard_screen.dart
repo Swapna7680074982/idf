@@ -95,8 +95,13 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
           children: [
             // Top App Bar / Progress Header
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 12.0),
-              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(
+                  bottom: BorderSide(color: Color(0xFFE2E8F0), width: 1.0),
+                ),
+              ),
               child: StepProgressIndicator(
                 currentStep: _currentStep,
                 totalSteps: _totalSteps,

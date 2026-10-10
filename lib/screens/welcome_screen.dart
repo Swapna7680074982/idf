@@ -75,9 +75,9 @@ class WelcomeScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const DrMohansLogo(
-                            size: 84,
+                            size: 52,
                             withWhiteBackground: true,
-                            borderRadius: 26,
+                            borderRadius: 18,
                           ),
                           const SizedBox(height: 22),
                           Text(

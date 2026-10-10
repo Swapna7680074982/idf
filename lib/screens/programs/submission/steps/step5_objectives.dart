@@ -22,7 +22,7 @@ class _Step5ObjectivesState extends State<Step5Objectives> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _participantsController;
   late TextEditingController _objectivesController;
-  late String _selectedAudience;
+  String? _selectedAudience;
 
   final List<String> _audiences = [
     'General Public & Youth',
@@ -41,7 +41,7 @@ class _Step5ObjectivesState extends State<Step5Objectives> {
     _objectivesController = TextEditingController(text: widget.model.objectives);
     _selectedAudience = widget.model.targetAudience.isNotEmpty
         ? widget.model.targetAudience
-        : _audiences.first;
+        : null;
   }
 
   @override
@@ -53,7 +53,7 @@ class _Step5ObjectivesState extends State<Step5Objectives> {
 
   void _handleContinue() {
     if (_formKey.currentState?.validate() ?? false) {
-      widget.model.targetAudience = _selectedAudience;
+      widget.model.targetAudience = _selectedAudience ?? '';
       widget.model.expectedParticipants = _participantsController.text.trim();
       widget.model.objectives = _objectivesController.text.trim();
       widget.onContinue();
@@ -71,7 +71,11 @@ class _Step5ObjectivesState extends State<Step5Objectives> {
           _buildFieldLabel('Target Audience *'),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
-            initialValue: _audiences.contains(_selectedAudience) ? _selectedAudience : _audiences.first,
+            initialValue: _selectedAudience,
+            hint: Text(
+              'Select target audience',
+              style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF94A3B8)),
+            ),
             decoration: const InputDecoration(
               contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
@@ -86,10 +90,10 @@ class _Step5ObjectivesState extends State<Step5Objectives> {
               );
             }).toList(),
             onChanged: (val) {
-              if (val != null) {
-                setState(() => _selectedAudience = val);
-              }
+              setState(() => _selectedAudience = val);
             },
+            validator: (val) =>
+                val == null || val.isEmpty ? 'Please select target audience' : null,
           ),
           const SizedBox(height: 18),
 

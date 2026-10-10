@@ -21,6 +21,8 @@ class ProgramImageBanner extends StatelessWidget {
         ? program.gradientColors.map((c) => Color(c)).toList()
         : [const Color(0xFF006097), const Color(0xFF017CC2)];
 
+    final hasImage = program.imageUrl != null && program.imageUrl!.isNotEmpty;
+
     return ClipRRect(
       borderRadius: borderRadius ?? BorderRadius.circular(16),
       child: Container(
@@ -34,48 +36,30 @@ class ProgramImageBanner extends StatelessWidget {
           ),
         ),
         child: Stack(
+          fit: StackFit.expand,
           children: [
-            // Background artistic elements
-            Positioned(
-              right: -30,
-              top: -30,
-              child: Container(
-                width: 140,
-                height: 140,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withAlpha(25),
-                ),
-              ),
-            ),
-            Positioned(
-              left: -20,
-              bottom: -20,
-              child: Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withAlpha(15),
-                ),
-              ),
-            ),
-            Positioned(
-              right: 40,
-              bottom: 10,
-              child: Icon(
-                _getCategoryIcon(program.type),
-                size: 70,
-                color: Colors.white.withAlpha(40),
-              ),
-            ),
-            Center(
-              child: Icon(
-                _getCategoryIcon(program.type),
-                size: 46,
-                color: Colors.white.withAlpha(200),
-              ),
-            ),
+            if (hasImage)
+              Image.network(
+                program.imageUrl!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => _buildArtisticBackground(colors),
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return Container(
+                    color: const Color(0xFFE2E8F0),
+                    child: const Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  );
+                },
+              )
+            else
+              _buildArtisticBackground(colors),
+
             // Floating Status Pill (for details screen hero banner)
             if (showFloatingStatus)
               Positioned(
@@ -111,6 +95,53 @@ class ProgramImageBanner extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildArtisticBackground(List<Color> colors) {
+    return Stack(
+      children: [
+        Positioned(
+          right: -30,
+          top: -30,
+          child: Container(
+            width: 140,
+            height: 140,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withAlpha(25),
+            ),
+          ),
+        ),
+        Positioned(
+          left: -20,
+          bottom: -20,
+          child: Container(
+            width: 100,
+            height: 100,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withAlpha(15),
+            ),
+          ),
+        ),
+        Positioned(
+          right: 40,
+          bottom: 10,
+          child: Icon(
+            _getCategoryIcon(program.type),
+            size: 70,
+            color: Colors.white.withAlpha(40),
+          ),
+        ),
+        Center(
+          child: Icon(
+            _getCategoryIcon(program.type),
+            size: 46,
+            color: Colors.white.withAlpha(200),
+          ),
+        ),
+      ],
     );
   }
 

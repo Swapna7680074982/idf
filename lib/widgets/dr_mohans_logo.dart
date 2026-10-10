@@ -7,9 +7,9 @@ class DrMohansLogo extends StatelessWidget {
 
   const DrMohansLogo({
     super.key,
-    this.size = 84,
+    this.size = 52,
     this.withWhiteBackground = true,
-    this.borderRadius = 28,
+    this.borderRadius = 18,
   });
 
   @override

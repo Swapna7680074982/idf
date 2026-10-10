@@ -7,7 +7,6 @@ import '../bloc/app_event.dart';
 import '../bloc/app_state.dart';
 import '../core/theme.dart';
 import '../models/program_model.dart';
-import '../widgets/globe_logo.dart';
 import 'notifications/notifications_screen.dart';
 import 'programs/program_details_screen.dart';
 import 'programs/programs_screen.dart';
@@ -137,7 +136,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.event_note_outlined,
                 activeIcon: Icons.event_note_rounded,
                 label: 'Programs',
-                badgeCount: 2,
               ),
               _buildWhatsAppNavItem(
                 index: 2,
@@ -150,7 +148,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.description_outlined,
                 activeIcon: Icons.description_rounded,
                 label: 'Applications',
-                badgeCount: 1,
               ),
               _buildWhatsAppNavItem(
                 index: 4,
@@ -170,7 +167,6 @@ class _HomeScreenState extends State<HomeScreen> {
     required IconData icon,
     required IconData activeIcon,
     required String label,
-    int? badgeCount,
   }) {
     final isSelected = _currentTabIndex == index;
     final activeColor = AppColors.primaryBlue;
@@ -191,55 +187,23 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 3,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color(0xFFE0F2FE)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Icon(
-                      isSelected ? activeIcon : icon,
-                      color: isSelected ? activeColor : inactiveColor,
-                      size: 22,
-                    ),
-                  ),
-                  if (badgeCount != null && badgeCount > 0)
-                    Positioned(
-                      top: -2,
-                      right: 4,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF22C55E),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
-                        ),
-                        constraints: const BoxConstraints(
-                          minWidth: 16,
-                          minHeight: 16,
-                        ),
-                        child: Center(
-                          child: Text(
-                            '$badgeCount',
-                            style: GoogleFonts.inter(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 3,
+                ),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? const Color(0xFFE0F2FE)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Icon(
+                  isSelected ? activeIcon : icon,
+                  color: isSelected ? activeColor : inactiveColor,
+                  size: 22,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
@@ -277,35 +241,27 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const GlobeLogo(size: 42, showBackgroundGlow: false),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Welcome back,',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            user.fullName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 19,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                        ],
+                    Text(
+                      'Welcome back,',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      user.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 19,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        letterSpacing: -0.2,
                       ),
                     ),
                   ],
@@ -442,12 +398,12 @@ class _HomeScreenState extends State<HomeScreen> {
           _buildMyApplicationsCard(state),
           const SizedBox(height: 20),
 
-          // Registered Programs
+          // Programs Section
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                'Registered Programs',
+                'Programs',
                 style: GoogleFonts.inter(
                   fontSize: 17,
                   fontWeight: FontWeight.w700,
@@ -601,7 +557,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 InkWell(
                   onTap: () {
                     setState(() {
-                      _currentTabIndex = 1;
+                      _currentTabIndex = 2;
                     });
                   },
                   borderRadius: BorderRadius.circular(20),
@@ -808,7 +764,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // -------------------------------------------------------------
-  // Registered Programs Carousel (Safe Height)
+  // Programs Carousel (Safe Height & Shared State)
   // -------------------------------------------------------------
   Widget _buildProgramsCarousel(AppState state) {
     return SizedBox(
@@ -816,31 +772,21 @@ class _HomeScreenState extends State<HomeScreen> {
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        itemCount: state.registeredPrograms.length,
+        itemCount: state.programs.length,
         separatorBuilder: (context, index) => const SizedBox(width: 14),
         itemBuilder: (context, index) {
-          final program = state.registeredPrograms[index];
-          return _buildProgramCard(
-            tag: program.tag,
-            title: program.title,
-            date: program.date,
-            location: program.location,
-            isRegistered: program.isRegistered,
-            gradientColors: program.gradientColors.map((c) => Color(c)).toList(),
-          );
+          final program = state.programs[index];
+          return _buildProgramCard(program: program);
         },
       ),
     );
   }
 
-  Widget _buildProgramCard({
-    required String tag,
-    required String title,
-    required String date,
-    required String location,
-    required bool isRegistered,
-    required List<Color> gradientColors,
-  }) {
+  Widget _buildProgramCard({required ProgramModel program}) {
+    final colors = program.gradientColors.isNotEmpty
+        ? program.gradientColors.map((c) => Color(c)).toList()
+        : [const Color(0xFF006097), const Color(0xFF017CC2)];
+
     return Container(
       width: 250,
       decoration: BoxDecoration(
@@ -853,51 +799,9 @@ class _HomeScreenState extends State<HomeScreen> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            final programModel = ProgramModel(
-              id: 'PRG-${title.hashCode.abs()}',
-              title: title,
-              tag: tag,
-              type: tag.contains('CAMPAIGN')
-                  ? ProgramType.campaign
-                  : ProgramType.activityDrive,
-              status: isRegistered ? ProgramStatus.upcoming : ProgramStatus.upcoming,
-              organizer: 'IDF Regional Committee',
-              organizationType: 'NGO / Non-profit Organization',
-              venue: location,
-              location: location,
-              country: location.contains(',') ? location.split(',').last.trim() : 'Global',
-              city: location.contains(',') ? location.split(',').first.trim() : location,
-              startDate: date,
-              endDate: date,
-              description:
-                  'Join thousands of participants in $title to promote active living and healthy diabetes habits as part of the IDF ACTIVATE initiative.',
-              agenda: const [
-                ProgramAgendaItem(
-                  time: '08:00',
-                  title: 'Registration & Check-in',
-                ),
-                ProgramAgendaItem(
-                  time: '09:00',
-                  title: 'Warm-up & Kickoff',
-                ),
-                ProgramAgendaItem(
-                  time: '11:00',
-                  title: 'Closing Ceremony & Hydration',
-                ),
-              ],
-              contactInfo: const ProgramContactInfo(
-                contactPerson: 'Dr. Sarah Osei',
-                phone: '+1 234 567 8900',
-                email: 'contact@idf.org',
-              ),
-              isRegistered: isRegistered,
-              gradientColors: gradientColors.map((c) => c.toARGB32()).toList(),
-              category: tag,
-            );
-
             Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => ProgramDetailsScreen(program: programModel),
+                builder: (_) => ProgramDetailsScreen(program: program),
               ),
             );
           },
@@ -905,25 +809,53 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                height: 100,
+                height: 105,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    colors: gradientColors,
+                    colors: colors,
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                 ),
                 child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Center(
-                      child: Icon(
-                        Icons.fitness_center_rounded,
-                        size: 40,
-                        color: Colors.white.withAlpha(160),
+                    if (program.imageUrl != null && program.imageUrl!.isNotEmpty)
+                      Image.network(
+                        program.imageUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Center(
+                          child: Icon(
+                            Icons.fitness_center_rounded,
+                            size: 40,
+                            color: Colors.white.withAlpha(160),
+                          ),
+                        ),
+                        loadingBuilder: (context, child, loadingProgress) {
+                          if (loadingProgress == null) return child;
+                          return Container(
+                            color: const Color(0xFFE2E8F0),
+                            child: const Center(
+                              child: SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                          );
+                        },
+                      )
+                    else
+                      Center(
+                        child: Icon(
+                          Icons.fitness_center_rounded,
+                          size: 40,
+                          color: Colors.white.withAlpha(160),
+                        ),
                       ),
-                    ),
-                    if (isRegistered)
+                    // Top-right Registered status pill (only shown for registered programs)
+                    if (program.isRegistered)
                       Positioned(
                         top: 10,
                         right: 10,
@@ -932,14 +864,32 @@ class _HomeScreenState extends State<HomeScreen> {
                           decoration: BoxDecoration(
                             color: const Color(0xFF22C55E),
                             borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withAlpha(40),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
                           ),
-                          child: Text(
-                            'Registered',
-                            style: GoogleFonts.inter(
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                size: 12,
+                                color: Colors.white,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Registered',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -952,7 +902,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      tag,
+                      program.category ?? program.tag,
                       style: GoogleFonts.inter(
                         fontSize: 10.5,
                         fontWeight: FontWeight.w800,
@@ -962,7 +912,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      title,
+                      program.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
@@ -978,7 +928,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 5),
                         Expanded(
                           child: Text(
-                            date,
+                            program.startDate,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.inter(
@@ -996,7 +946,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 5),
                         Expanded(
                           child: Text(
-                            location,
+                            program.location,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.inter(

@@ -24,7 +24,7 @@ class _Step2OrganizerState extends State<Step2Organizer> {
   late TextEditingController _contactPersonController;
   late TextEditingController _phoneController;
   late TextEditingController _emailController;
-  late String _selectedOrgType;
+  String? _selectedOrgType;
 
   final List<String> _orgTypes = [
     'Hospital / Healthcare Facility',
@@ -45,7 +45,7 @@ class _Step2OrganizerState extends State<Step2Organizer> {
     _emailController = TextEditingController(text: widget.model.email);
     _selectedOrgType = widget.model.organizationType.isNotEmpty
         ? widget.model.organizationType
-        : _orgTypes.first;
+        : null;
   }
 
   @override
@@ -60,7 +60,7 @@ class _Step2OrganizerState extends State<Step2Organizer> {
   void _handleContinue() {
     if (_formKey.currentState?.validate() ?? false) {
       widget.model.organizingEntityName = _entityNameController.text.trim();
-      widget.model.organizationType = _selectedOrgType;
+      widget.model.organizationType = _selectedOrgType ?? '';
       widget.model.contactPerson = _contactPersonController.text.trim();
       widget.model.phone = _phoneController.text.trim();
       widget.model.email = _emailController.text.trim();
@@ -92,7 +92,11 @@ class _Step2OrganizerState extends State<Step2Organizer> {
           _buildFieldLabel('Organization Type *'),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
-            initialValue: _orgTypes.contains(_selectedOrgType) ? _selectedOrgType : _orgTypes.first,
+            initialValue: _selectedOrgType,
+            hint: Text(
+              'Select organization type',
+              style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF94A3B8)),
+            ),
             decoration: const InputDecoration(
               contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
@@ -107,10 +111,10 @@ class _Step2OrganizerState extends State<Step2Organizer> {
               );
             }).toList(),
             onChanged: (val) {
-              if (val != null) {
-                setState(() => _selectedOrgType = val);
-              }
+              setState(() => _selectedOrgType = val);
             },
+            validator: (val) =>
+                val == null || val.isEmpty ? 'Please select organization type' : null,
           ),
           const SizedBox(height: 16),
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../bloc/app_bloc.dart';
 import '../../core/theme.dart';
 import '../../models/program_model.dart';
 import '../../widgets/custom_button.dart';
@@ -46,7 +48,12 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isRegistered = _currentProgram.isRegistered;
+    final programFromBloc = context.watch<AppBloc>().state.programs.firstWhere(
+      (p) => p.id == widget.program.id,
+      orElse: () => _currentProgram,
+    );
+    final activeProgram = programFromBloc.isRegistered ? programFromBloc : _currentProgram;
+    final isRegistered = activeProgram.isRegistered;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -61,7 +68,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
               Stack(
                 children: [
                   ProgramImageBanner(
-                    program: _currentProgram,
+                    program: activeProgram,
                     height: 220,
                     borderRadius: const BorderRadius.vertical(
                       bottom: Radius.circular(24),
@@ -189,45 +196,6 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 18),
-
-                    // Register Button (or Registered confirmation banner)
-                    if (isRegistered)
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFF86EFAC)),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.check_circle_rounded,
-                              color: Color(0xFF16A34A),
-                              size: 20,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'You are registered for this program',
-                              style: GoogleFonts.inter(
-                                fontSize: 13.5,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF16A34A),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    else
-                      CustomButton(
-                        text: 'Register for this Program',
-                        onPressed: _navigateToRegistration,
-                      ),
-                    const SizedBox(height: 18),
-
                     // Program Agenda Card
                     _buildSectionCard(
                       title: 'Program Agenda',
@@ -262,7 +230,44 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 20),
+
+                    // Register Button (or Registered confirmation banner) at the end
+                    if (isRegistered)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFF86EFAC)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              color: Color(0xFF16A34A),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'You are registered for this program',
+                              style: GoogleFonts.inter(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF16A34A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      PrimaryButton(
+                        text: 'Register for this Program',
+                        onPressed: _navigateToRegistration,
+                      ),
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),

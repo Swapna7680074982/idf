@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../bloc/app_bloc.dart';
+import '../../../bloc/app_event.dart';
 import '../../../core/theme.dart';
 import '../../../models/program_model.dart';
 import '../../../widgets/custom_button.dart';
@@ -30,6 +33,8 @@ class _ProgramRegistrationConfirmationScreenState
     await Future.delayed(const Duration(milliseconds: 600));
 
     if (mounted) {
+      context.read<AppBloc>().add(RegisterForProgramRequested(widget.program.id));
+
       setState(() {
         _isConfirming = false;
       });

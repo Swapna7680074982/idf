@@ -8,6 +8,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     on<RegisterAccountRequested>(_onRegisterAccountRequested);
     on<ResetPasswordRequested>(_onResetPasswordRequested);
     on<LogoutRequested>(_onLogoutRequested);
+    on<RegisterForProgramRequested>(_onRegisterForProgramRequested);
   }
 
   Future<void> _onLoginRequested(
@@ -84,5 +85,18 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     emit(state.copyWith(
       authStatus: AuthStatus.unauthenticated,
     ));
+  }
+
+  void _onRegisterForProgramRequested(
+    RegisterForProgramRequested event,
+    Emitter<AppState> emit,
+  ) {
+    final updatedPrograms = state.programs.map((p) {
+      if (p.id == event.programId) {
+        return p.copyWith(isRegistered: true);
+      }
+      return p;
+    }).toList();
+    emit(state.copyWith(programs: updatedPrograms));
   }
 }

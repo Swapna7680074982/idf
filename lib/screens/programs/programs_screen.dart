@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../bloc/app_bloc.dart';
 import '../../core/theme.dart';
 import '../../models/program_model.dart';
 import 'program_details_screen.dart';
@@ -25,22 +27,14 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   String _selectedFilter = 'All';
   ProgramType? _selectedType;
 
-  late List<ProgramModel> _allPrograms;
-
-  @override
-  void initState() {
-    super.initState();
-    _allPrograms = ProgramModel.samplePrograms();
-  }
-
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
 
-  List<ProgramModel> get _filteredPrograms {
-    return _allPrograms.where((prog) {
+  List<ProgramModel> _getFilteredPrograms(List<ProgramModel> allPrograms) {
+    return allPrograms.where((prog) {
       // 1. Search Query Filter
       if (_searchQuery.isNotEmpty) {
         final q = _searchQuery.toLowerCase();
@@ -90,7 +84,8 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredList = _filteredPrograms;
+    final allPrograms = context.watch<AppBloc>().state.programs;
+    final filteredList = _getFilteredPrograms(allPrograms);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),

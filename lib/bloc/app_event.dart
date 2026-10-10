@@ -71,3 +71,12 @@ class ResetPasswordRequested extends AppEvent {
 }
 
 class LogoutRequested extends AppEvent {}
+
+class RegisterForProgramRequested extends AppEvent {
+  final String programId;
+
+  const RegisterForProgramRequested(this.programId);
+
+  @override
+  List<Object?> get props => [programId];
+}

@@ -20,66 +20,81 @@ class StepProgressIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            InkWell(
-              onTap: onBack,
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
-                ),
-                child: const Icon(
-                  Icons.arrow_back_rounded,
-                  size: 18,
-                  color: AppColors.textPrimary,
+            // Sleek Back Button
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: onBack,
+                borderRadius: BorderRadius.circular(10),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+                  ),
+                  child: const Icon(
+                    Icons.arrow_back_rounded,
+                    size: 19,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
+
+            // Step Title
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'STEP $currentStep OF $totalSteps',
-                    style: GoogleFonts.inter(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF64748B),
-                      letterSpacing: 0.8,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    stepTitle,
-                    style: GoogleFonts.inter(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                ],
+              child: Text(
+                stepTitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+
+            // Step Pill Badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4.5),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFBFDBFE), width: 1),
+              ),
+              child: Text(
+                'Step $currentStep of $totalSteps',
+                style: GoogleFonts.inter(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryBlue,
+                ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
 
-        // 7 Segmented Progress Bars
+        // Modern Segmented Progress Bar
         Row(
           children: List.generate(totalSteps, (index) {
             final isCompleted = (index + 1) <= currentStep;
             return Expanded(
-              child: Container(
-                height: 4,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                height: 4.5,
                 margin: EdgeInsets.only(
                   right: index == totalSteps - 1 ? 0 : 5,
                 ),
@@ -87,7 +102,7 @@ class StepProgressIndicator extends StatelessWidget {
                   color: isCompleted
                       ? AppColors.primaryBlue
                       : const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(2),
+                  borderRadius: BorderRadius.circular(3),
                 ),
               ),
             );

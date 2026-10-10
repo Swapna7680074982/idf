@@ -59,9 +59,9 @@ class _SplashScreenState extends State<SplashScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const DrMohansLogo(
-                    size: 88,
+                    size: 52,
                     withWhiteBackground: true,
-                    borderRadius: 28,
+                    borderRadius: 18,
                   ),
                   const SizedBox(height: 24),
                   Text(

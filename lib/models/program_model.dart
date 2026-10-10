@@ -189,6 +189,7 @@ class ProgramModel {
         ),
         isRegistered: false,
         gradientColors: [0xFF006097, 0xFF017CC2],
+        imageUrl: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&auto=format&fit=crop&q=80',
         category: 'Activity Drive',
       ),
       ProgramModel(
@@ -232,6 +233,7 @@ class ProgramModel {
         ),
         isRegistered: false,
         gradientColors: [0xFF4F46E5, 0xFF7C3AED],
+        imageUrl: 'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=800&auto=format&fit=crop&q=80',
         category: 'Conference',
       ),
       ProgramModel(
@@ -271,6 +273,7 @@ class ProgramModel {
         ),
         isRegistered: true,
         gradientColors: [0xFF059669, 0xFF10B981],
+        imageUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&auto=format&fit=crop&q=80',
         category: 'Campaign',
       ),
       ProgramModel(
@@ -310,6 +313,7 @@ class ProgramModel {
         ),
         isRegistered: true,
         gradientColors: [0xFFEA580C, 0xFFF97316],
+        imageUrl: 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=800&auto=format&fit=crop&q=80',
         category: 'Campaign',
       ),
     ];

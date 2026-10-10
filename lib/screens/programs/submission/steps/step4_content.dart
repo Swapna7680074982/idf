@@ -77,7 +77,7 @@ class _Step4ContentState extends State<Step4Content> {
             controller: _agendaController,
             maxLines: 6,
             decoration: const InputDecoration(
-              hintText: 'List the program schedule...\n08:00 - Registration\n09:00 - Opening ceremony\n10:00 - Walk & Physical activity',
+              hintText: 'List the program schedule',
               alignLabelWithHint: true,
             ),
           ),

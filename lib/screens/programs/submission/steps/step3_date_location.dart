@@ -25,7 +25,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
   late TextEditingController _regionController;
   late TextEditingController _cityController;
   late TextEditingController _venueController;
-  late String _selectedCountry;
+  String? _selectedCountry;
 
   DateTime? _startDate;
   DateTime? _endDate;
@@ -46,14 +46,18 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
   @override
   void initState() {
     super.initState();
-    _startDate = widget.model.startDate ?? DateTime.now().add(const Duration(days: 30));
-    _endDate = widget.model.endDate ?? DateTime.now().add(const Duration(days: 30));
-    _startDateController = TextEditingController(text: _formatDate(_startDate!));
-    _endDateController = TextEditingController(text: _formatDate(_endDate!));
+    _startDate = widget.model.startDate;
+    _endDate = widget.model.endDate;
+    _startDateController = TextEditingController(
+      text: _startDate != null ? _formatDate(_startDate!) : '',
+    );
+    _endDateController = TextEditingController(
+      text: _endDate != null ? _formatDate(_endDate!) : '',
+    );
     _regionController = TextEditingController(text: widget.model.regionState);
     _cityController = TextEditingController(text: widget.model.city);
     _venueController = TextEditingController(text: widget.model.venueAddress);
-    _selectedCountry = widget.model.country.isNotEmpty ? widget.model.country : _countries.first;
+    _selectedCountry = widget.model.country.isNotEmpty ? widget.model.country : null;
   }
 
   @override
@@ -110,7 +114,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
     if (_formKey.currentState?.validate() ?? false) {
       widget.model.startDate = _startDate;
       widget.model.endDate = _endDate;
-      widget.model.country = _selectedCountry;
+      widget.model.country = _selectedCountry ?? '';
       widget.model.regionState = _regionController.text.trim();
       widget.model.city = _cityController.text.trim();
       widget.model.venueAddress = _venueController.text.trim();
@@ -159,7 +163,11 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
           _buildFieldLabel('Country *'),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
-            initialValue: _countries.contains(_selectedCountry) ? _selectedCountry : _countries.first,
+            initialValue: _selectedCountry,
+            hint: Text(
+              'Select country',
+              style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF94A3B8)),
+            ),
             decoration: const InputDecoration(
               contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
@@ -174,10 +182,10 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
               );
             }).toList(),
             onChanged: (val) {
-              if (val != null) {
-                setState(() => _selectedCountry = val);
-              }
+              setState(() => _selectedCountry = val);
             },
+            validator: (val) =>
+                val == null || val.isEmpty ? 'Please select country' : null,
           ),
           const SizedBox(height: 16),
 
@@ -187,7 +195,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
           TextFormField(
             controller: _regionController,
             decoration: const InputDecoration(
-              hintText: 'e.g. Lagos State',
+              hintText: 'e.g. Lagos State, Nairobi County',
             ),
           ),
           const SizedBox(height: 16),
@@ -198,7 +206,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
           TextFormField(
             controller: _cityController,
             decoration: const InputDecoration(
-              hintText: 'e.g. Lagos',
+              hintText: 'e.g. Lagos, Nairobi, Mumbai',
             ),
             validator: (val) => val == null || val.trim().isEmpty ? 'Please enter city' : null,
           ),

@@ -22,7 +22,7 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
-  late String _selectedType;
+  String? _selectedType;
 
   final List<String> _programTypes = [
     'Activity Drive',
@@ -41,7 +41,7 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
     _descriptionController = TextEditingController(text: widget.model.description);
     _selectedType = widget.model.programType.isNotEmpty
         ? widget.model.programType
-        : _programTypes.first;
+        : null;
   }
 
   @override
@@ -54,7 +54,7 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
   void _handleContinue() {
     if (_formKey.currentState?.validate() ?? false) {
       widget.model.programName = _nameController.text.trim();
-      widget.model.programType = _selectedType;
+      widget.model.programType = _selectedType ?? '';
       widget.model.description = _descriptionController.text.trim();
       widget.onContinue();
     }
@@ -88,7 +88,14 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
           _buildFieldLabel('Program Type *'),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
-            initialValue: _programTypes.contains(_selectedType) ? _selectedType : _programTypes.first,
+            initialValue: _selectedType,
+            hint: Text(
+              'Select program type',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: const Color(0xFF94A3B8),
+              ),
+            ),
             decoration: const InputDecoration(
               contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
@@ -106,12 +113,12 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
               );
             }).toList(),
             onChanged: (val) {
-              if (val != null) {
-                setState(() {
-                  _selectedType = val;
-                });
-              }
+              setState(() {
+                _selectedType = val;
+              });
             },
+            validator: (val) =>
+                val == null || val.isEmpty ? 'Please select program type' : null,
           ),
           const SizedBox(height: 18),
 

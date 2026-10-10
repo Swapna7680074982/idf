@@ -24,20 +24,34 @@ class ProgramRegistrationSuccessScreen extends StatelessWidget {
             children: [
               const Spacer(flex: 1),
 
-              // Green Success Checkmark Badge
+              // Green Success Checkmark Badge (matching provided asset)
               Container(
-                width: 76,
-                height: 76,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
+                width: 96,
+                height: 96,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE2F8E9),
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFF86EFAC), width: 1.5),
                 ),
-                child: const Center(
-                  child: Icon(
-                    Icons.check_rounded,
-                    size: 44,
-                    color: Color(0xFF16A34A),
+                child: Center(
+                  child: Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF00AA13),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF00AA13).withAlpha(55),
+                          blurRadius: 10,
+                          offset: const Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      size: 36,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
               ),

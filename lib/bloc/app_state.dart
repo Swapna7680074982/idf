@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../models/program_model.dart';
 
 // Models
 class UserModel extends Equatable {
@@ -63,6 +64,7 @@ class ProgramItem extends Equatable {
   final String location;
   final bool isRegistered;
   final List<int> gradientColors;
+  final String? imageUrl;
 
   const ProgramItem({
     required this.tag,
@@ -71,10 +73,11 @@ class ProgramItem extends Equatable {
     required this.location,
     required this.isRegistered,
     required this.gradientColors,
+    this.imageUrl,
   });
 
   @override
-  List<Object?> get props => [tag, title, date, location, isRegistered, gradientColors];
+  List<Object?> get props => [tag, title, date, location, isRegistered, gradientColors, imageUrl];
 }
 
 // -------------------------------------------------------------
@@ -88,6 +91,7 @@ class AppState extends Equatable {
   final int programApplicationsCount;
   final int certificationApplicationsCount;
   final List<ProgramItem> registeredPrograms;
+  final List<ProgramModel> programs;
   final List<String> organizationTypes;
   final List<String> countries;
   final List<String> states;
@@ -101,6 +105,7 @@ class AppState extends Equatable {
     required this.programApplicationsCount,
     required this.certificationApplicationsCount,
     required this.registeredPrograms,
+    required this.programs,
     required this.organizationTypes,
     required this.countries,
     required this.states,
@@ -123,16 +128,28 @@ class AppState extends Equatable {
           location: 'Hyderabad, India',
           isRegistered: true,
           gradientColors: [0xFFEA580C, 0xFFF97316],
+          imageUrl: 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=800&auto=format&fit=crop&q=80',
         ),
         ProgramItem(
           tag: 'ACTIVITY DRIVE',
-          title: 'Global Walk for Diabetes',
-          date: '14 Nov 2026',
+          title: 'Global Walk for Diabetes 2025',
+          date: '14 Nov 2025',
           location: 'Nairobi, Kenya',
-          isRegistered: false,
+          isRegistered: true,
           gradientColors: [0xFF006097, 0xFF017CC2],
+          imageUrl: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&auto=format&fit=crop&q=80',
+        ),
+        ProgramItem(
+          tag: 'CAMPAIGN',
+          title: 'Community Cycling Campaign – SEA',
+          date: '10 Aug 2025',
+          location: 'Bangkok, Thailand',
+          isRegistered: true,
+          gradientColors: [0xFF059669, 0xFF10B981],
+          imageUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&auto=format&fit=crop&q=80',
         ),
       ],
+      programs: ProgramModel.samplePrograms(),
       organizationTypes: const [
         'Hospital / Healthcare Facility',
         'NGO / Non-profit Organization',
@@ -189,6 +206,7 @@ class AppState extends Equatable {
     int? programApplicationsCount,
     int? certificationApplicationsCount,
     List<ProgramItem>? registeredPrograms,
+    List<ProgramModel>? programs,
     List<String>? organizationTypes,
     List<String>? countries,
     List<String>? states,
@@ -204,6 +222,7 @@ class AppState extends Equatable {
       certificationApplicationsCount:
           certificationApplicationsCount ?? this.certificationApplicationsCount,
       registeredPrograms: registeredPrograms ?? this.registeredPrograms,
+      programs: programs ?? this.programs,
       organizationTypes: organizationTypes ?? this.organizationTypes,
       countries: countries ?? this.countries,
       states: states ?? this.states,
@@ -220,6 +239,7 @@ class AppState extends Equatable {
         programApplicationsCount,
         certificationApplicationsCount,
         registeredPrograms,
+        programs,
         organizationTypes,
         countries,
         states,
