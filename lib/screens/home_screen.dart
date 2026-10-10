@@ -6,6 +6,11 @@ import '../bloc/app_bloc.dart';
 import '../bloc/app_event.dart';
 import '../bloc/app_state.dart';
 import '../core/theme.dart';
+import '../models/program_model.dart';
+import 'notifications/notifications_screen.dart';
+import 'programs/program_details_screen.dart';
+import 'programs/programs_screen.dart';
+import 'programs/submission/submit_program_wizard_screen.dart';
 import 'welcome_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -79,7 +84,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 index: _currentTabIndex,
                 children: [
                   _buildHomeDashboardTab(state),
-                  _buildProgramsTab(state),
+                  const ProgramsScreen(isTabMode: true),
                   _buildIDFActiveTab(state),
                   _buildApplicationsTab(state),
                   _buildAccountTab(state),
@@ -297,17 +302,50 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              IconButton(
-                icon: const Icon(
-                  Icons.notifications_none_rounded,
-                  color: Color(0xFF334155),
-                  size: 26,
-                ),
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('No new notifications')),
-                  );
-                },
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  IconButton(
+                    icon: const Icon(
+                      Icons.notifications_none_rounded,
+                      color: Color(0xFF334155),
+                      size: 26,
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const NotificationsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Center(
+                        child: Text(
+                          '2',
+                          style: GoogleFonts.inter(
+                            color: Colors.white,
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -336,9 +374,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   title: 'Submit a Program',
                   subtitle: 'Share your PA initiative',
                   onTap: () {
-                    setState(() {
-                      _currentTabIndex = 1;
-                    });
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const SubmitProgramWizardScreen(),
+                      ),
+                    );
                   },
                 ),
               ),
@@ -474,15 +514,15 @@ class _HomeScreenState extends State<HomeScreen> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF003E85),
-            Color(0xFF0058B0),
-            Color(0xFF0068D1),
+            Color(0xFF006097),
+            Color(0xFF017CC2),
+            Color(0xFF017CC2),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0056B3).withAlpha(40),
+            color: AppColors.primaryBlue.withAlpha(40),
             blurRadius: 16,
             offset: const Offset(0, 6),
           ),
@@ -559,7 +599,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1D70C8),
+                      color: const Color(0xFF006097).withAlpha(180),
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                         color: Colors.white.withAlpha(60),
@@ -800,116 +840,170 @@ class _HomeScreenState extends State<HomeScreen> {
         border: Border.all(color: AppColors.border, width: 1.1),
       ),
       clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 100,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: gradientColors,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            final programModel = ProgramModel(
+              id: 'PRG-${title.hashCode.abs()}',
+              title: title,
+              tag: tag,
+              type: tag.contains('CAMPAIGN')
+                  ? ProgramType.campaign
+                  : ProgramType.activityDrive,
+              status: isRegistered ? ProgramStatus.upcoming : ProgramStatus.upcoming,
+              organizer: 'IDF Regional Committee',
+              organizationType: 'NGO / Non-profit Organization',
+              venue: location,
+              location: location,
+              country: location.contains(',') ? location.split(',').last.trim() : 'Global',
+              city: location.contains(',') ? location.split(',').first.trim() : location,
+              startDate: date,
+              endDate: date,
+              description:
+                  'Join thousands of participants in $title to promote active living and healthy diabetes habits as part of the IDF ACTIVATE initiative.',
+              agenda: const [
+                ProgramAgendaItem(
+                  time: '08:00',
+                  title: 'Registration & Check-in',
+                ),
+                ProgramAgendaItem(
+                  time: '09:00',
+                  title: 'Warm-up & Kickoff',
+                ),
+                ProgramAgendaItem(
+                  time: '11:00',
+                  title: 'Closing Ceremony & Hydration',
+                ),
+              ],
+              contactInfo: const ProgramContactInfo(
+                contactPerson: 'Dr. Sarah Osei',
+                phone: '+1 234 567 8900',
+                email: 'contact@idf.org',
               ),
-            ),
-            child: Stack(
-              children: [
-                Center(
-                  child: Icon(
-                    Icons.fitness_center_rounded,
-                    size: 40,
-                    color: Colors.white.withAlpha(160),
+              isRegistered: isRegistered,
+              gradientColors: gradientColors.map((c) => c.toARGB32()).toList(),
+              category: tag,
+            );
+
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ProgramDetailsScreen(program: programModel),
+              ),
+            );
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                height: 100,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: gradientColors,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
                 ),
-                if (isRegistered)
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF22C55E),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Registered',
-                        style: GoogleFonts.inter(
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
+                child: Stack(
+                  children: [
+                    Center(
+                      child: Icon(
+                        Icons.fitness_center_rounded,
+                        size: 40,
+                        color: Colors.white.withAlpha(160),
                       ),
                     ),
-                  ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tag,
-                  style: GoogleFonts.inter(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    color: const Color(0xFF0284C7),
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Text('📅', style: TextStyle(fontSize: 11)),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        date,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          color: const Color(0xFF64748B),
+                    if (isRegistered)
+                      Positioned(
+                        top: 10,
+                        right: 10,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF22C55E),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'Registered',
+                            style: GoogleFonts.inter(
+                              fontSize: 10.5,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(12.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tag,
+                      style: GoogleFonts.inter(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.primaryBlue,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Text('📅', style: TextStyle(fontSize: 11)),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            date,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        const Text('📍', style: TextStyle(fontSize: 11)),
+                        const SizedBox(width: 5),
+                        Expanded(
+                          child: Text(
+                            location,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 3),
-                Row(
-                  children: [
-                    const Text('📍', style: TextStyle(fontSize: 11)),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        location,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -995,50 +1089,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // -------------------------------------------------------------
-  // Programs Tab (Scrollable)
-  // -------------------------------------------------------------
-  Widget _buildProgramsTab(AppState state) {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.all(18.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Physical Activity Programs',
-            style: GoogleFonts.inter(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Explore, submit, and track active diabetes programs',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: const Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(height: 18),
-          ...state.registeredPrograms.map(
-            (item) => Padding(
-              padding: const EdgeInsets.only(bottom: 14.0),
-              child: _buildProgramCard(
-                tag: item.tag,
-                title: item.title,
-                date: item.date,
-                location: item.location,
-                isRegistered: item.isRegistered,
-                gradientColors: item.gradientColors.map((c) => Color(c)).toList(),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   // -------------------------------------------------------------
   // IDF Active Tab (Scrollable)

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/theme.dart';
-import '../widgets/globe_logo.dart';
+import '../widgets/dr_mohans_logo.dart';
 import '../widgets/custom_button.dart';
 import 'login_screen.dart';
 import 'signup/signup_step1_account.dart';
@@ -15,9 +15,9 @@ class WelcomeScreen extends StatelessWidget {
       backgroundColor: Colors.white,
       body: Column(
         children: [
-          // Top Blue Gradient Section with Decorative Bubbles
+          // Top Blue Gradient Section with Decorative Bubbles (Image 2)
           Expanded(
-            flex: 6,
+            flex: 65,
             child: Stack(
               children: [
                 Container(
@@ -29,44 +29,44 @@ class WelcomeScreen extends StatelessWidget {
                 ),
                 // Decorative Circle 1 (Top Left)
                 Positioned(
-                  top: -20,
-                  left: -30,
+                  top: 20,
+                  left: 20,
                   child: Container(
-                    width: 140,
-                    height: 140,
+                    width: 60,
+                    height: 60,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white.withAlpha(20),
                     ),
                   ),
                 ),
-                // Decorative Circle 2 (Right Mid)
+                // Decorative Circle 2 (Right Mid Large)
                 Positioned(
-                  top: 90,
-                  right: -40,
+                  top: 60,
+                  right: 30,
                   child: Container(
-                    width: 200,
-                    height: 200,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withAlpha(22),
-                    ),
-                  ),
-                ),
-                // Decorative Circle 3 (Right Inner)
-                Positioned(
-                  top: 130,
-                  right: 40,
-                  child: Container(
-                    width: 110,
-                    height: 110,
+                    width: 130,
+                    height: 130,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.white.withAlpha(18),
                     ),
                   ),
                 ),
-                // Content
+                // Decorative Circle 3 (Right Mid Inner Overlay)
+                Positioned(
+                  top: 110,
+                  right: 65,
+                  child: Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withAlpha(16),
+                    ),
+                  ),
+                ),
+                // Center Content (Logo + Dr. Mohan's + Diabetes Specialities centre)
                 SafeArea(
                   child: Center(
                     child: Padding(
@@ -74,26 +74,25 @@ class WelcomeScreen extends StatelessWidget {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const GlobeLogo(size: 92),
-                          const SizedBox(height: 24),
+                          const DrMohansLogo(size: 94),
+                          const SizedBox(height: 22),
                           Text(
-                            'IDF Digital Hub',
+                            "Dr. Mohan's",
                             style: GoogleFonts.inter(
                               fontSize: 26,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
-                              letterSpacing: -0.3,
+                              letterSpacing: -0.2,
                             ),
                           ),
-                          const SizedBox(height: 14),
+                          const SizedBox(height: 8),
                           Text(
-                            'Supporting physical activity programs\nand institutional certification for a\nhealthier world.',
+                            'Diabetes Specialities centre',
                             textAlign: TextAlign.center,
                             style: GoogleFonts.inter(
-                              fontSize: 14,
+                              fontSize: 14.5,
                               fontWeight: FontWeight.w400,
-                              color: Colors.white.withAlpha(235),
-                              height: 1.45,
+                              color: Colors.white.withAlpha(240),
                             ),
                           ),
                         ],
@@ -105,18 +104,18 @@ class WelcomeScreen extends StatelessWidget {
             ),
           ),
 
-          // Bottom Action Section
+          // Bottom Action Section (White Background)
           Expanded(
-            flex: 4,
+            flex: 35,
             child: Container(
               color: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 24.0),
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   Column(
                     children: [
-                      // Log In Button
+                      // Log In Button (Blue)
                       PrimaryButton(
                         text: 'Log In',
                         onPressed: () {
@@ -128,7 +127,7 @@ class WelcomeScreen extends StatelessWidget {
                         },
                       ),
                       const SizedBox(height: 14),
-                      // Create Account Button
+                      // Create Account Button (Outlined)
                       OutlineButtonWidget(
                         text: 'Create Account',
                         onPressed: () {
@@ -162,7 +161,7 @@ class WelcomeScreen extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const TextSpan(text: ' and\n'),
+                          const TextSpan(text: ' and '),
                           TextSpan(
                             text: 'Privacy Policy',
                             style: GoogleFonts.inter(

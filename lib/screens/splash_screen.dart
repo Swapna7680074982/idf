@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/theme.dart';
-import '../widgets/globe_logo.dart';
+import '../widgets/dr_mohans_logo.dart';
 import 'welcome_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -52,16 +52,16 @@ class _SplashScreenState extends State<SplashScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const SizedBox(height: 20),
+              const SizedBox(height: 40),
 
               // Center Logo & Title
               Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const GlobeLogo(size: 88),
-                  const SizedBox(height: 24),
+                  const DrMohansLogo(size: 94),
+                  const SizedBox(height: 22),
                   Text(
-                    'IDF Digital Hub',
+                    "Dr. Mohan's",
                     style: GoogleFonts.inter(
                       fontSize: 26,
                       fontWeight: FontWeight.w700,
@@ -71,12 +71,12 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'ACTIVATE INITIATIVE',
+                    'DIABETES SPECIALITIES CENTRE',
                     style: GoogleFonts.inter(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: Colors.white.withAlpha(210),
-                      letterSpacing: 2.0,
+                      letterSpacing: 1.4,
                     ),
                   ),
                 ],

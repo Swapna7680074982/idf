@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
-  // Brand Blue Gradients
-  static const Color primaryDark = Color(0xFF003875);
-  static const Color primaryBlue = Color(0xFF0056B3);
-  static const Color primaryLightBlue = Color(0xFF0072D6);
-  static const Color accentBlue = Color(0xFF0284C7);
+  // Brand Blue Gradients (#006097 -> #017CC2 -> #017CC2)
+  static const Color primaryDark = Color(0xFF006097);
+  static const Color primaryBlue = Color(0xFF017CC2);
+  static const Color primaryLightBlue = Color(0xFF017CC2);
+  static const Color accentBlue = Color(0xFF017CC2);
 
   static const LinearGradient blueGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [
-      Color(0xFF003D82),
-      Color(0xFF0054A8),
-      Color(0xFF0066CC),
+      Color(0xFF006097),
+      Color(0xFF017CC2),
+      Color(0xFF017CC2),
     ],
   );
 
@@ -22,9 +22,9 @@ class AppColors {
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [
-      Color(0xFF003B7B),
-      Color(0xFF00509E),
-      Color(0xFF0061BD),
+      Color(0xFF006097),
+      Color(0xFF017CC2),
+      Color(0xFF017CC2),
     ],
   );
 
@@ -32,7 +32,7 @@ class AppColors {
   static const Color background = Color(0xFFFFFFFF);
   static const Color surface = Color(0xFFFFFFFF);
   static const Color cardBackground = Color(0xFFF8FAFC);
-  static const Color infoCardBg = Color(0xFFF0F7FF);
+  static const Color infoCardBg = Color(0xFFF0F9FF);
   static const Color infoCardBorder = Color(0xFFBAE6FD);
 
   // Text Colors
@@ -44,13 +44,13 @@ class AppColors {
 
   // Border & Inputs
   static const Color border = Color(0xFFE2E8F0);
-  static const Color borderFocused = Color(0xFF0056B3);
+  static const Color borderFocused = Color(0xFF017CC2);
   static const Color inputBackground = Color(0xFFFFFFFF);
 
   // Status & Accents
   static const Color success = Color(0xFF22C55E);
   static const Color successBg = Color(0xFFDCFCE7);
-  static const Color disabledButton = Color(0xFF8BB5E0);
+  static const Color disabledButton = Color(0xFF81BDE2);
 }
 
 class AppTheme {

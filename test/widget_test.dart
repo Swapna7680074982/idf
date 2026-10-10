@@ -13,9 +13,9 @@ void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
     // Build our app and trigger a frame.
     await tester.pumpWidget(const IDFDigitalHubApp());
-    expect(find.text('IDF Digital Hub'), findsWidgets);
+    expect(find.text("Dr. Mohan's"), findsWidgets);
     await tester.pump(const Duration(seconds: 3));
     await tester.pumpAndSettle();
-    expect(find.text('IDF Digital Hub'), findsWidgets);
+    expect(find.text("Dr. Mohan's"), findsWidgets);
   });
 }

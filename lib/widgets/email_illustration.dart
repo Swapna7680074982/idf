@@ -45,14 +45,14 @@ class EmailIllustration extends StatelessWidget {
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Color(0xFF38BDF8),
-                  Color(0xFF0284C7),
+                  Color(0xFF017CC2),
+                  Color(0xFF006097),
                 ],
               ),
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF0284C7).withAlpha(60),
+                  color: const Color(0xFF017CC2).withAlpha(60),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),

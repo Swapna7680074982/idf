@@ -130,7 +130,7 @@ class AppState extends Equatable {
           date: '14 Nov 2026',
           location: 'Nairobi, Kenya',
           isRegistered: false,
-          gradientColors: [0xFF0284C7, 0xFF0EA5E9],
+          gradientColors: [0xFF006097, 0xFF017CC2],
         ),
       ],
       organizationTypes: const [

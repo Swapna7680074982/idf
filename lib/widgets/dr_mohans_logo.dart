@@ -1,13 +1,11 @@
 import 'package:flutter/material.dart';
 
-class GlobeLogo extends StatelessWidget {
+class DrMohansLogo extends StatelessWidget {
   final double size;
-  final bool showBackgroundGlow;
 
-  const GlobeLogo({
+  const DrMohansLogo({
     super.key,
-    this.size = 80,
-    this.showBackgroundGlow = true,
+    this.size = 84,
   });
 
   @override
