@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../bloc/app_bloc.dart';
-import '../bloc/app_event.dart';
 import '../bloc/app_state.dart';
 import '../core/theme.dart';
 import '../models/program_model.dart';
@@ -11,18 +10,38 @@ import 'notifications/notifications_screen.dart';
 import 'programs/program_details_screen.dart';
 import 'programs/programs_screen.dart';
 import 'programs/submission/submit_program_wizard_screen.dart';
-import 'welcome_screen.dart';
+import 'certification/certification_tab_screen.dart';
+import 'certification/certification_wizard_screen.dart';
+import '../models/certification_model.dart';
+import '../models/application_item_model.dart';
+import 'applications/my_applications_screen.dart';
+import 'account/account_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final int initialTabIndex;
+  final int initialAppTabIndex;
+
+  const HomeScreen({
+    super.key,
+    this.initialTabIndex = 0,
+    this.initialAppTabIndex = 0,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentTabIndex = 0;
+  late int _currentTabIndex;
+  late int _appTabIndex;
   DateTime? _lastBackPressTime;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentTabIndex = widget.initialTabIndex;
+    _appTabIndex = widget.initialAppTabIndex;
+  }
 
   void _handlePopScope(bool didPop) {
     if (didPop) return;
@@ -87,7 +106,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   const ProgramsScreen(isTabMode: true),
                   _buildIDFActiveTab(state),
                   _buildApplicationsTab(state),
-                  _buildAccountTab(state),
+                  const AccountScreen(),
                 ],
               ),
             ),
@@ -677,85 +696,103 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-            child: Row(
-              children: [
-                const Text('📋', style: TextStyle(fontSize: 22)),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Program Applications',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+          InkWell(
+            onTap: () {
+              setState(() {
+                _appTabIndex = 0;
+                _currentTabIndex = 3;
+              });
+            },
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+              child: Row(
+                children: [
+                  const Text('📋', style: TextStyle(fontSize: 22)),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Program Applications',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${state.programApplicationsCount} active submissions',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: const Color(0xFF64748B),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${state.programApplicationsCount} active submissions',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: const Color(0xFF64748B),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                Text(
-                  '${state.programApplicationsCount}',
-                  style: GoogleFonts.inter(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primaryBlue,
+                  Text(
+                    '${state.programApplicationsCount}',
+                    style: GoogleFonts.inter(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryBlue,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const Divider(height: 1, color: AppColors.border),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
-            child: Row(
-              children: [
-                const Text('🏅', style: TextStyle(fontSize: 22)),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Certification Applications',
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+          InkWell(
+            onTap: () {
+              setState(() {
+                _appTabIndex = 1;
+                _currentTabIndex = 3;
+              });
+            },
+            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+              child: Row(
+                children: [
+                  const Text('🏅', style: TextStyle(fontSize: 22)),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Certification Applications',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${state.certificationApplicationsCount} active application',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          color: const Color(0xFF64748B),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${state.certificationApplicationsCount} active application',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: const Color(0xFF64748B),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                Text(
-                  '${state.certificationApplicationsCount}',
-                  style: GoogleFonts.inter(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primaryBlue,
+                  Text(
+                    '${state.certificationApplicationsCount}',
+                    style: GoogleFonts.inter(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primaryBlue,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -971,224 +1008,128 @@ class _HomeScreenState extends State<HomeScreen> {
   // IDF Active Certification Card
   // -------------------------------------------------------------
   Widget _buildCertificationCard(UserModel user) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border, width: 1.1),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFEF3C7),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Center(
-              child: Text(
-                '🏅',
-                style: TextStyle(fontSize: 24),
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CertificationWizardScreen(
+              initialModel:
+                  CertificationApplicationModel.prefilledForCertificate(
+                CertificateApplicationItem(
+                  id: '2',
+                  institutionName: user.organizationName.isNotEmpty
+                      ? user.organizationName
+                      : 'Lagos State University',
+                  institutionType: user.organizationType.isNotEmpty
+                      ? user.organizationType
+                      : 'College / University',
+                  certificateId: 'APP-CERT-2025-0018',
+                  issuedDate: '01 Sep 2025',
+                  expiresDate: '01 Sep 2027',
+                  status: user.certificationStatus.isNotEmpty
+                      ? user.certificationStatus
+                      : 'Changes Required',
+                  score: '7/10',
+                ),
               ),
             ),
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user.organizationName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 14.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border, width: 1.1),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Center(
+                child: Text(
+                  '🏅',
+                  style: TextStyle(fontSize: 24),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  user.organizationType,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: const Color(0xFF64748B),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEE2E2),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    user.certificationStatus,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    user.organizationName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: const Color(0xFFDC2626),
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 2),
+                  Text(
+                    user.organizationType,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      user.certificationStatus,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFFDC2626),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Icon(
-            Icons.arrow_forward_rounded,
-            color: AppColors.primaryBlue,
-            size: 20,
-          ),
-        ],
+            const Icon(
+              Icons.arrow_forward_rounded,
+              color: AppColors.primaryBlue,
+              size: 20,
+            ),
+          ],
+        ),
       ),
     );
   }
 
 
   // -------------------------------------------------------------
-  // IDF Active Tab (Scrollable)
+  // IDF Active Tab
   // -------------------------------------------------------------
   Widget _buildIDFActiveTab(AppState state) {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.all(18.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'IDF ACTIVE Certification',
-            style: GoogleFonts.inter(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Institutional certification & global standards',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: const Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(height: 18),
-          _buildCertificationCard(state.user),
-        ],
-      ),
-    );
+    return const CertificationTabScreen();
   }
 
   // -------------------------------------------------------------
-  // Applications Tab (Scrollable)
+  // Applications Tab
   // -------------------------------------------------------------
   Widget _buildApplicationsTab(AppState state) {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.all(18.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'My Applications',
-            style: GoogleFonts.inter(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Review all your submissions and pending certification requests',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: const Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(height: 18),
-          _buildMyApplicationsCard(state),
-        ],
-      ),
-    );
-  }
-
-  // -------------------------------------------------------------
-  // Account Tab (Scrollable)
-  // -------------------------------------------------------------
-  Widget _buildAccountTab(AppState state) {
-    final user = state.user;
-
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.all(20.0),
-      child: Column(
-        children: [
-          const SizedBox(height: 16),
-          const CircleAvatar(
-            radius: 44,
-            backgroundColor: Color(0xFFE0F2FE),
-            child: Icon(Icons.person, size: 48, color: AppColors.primaryBlue),
-          ),
-          const SizedBox(height: 14),
-          Text(
-            user.fullName,
-            style: GoogleFonts.inter(
-              fontSize: 20,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            user.email,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: const Color(0xFF64748B),
-            ),
-          ),
-          const SizedBox(height: 28),
-          ListTile(
-            leading: const Icon(Icons.business_outlined, color: AppColors.primaryBlue),
-            title: Text(user.organizationName),
-            subtitle: Text(user.organizationType),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: AppColors.border),
-            ),
-          ),
-          const SizedBox(height: 12),
-          ListTile(
-            leading: const Icon(Icons.location_on_outlined, color: AppColors.primaryBlue),
-            title: Text('${user.city}, ${user.country}'),
-            subtitle: Text(user.address),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: AppColors.border),
-            ),
-          ),
-          const SizedBox(height: 20),
-          ListTile(
-            leading: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-            title: const Text('Log Out', style: TextStyle(color: Colors.redAccent)),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: AppColors.border),
-            ),
-            onTap: () {
-              context.read<AppBloc>().add(LogoutRequested());
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (_) => const WelcomeScreen(),
-                ),
-                (route) => false,
-              );
-            },
-          ),
-        ],
-      ),
+    return MyApplicationsScreen(
+      key: ValueKey('my_apps_$_appTabIndex'),
+      initialTabIndex: _appTabIndex,
     );
   }
 }

@@ -127,7 +127,10 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
                 onPressed: () {
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(
-                      builder: (_) => const HomeScreen(),
+                      builder: (_) => const HomeScreen(
+                        initialTabIndex: 3,
+                        initialAppTabIndex: 0,
+                      ),
                     ),
                     (route) => false,
                   );

@@ -27,9 +27,7 @@ class _Step4ContentState extends State<Step4Content> {
   void initState() {
     super.initState();
     _programDescController =
-        TextEditingController(text: widget.model.programDescription.isNotEmpty
-            ? widget.model.programDescription
-            : widget.model.description);
+        TextEditingController(text: widget.model.programDescription);
     _agendaController = TextEditingController(text: widget.model.agenda);
   }
 

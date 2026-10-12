@@ -1,4 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../bloc/app_bloc.dart';
+import '../../../bloc/app_event.dart';
+import '../../../models/program_model.dart';
 import '../../../models/program_submission_model.dart';
 import '../widgets/step_progress_indicator.dart';
 import 'steps/step1_program_info.dart';
@@ -71,7 +75,71 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
     _submissionModel.submissionDate = DateTime.now();
     _submissionModel.status = 'AI Review';
 
+    final String fullDesc = _submissionModel.programDescription.isNotEmpty
+        ? _submissionModel.programDescription
+        : _submissionModel.description;
+
+    final newProgram = ProgramModel(
+      id: _submissionModel.referenceNumber ?? 'APP-PRG-2025-0089',
+      title: _submissionModel.programName.isNotEmpty
+          ? _submissionModel.programName
+          : 'Community Physical Activity Drive',
+      tag: _submissionModel.programType.isNotEmpty
+          ? _submissionModel.programType.toUpperCase()
+          : 'CAMPAIGN',
+      type: ProgramType.activityDrive,
+      status: ProgramStatus.upcoming,
+      organizer: _submissionModel.organizingEntityName.isNotEmpty
+          ? _submissionModel.organizingEntityName
+          : 'Lagos State University',
+      organizationType: _submissionModel.organizationType.isNotEmpty
+          ? _submissionModel.organizationType
+          : 'Academic / Research Institution',
+      venue: _submissionModel.venueAddress.isNotEmpty
+          ? _submissionModel.venueAddress
+          : '${_submissionModel.city}, ${_submissionModel.country}',
+      location: _submissionModel.city.isNotEmpty
+          ? '${_submissionModel.city}, ${_submissionModel.country}'
+          : 'Lagos, Nigeria',
+      country: _submissionModel.country.isNotEmpty
+          ? _submissionModel.country
+          : 'Nigeria',
+      city: _submissionModel.city.isNotEmpty ? _submissionModel.city : 'Lagos',
+      startDate: _submissionModel.startDate != null
+          ? '${_submissionModel.startDate!.year}-${_submissionModel.startDate!.month.toString().padLeft(2, '0')}-${_submissionModel.startDate!.day.toString().padLeft(2, '0')}'
+          : '2026-11-20',
+      endDate: _submissionModel.endDate != null
+          ? '${_submissionModel.endDate!.year}-${_submissionModel.endDate!.month.toString().padLeft(2, '0')}-${_submissionModel.endDate!.day.toString().padLeft(2, '0')}'
+          : '2026-11-20',
+      description: fullDesc.isNotEmpty
+          ? fullDesc
+          : 'Community activity initiative submitted for review.',
+      agenda: const [
+        ProgramAgendaItem(
+          time: '09:00',
+          title: 'Opening & Welcome',
+          description: 'Official commencement of the activity drive.',
+        ),
+      ],
+      contactInfo: ProgramContactInfo(
+        contactPerson: _submissionModel.contactPerson.isNotEmpty
+            ? _submissionModel.contactPerson
+            : 'Dr. Sarah Osei',
+        phone: _submissionModel.phone.isNotEmpty
+            ? _submissionModel.phone
+            : '+234 801 234 5678',
+        email: _submissionModel.email.isNotEmpty
+            ? _submissionModel.email
+            : 'contact@institution.com',
+      ),
+      gradientColors: const [0xFF006097, 0xFF017CC2],
+      category: _submissionModel.programType.isNotEmpty
+          ? _submissionModel.programType
+          : 'Activity Drive',
+    );
+
     if (mounted) {
+      context.read<AppBloc>().add(AddProgramRequested(newProgram));
       setState(() {
         _isSubmitting = false;
       });

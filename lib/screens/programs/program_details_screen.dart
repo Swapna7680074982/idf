@@ -30,11 +30,11 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
     _currentProgram = widget.program;
   }
 
-  void _navigateToRegistration() async {
+  void _navigateToRegistration(ProgramModel program) async {
     final result = await Navigator.of(context).push<ProgramModel>(
       MaterialPageRoute(
         builder: (_) => ProgramRegistrationConfirmationScreen(
-          program: _currentProgram,
+          program: program,
         ),
       ),
     );
@@ -48,11 +48,10 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final programFromBloc = context.watch<AppBloc>().state.programs.firstWhere(
+    final activeProgram = context.watch<AppBloc>().state.programs.firstWhere(
       (p) => p.id == widget.program.id,
       orElse: () => _currentProgram,
     );
-    final activeProgram = programFromBloc.isRegistered ? programFromBloc : _currentProgram;
     final isRegistered = activeProgram.isRegistered;
 
     return Scaffold(
@@ -114,7 +113,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                   children: [
                     // Program Title
                     Text(
-                      _currentProgram.title,
+                      activeProgram.title,
                       style: GoogleFonts.inter(
                         fontSize: 21,
                         fontWeight: FontWeight.w700,
@@ -132,21 +131,21 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                         children: [
                           _buildMetaChip(
                             emoji: '📋',
-                            label: _currentProgram.category ?? _currentProgram.tag,
+                            label: activeProgram.category ?? activeProgram.tag,
                             bgColor: const Color(0xFFFEF3C7),
                             textColor: const Color(0xFFB45309),
                           ),
                           const SizedBox(width: 8),
                           _buildMetaChip(
                             emoji: '📍',
-                            label: _currentProgram.location,
+                            label: activeProgram.location,
                             bgColor: const Color(0xFFFFE4E6),
                             textColor: const Color(0xFFE11D48),
                           ),
                           const SizedBox(width: 8),
                           _buildMetaChip(
                             emoji: '📅',
-                            label: _currentProgram.startDate,
+                            label: activeProgram.startDate,
                             bgColor: const Color(0xFFF1F5F9),
                             textColor: const Color(0xFF475569),
                           ),
@@ -159,11 +158,13 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                     _buildSectionCard(
                       title: 'About This Program',
                       child: Text(
-                        _currentProgram.description,
+                        activeProgram.description.isNotEmpty
+                            ? activeProgram.description
+                            : 'No description available for this program.',
                         style: GoogleFonts.inter(
-                          fontSize: 13,
+                          fontSize: 13.5,
                           color: const Color(0xFF475569),
-                          height: 1.5,
+                          height: 1.55,
                         ),
                       ),
                     ),
@@ -177,21 +178,21 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                           _buildEventDetailRow(
                             emoji: '🏢',
                             label: 'ORGANIZER',
-                            value: _currentProgram.organizer,
+                            value: activeProgram.organizer,
                           ),
                           const Divider(height: 18, color: AppColors.border),
                           _buildEventDetailRow(
                             emoji: '📍',
                             label: 'VENUE',
-                            value: _currentProgram.venue.isNotEmpty
-                                ? _currentProgram.venue
-                                : _currentProgram.location,
+                            value: activeProgram.venue.isNotEmpty
+                                ? activeProgram.venue
+                                : activeProgram.location,
                           ),
                           const Divider(height: 18, color: AppColors.border),
                           _buildEventDetailRow(
                             emoji: '🏁',
                             label: 'END DATE',
-                            value: _currentProgram.endDate,
+                            value: activeProgram.endDate,
                           ),
                         ],
                       ),
@@ -200,7 +201,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                     _buildSectionCard(
                       title: 'Program Agenda',
                       child: AgendaTimelineWidget(
-                        agenda: _currentProgram.agenda,
+                        agenda: activeProgram.agenda,
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -213,19 +214,19 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                           _buildContactRow(
                             icon: Icons.person_outline_rounded,
                             label: 'CONTACT PERSON',
-                            value: _currentProgram.contactInfo.contactPerson,
+                            value: activeProgram.contactInfo.contactPerson,
                           ),
                           const Divider(height: 18, color: AppColors.border),
                           _buildContactRow(
                             icon: Icons.phone_outlined,
                             label: 'PHONE',
-                            value: _currentProgram.contactInfo.phone,
+                            value: activeProgram.contactInfo.phone,
                           ),
                           const Divider(height: 18, color: AppColors.border),
                           _buildContactRow(
                             icon: Icons.mail_outline_rounded,
                             label: 'EMAIL',
-                            value: _currentProgram.contactInfo.email,
+                            value: activeProgram.contactInfo.email,
                           ),
                         ],
                       ),
@@ -265,7 +266,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                     else
                       PrimaryButton(
                         text: 'Register for this Program',
-                        onPressed: _navigateToRegistration,
+                        onPressed: () => _navigateToRegistration(activeProgram),
                       ),
                     const SizedBox(height: 32),
                   ],

@@ -80,3 +80,55 @@ class RegisterForProgramRequested extends AppEvent {
   @override
   List<Object?> get props => [programId];
 }
+
+class AddProgramRequested extends AppEvent {
+  final dynamic program;
+
+  const AddProgramRequested(this.program);
+
+  @override
+  List<Object?> get props => [program];
+}
+
+class UpdateUserProfileRequested extends AppEvent {
+  final String? fullName;
+  final String? email;
+  final String? phone;
+  final String? organizationName;
+  final String? organizationType;
+  final String? country;
+  final String? state;
+  final String? city;
+  final String? address;
+  final String? contactEmail;
+  final String? contactPhone;
+
+  const UpdateUserProfileRequested({
+    this.fullName,
+    this.email,
+    this.phone,
+    this.organizationName,
+    this.organizationType,
+    this.country,
+    this.state,
+    this.city,
+    this.address,
+    this.contactEmail,
+    this.contactPhone,
+  });
+
+  @override
+  List<Object?> get props => [
+        fullName,
+        email,
+        phone,
+        organizationName,
+        organizationType,
+        country,
+        state,
+        city,
+        address,
+        contactEmail,
+        contactPhone,
+      ];
+}

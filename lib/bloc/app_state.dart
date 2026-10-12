@@ -13,6 +13,8 @@ class UserModel extends Equatable {
   final String city;
   final String address;
   final String certificationStatus;
+  final String contactEmail;
+  final String contactPhone;
 
   const UserModel({
     required this.fullName,
@@ -25,20 +27,54 @@ class UserModel extends Equatable {
     required this.city,
     required this.address,
     required this.certificationStatus,
+    this.contactEmail = 'contact@org.com',
+    this.contactPhone = '+234 800 000 0000',
   });
 
   factory UserModel.initial() {
     return const UserModel(
       fullName: 'Dr. Sarah Osei',
-      email: 'sarah.osei@lasu.edu.ng',
-      phone: '+91 0987654321',
+      email: '123@xyz.com',
+      phone: '+1 234 567 8900',
       organizationName: 'Lagos State University',
-      organizationType: 'College / University',
+      organizationType: 'Institution',
       country: 'Nigeria',
-      state: 'Lagos',
-      city: 'Ojo',
-      address: 'Badagry Expressway, Ojo, Lagos',
+      state: 'Lagos State',
+      city: 'Lagos',
+      address: 'Street address',
       certificationStatus: 'Changes Required',
+      contactEmail: 'contact@org.com',
+      contactPhone: '+234 800 000 0000',
+    );
+  }
+
+  UserModel copyWith({
+    String? fullName,
+    String? email,
+    String? phone,
+    String? organizationName,
+    String? organizationType,
+    String? country,
+    String? state,
+    String? city,
+    String? address,
+    String? certificationStatus,
+    String? contactEmail,
+    String? contactPhone,
+  }) {
+    return UserModel(
+      fullName: fullName ?? this.fullName,
+      email: email ?? this.email,
+      phone: phone ?? this.phone,
+      organizationName: organizationName ?? this.organizationName,
+      organizationType: organizationType ?? this.organizationType,
+      country: country ?? this.country,
+      state: state ?? this.state,
+      city: city ?? this.city,
+      address: address ?? this.address,
+      certificationStatus: certificationStatus ?? this.certificationStatus,
+      contactEmail: contactEmail ?? this.contactEmail,
+      contactPhone: contactPhone ?? this.contactPhone,
     );
   }
 
@@ -54,6 +90,8 @@ class UserModel extends Equatable {
         city,
         address,
         certificationStatus,
+        contactEmail,
+        contactPhone,
       ];
 }
 

@@ -186,12 +186,12 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                     hintText: 'Search programs, organizer, location...',
                     hintStyle: GoogleFonts.inter(
                       fontSize: 13,
-                      color: const Color(0xFF94A3B8),
+                      color: const Color(0xFFB0BAC9),
                     ),
                     prefixIcon: const Icon(
                       Icons.search_rounded,
                       size: 20,
-                      color: Color(0xFF94A3B8),
+                      color: Color(0xFFB0BAC9),
                     ),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(

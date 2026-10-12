@@ -1,4 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../models/program_model.dart';
 import 'app_event.dart';
 import 'app_state.dart';
 
@@ -9,6 +10,8 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     on<ResetPasswordRequested>(_onResetPasswordRequested);
     on<LogoutRequested>(_onLogoutRequested);
     on<RegisterForProgramRequested>(_onRegisterForProgramRequested);
+    on<AddProgramRequested>(_onAddProgramRequested);
+    on<UpdateUserProfileRequested>(_onUpdateUserProfileRequested);
   }
 
   Future<void> _onLoginRequested(
@@ -98,5 +101,38 @@ class AppBloc extends Bloc<AppEvent, AppState> {
       return p;
     }).toList();
     emit(state.copyWith(programs: updatedPrograms));
+  }
+
+  void _onAddProgramRequested(
+    AddProgramRequested event,
+    Emitter<AppState> emit,
+  ) {
+    if (event.program is ProgramModel) {
+      final updatedPrograms = [event.program as ProgramModel, ...state.programs];
+      emit(state.copyWith(
+        programs: updatedPrograms,
+        programApplicationsCount: state.programApplicationsCount + 1,
+      ));
+    }
+  }
+
+  void _onUpdateUserProfileRequested(
+    UpdateUserProfileRequested event,
+    Emitter<AppState> emit,
+  ) {
+    final updatedUser = state.user.copyWith(
+      fullName: event.fullName,
+      email: event.email,
+      phone: event.phone,
+      organizationName: event.organizationName,
+      organizationType: event.organizationType,
+      country: event.country,
+      state: event.state,
+      city: event.city,
+      address: event.address,
+      contactEmail: event.contactEmail,
+      contactPhone: event.contactPhone,
+    );
+    emit(state.copyWith(user: updatedUser));
   }
 }

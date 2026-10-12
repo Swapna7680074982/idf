@@ -38,7 +38,8 @@ class AppColors {
   // Text Colors
   static const Color textPrimary = Color(0xFF0F172A);
   static const Color textSecondary = Color(0xFF475569);
-  static const Color textMuted = Color(0xFF94A3B8);
+  static const Color textMuted = Color(0xFFB0BAC9); // Clean soft light gray
+  static const Color textLightGray = Color(0xFFB0BAC9);
   static const Color textWhite = Color(0xFFFFFFFF);
   static const Color textWhiteMuted = Color(0xCCFFFFFF);
 
@@ -61,7 +62,7 @@ class AppTheme {
       useMaterial3: true,
       scaffoldBackgroundColor: AppColors.background,
       primaryColor: AppColors.primaryBlue,
-      colorScheme: ColorScheme.light(
+      colorScheme: const ColorScheme.light(
         primary: AppColors.primaryBlue,
         secondary: AppColors.primaryLightBlue,
         surface: AppColors.surface,
@@ -71,49 +72,71 @@ class AppTheme {
         displayLarge: baseTextTheme.displayLarge?.copyWith(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.bold,
+          letterSpacing: -0.5,
         ),
         headlineLarge: baseTextTheme.headlineLarge?.copyWith(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.bold,
+          letterSpacing: -0.4,
         ),
         headlineMedium: baseTextTheme.headlineMedium?.copyWith(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.w700,
+          letterSpacing: -0.3,
         ),
         titleLarge: baseTextTheme.titleLarge?.copyWith(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.w600,
+          letterSpacing: -0.2,
         ),
         titleMedium: baseTextTheme.titleMedium?.copyWith(
+          color: AppColors.textPrimary,
+          fontWeight: FontWeight.w600,
+          letterSpacing: -0.1,
+        ),
+        titleSmall: baseTextTheme.titleSmall?.copyWith(
           color: AppColors.textPrimary,
           fontWeight: FontWeight.w600,
         ),
         bodyLarge: baseTextTheme.bodyLarge?.copyWith(
           color: AppColors.textPrimary,
+          fontSize: 14.5,
+          letterSpacing: -0.1,
         ),
         bodyMedium: baseTextTheme.bodyMedium?.copyWith(
           color: AppColors.textSecondary,
+          fontSize: 13.5,
+          letterSpacing: 0.0,
+        ),
+        bodySmall: baseTextTheme.bodySmall?.copyWith(
+          color: const Color(0xFF64748B),
+          fontSize: 12.0,
+        ),
+        labelLarge: baseTextTheme.labelLarge?.copyWith(
+          fontWeight: FontWeight.w600,
+          fontSize: 13.0,
+          letterSpacing: 0.1,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.inputBackground,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border, width: 1.2),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.1),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border, width: 1.2),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.1),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.borderFocused, width: 1.5),
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.4),
         ),
         hintStyle: GoogleFonts.inter(
-          color: AppColors.textMuted,
-          fontSize: 14,
+          color: const Color(0xFFB0BAC9), // Soft, light gray
+          fontSize: 13.0,
           fontWeight: FontWeight.w400,
         ),
       ),
