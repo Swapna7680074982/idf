@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme.dart';
-import '../../../models/program_model.dart';
+import '../../../models/meta_models.dart';
 
 class ProgramFilterChips extends StatelessWidget {
   final String selectedFilter; // 'All', 'Upcoming', 'Ongoing'
-  final ProgramType? selectedType;
+  final List<ProgramTypeItem> programTypes;
+  final ProgramTypeItem? selectedType;
   final ValueChanged<String> onFilterSelected;
-  final ValueChanged<ProgramType?> onTypeSelected;
+  final ValueChanged<ProgramTypeItem?> onTypeSelected;
 
   const ProgramFilterChips({
     super.key,
     required this.selectedFilter,
+    required this.programTypes,
     required this.selectedType,
     required this.onFilterSelected,
     required this.onTypeSelected,
@@ -101,7 +103,7 @@ class ProgramFilterChips extends StatelessWidget {
   Widget _buildTypeDropdownChip(BuildContext context) {
     final hasSelectedType = selectedType != null;
     final typeLabel = hasSelectedType
-        ? _formatType(selectedType!)
+        ? selectedType!.name
         : 'Type ▾';
 
     return Material(
@@ -136,25 +138,6 @@ class ProgramFilterChips extends StatelessWidget {
     );
   }
 
-  String _formatType(ProgramType type) {
-    switch (type) {
-      case ProgramType.activityDrive:
-        return 'Activity Drive';
-      case ProgramType.campaign:
-        return 'Campaign';
-      case ProgramType.conference:
-        return 'Conference';
-      case ProgramType.workshop:
-        return 'Workshop';
-      case ProgramType.seminar:
-        return 'Seminar';
-      case ProgramType.communityWalk:
-        return 'Community Walk';
-      case ProgramType.marathon:
-        return 'Marathon';
-    }
-  }
-
   void _showTypeSelectionModal(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -174,7 +157,6 @@ class ProgramFilterChips extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const SizedBox(height: 10),
-                // Drag handle
                 Center(
                   child: Container(
                     width: 36,
@@ -219,45 +201,58 @@ class ProgramFilterChips extends StatelessWidget {
                 ),
                 const Divider(height: 1, color: AppColors.border),
                 Flexible(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: ProgramType.values.map((type) {
-                        final isSelected = selectedType == type;
-                        return Container(
-                          margin: const EdgeInsets.symmetric(vertical: 2.0),
-                          decoration: BoxDecoration(
-                            color: isSelected ? const Color(0xFFF0F9FF) : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ListTile(
-                            dense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            title: Text(
-                              _formatType(type),
+                  child: programTypes.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Center(
+                            child: Text(
+                              'No program types available',
                               style: GoogleFonts.inter(
-                                fontSize: 14,
-                                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                                color: isSelected ? AppColors.primaryBlue : AppColors.textPrimary,
+                                fontSize: 13,
+                                color: const Color(0xFF64748B),
                               ),
                             ),
-                            trailing: isSelected
-                                ? const Icon(Icons.check_circle_rounded, color: AppColors.primaryBlue, size: 20)
-                                : null,
-                            onTap: () {
-                              onTypeSelected(type);
-                              Navigator.pop(ctx);
-                            },
                           ),
-                        );
-                      }).toList(),
-                    ),
-                  ),
+                        )
+                      : SingleChildScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(vertical: 8.0, horizontal: 12.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: programTypes.map((type) {
+                              final isSelected = selectedType?.id == type.id;
+                              return Container(
+                                margin: const EdgeInsets.symmetric(vertical: 2.0),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? const Color(0xFFF0F9FF) : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: ListTile(
+                                  dense: true,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  title: Text(
+                                    type.name,
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                                      color: isSelected ? AppColors.primaryBlue : AppColors.textPrimary,
+                                    ),
+                                  ),
+                                  trailing: isSelected
+                                      ? const Icon(Icons.check_circle_rounded, color: AppColors.primaryBlue, size: 20)
+                                      : null,
+                                  onTap: () {
+                                    onTypeSelected(type);
+                                    Navigator.pop(ctx);
+                                  },
+                                ),
+                              );
+                            }).toList(),
+                          ),
+                        ),
                 ),
                 const SizedBox(height: 10),
               ],

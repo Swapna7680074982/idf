@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../models/program_model.dart';
 import '../../../services/api_config.dart';
+import 'program_status_pill.dart';
 
 class ProgramImageBanner extends StatelessWidget {
   final ProgramModel program;
@@ -80,31 +81,10 @@ class ProgramImageBanner extends StatelessWidget {
               Positioned(
                 bottom: 14,
                 left: 14,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(30),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    program.status == ProgramStatus.upcoming
-                        ? 'Upcoming'
-                        : program.status == ProgramStatus.ongoing
-                            ? 'Ongoing'
-                            : 'Completed',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF017CC2),
-                    ),
-                  ),
+                child: ProgramStatusPill(
+                  status: program.status,
+                  fontSize: 11.5,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                 ),
               ),
           ],

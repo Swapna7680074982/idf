@@ -8,6 +8,8 @@ import 'program_details_screen.dart';
 import 'submission/submit_program_wizard_screen.dart';
 import 'widgets/program_card.dart';
 import 'widgets/program_filter_chips.dart';
+import '../../models/meta_models.dart';
+import '../../services/metadata_service.dart';
 
 class ProgramsScreen extends StatefulWidget {
   final bool isTabMode;
@@ -28,7 +30,8 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   int _selectedScopeIndex = 0; // 0: Explore Programs, 1: My Registrations
   String _searchQuery = '';
   String _selectedFilter = 'All';
-  ProgramType? _selectedType;
+  ProgramTypeItem? _selectedProgramType;
+  List<ProgramTypeItem> _programTypes = [];
 
   bool _isLoading = true;
   String? _errorMessage;
@@ -37,7 +40,19 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   @override
   void initState() {
     super.initState();
+    _fetchProgramTypes();
     _fetchPrograms();
+  }
+
+  Future<void> _fetchProgramTypes() async {
+    try {
+      final types = await MetadataService.getProgramTypes();
+      if (mounted) {
+        setState(() {
+          _programTypes = types;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -65,15 +80,10 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           status = 'completed';
         }
 
-        int? typeId;
-        if (_selectedType != null) {
-          typeId = _selectedType!.index + 1;
-        }
-
         final res = await ProgramsService.getPrograms(
           search: _searchQuery.isNotEmpty ? _searchQuery : null,
           status: status,
-          typeId: typeId,
+          typeId: _selectedProgramType?.id,
           page: 1,
           limit: 50,
         );
@@ -363,8 +373,9 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
               Padding(
                 padding: const EdgeInsets.only(left: 18.0, right: 18.0, top: 4.0, bottom: 8.0),
                 child: ProgramFilterChips(
+                  programTypes: _programTypes,
                   selectedFilter: _selectedFilter,
-                  selectedType: _selectedType,
+                  selectedType: _selectedProgramType,
                   onFilterSelected: (filter) {
                     setState(() {
                       _selectedFilter = filter;
@@ -373,7 +384,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                   },
                   onTypeSelected: (type) {
                     setState(() {
-                      _selectedType = type;
+                      _selectedProgramType = type;
                     });
                     _fetchPrograms();
                   },

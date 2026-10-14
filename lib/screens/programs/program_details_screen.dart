@@ -351,8 +351,58 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Register Button (or Registered confirmation banner) at the end
-                    if (isRegistered) ...[
+                    // Event Status Registration Actions
+                    if (activeProgram.status == ProgramStatus.cancelled) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE2E2),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFFECACA)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.cancel_rounded, color: Color(0xFFDC2626), size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'This event has been cancelled',
+                              style: GoogleFonts.inter(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFFDC2626),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else if (activeProgram.status == ProgramStatus.completed) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF1F5F9),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFCBD5E1)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.event_busy_rounded, color: Color(0xFF64748B), size: 20),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Registration Closed (Event Completed)',
+                              style: GoogleFonts.inter(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ] else if (isRegistered) ...[
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -371,7 +421,9 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              'You are registered for this program',
+                              activeProgram.status == ProgramStatus.ongoing
+                                  ? 'Registered • Session is Live!'
+                                  : 'You are registered for this program',
                               style: GoogleFonts.inter(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w600,
@@ -405,11 +457,16 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                         ),
                       ),
-                    ] else
+                    ] else ...[
                       PrimaryButton(
-                        text: 'Register for this Program',
+                        text: activeProgram.status == ProgramStatus.ongoing
+                            ? 'Join Session • Register Now'
+                            : (activeProgram.registrationLink != null && activeProgram.registrationLink!.isNotEmpty
+                                ? 'Register Now'
+                                : 'Register for this Program'),
                         onPressed: () => _navigateToRegistration(activeProgram),
                       ),
+                    ],
                     const SizedBox(height: 32),
                   ],
                 ),

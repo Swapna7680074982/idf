@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme.dart';
 import '../../../models/program_model.dart';
 import 'program_image_banner.dart';
+import 'program_status_pill.dart';
 
 class ProgramCard extends StatelessWidget {
   final ProgramModel program;
@@ -16,27 +17,6 @@ class ProgramCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isUpcoming = program.status == ProgramStatus.upcoming;
-    final isOngoing = program.status == ProgramStatus.ongoing;
-
-    final statusBg = isUpcoming
-        ? const Color(0xFFE0F2FE)
-        : isOngoing
-            ? const Color(0xFFDCFCE7)
-            : const Color(0xFFF1F5F9);
-
-    final statusText = isUpcoming
-        ? const Color(0xFF017CC2)
-        : isOngoing
-            ? const Color(0xFF16A34A)
-            : const Color(0xFF64748B);
-
-    final statusLabel = isUpcoming
-        ? 'Upcoming'
-        : isOngoing
-            ? 'Ongoing'
-            : 'Completed';
-
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -60,11 +40,20 @@ class ProgramCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Program Banner
-              ProgramImageBanner(
-                program: program,
-                height: 125,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+              // Program Banner with top-right Event Status Pill
+              Stack(
+                children: [
+                  ProgramImageBanner(
+                    program: program,
+                    height: 130,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                  ),
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: ProgramStatusPill(status: program.status),
+                  ),
+                ],
               ),
 
               // Content
@@ -73,31 +62,24 @@ class ProgramCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Status badge & category tag row
+                    // Program Type / Category Badge
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: statusBg,
+                            color: const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
-                            statusLabel,
+                            (program.category ?? program.tag).toUpperCase(),
                             style: GoogleFonts.inter(
-                              fontSize: 10.5,
+                              fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              color: statusText,
+                              color: const Color(0xFF475569),
+                              letterSpacing: 0.3,
                             ),
-                          ),
-                        ),
-                        Text(
-                          program.category ?? program.tag,
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            color: const Color(0xFF64748B),
                           ),
                         ),
                       ],

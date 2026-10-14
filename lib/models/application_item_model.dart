@@ -27,6 +27,22 @@ class ProgramApplicationItem {
     this.supportingMaterials = const ['Program flyer.pdf', 'Schedule 2026.pdf'],
   });
 
+  factory ProgramApplicationItem.fromJson(Map<String, dynamic> json) {
+    return ProgramApplicationItem(
+      id: (json['id'] ?? '').toString(),
+      programName: (json['title'] ?? json['program_name'] ?? '').toString(),
+      programType: (json['program_type'] ?? '').toString(),
+      category: (json['program_type'] ?? '').toString(),
+      referenceNumber: (json['program_no'] ?? json['application_id'] ?? '').toString(),
+      startDate: (json['start_date'] ?? '').toString(),
+      location: (json['city_text'] ?? json['city'] ?? json['location'] ?? '').toString(),
+      organizer: (json['organizer_name'] ?? json['organizer'] ?? '').toString(),
+      submittedDate: (json['submitted_at'] ?? json['submitted'] ?? '').toString(),
+      lastUpdatedDate: (json['last_updated'] ?? '').toString(),
+      status: (json['display_status'] ?? json['status'] ?? 'Submitted').toString(),
+    );
+  }
+
   static List<ProgramApplicationItem> sampleItems() {
     return const [
       ProgramApplicationItem(

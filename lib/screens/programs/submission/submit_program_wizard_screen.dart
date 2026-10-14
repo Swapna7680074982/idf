@@ -103,6 +103,7 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
         organizerName: _submissionModel.organizingEntityName.isNotEmpty
             ? _submissionModel.organizingEntityName
             : 'World Health Centre',
+        organizationType: _submissionModel.organizationType,
         about: fullDesc.isNotEmpty ? fullDesc : 'Physical activity initiative proposal.',
         venue: _submissionModel.venueAddress.isNotEmpty
             ? _submissionModel.venueAddress
@@ -110,6 +111,7 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
         countryId: _submissionModel.countryId ?? 1,
         cityText: _submissionModel.city.isNotEmpty ? _submissionModel.city : 'Mumbai',
         countryText: _submissionModel.country.isNotEmpty ? _submissionModel.country : 'India',
+        regionText: _submissionModel.regionState,
         startDate: startDateStr,
         endDate: endDateStr,
         contactPerson: _submissionModel.contactPerson.isNotEmpty

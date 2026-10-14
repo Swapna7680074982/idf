@@ -42,9 +42,14 @@ class ApiConfig {
 
   // 06. Programs
   static String get programs => '$baseUrl/api/programs';
+  static String get programBanner => '$baseUrl/api/programs/banner';
   static String get programsRegistered => '$baseUrl/api/programs/registered';
   static String programDetail(dynamic id) => '$baseUrl/api/programs/$id';
   static String programRegister(dynamic id) => '$baseUrl/api/programs/$id/register';
+
+  // 07. Program Applications
+  static String get applicationsPrograms => '$baseUrl/api/applications/programs';
+  static String applicationProgramDetail(dynamic id) => '$baseUrl/api/applications/programs/$id';
 
   // 10. Support & Tickets
   static String get supportIssueTypes => '$baseUrl/api/support/issue-types';

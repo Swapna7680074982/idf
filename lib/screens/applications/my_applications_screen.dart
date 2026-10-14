@@ -8,6 +8,7 @@ import '../certification/certification_wizard_screen.dart';
 import 'certificate_view_screen.dart';
 import 'expired_certificate_details_screen.dart';
 import 'program_application_details_screen.dart';
+import '../../services/programs_service.dart';
 
 class MyApplicationsScreen extends StatefulWidget {
   final int initialTabIndex; // 0: Programs, 1: Certificates
@@ -47,13 +48,42 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     'Expired',
   ];
 
-  final List<ProgramApplicationItem> _programs = ProgramApplicationItem.sampleItems();
+  List<ProgramApplicationItem> _programs = ProgramApplicationItem.sampleItems();
   final List<CertificateApplicationItem> _certificates = CertificateApplicationItem.sampleItems();
+  bool _isLoadingPrograms = false;
 
   @override
   void initState() {
     super.initState();
     _selectedTab = widget.initialTabIndex;
+    _fetchMyProgramApplications();
+  }
+
+  Future<void> _fetchMyProgramApplications() async {
+    setState(() {
+      _isLoadingPrograms = true;
+    });
+    try {
+      final res = await ProgramsService.getMyApplications();
+      final items = res['items'] is List ? res['items'] as List : [];
+      if (mounted) {
+        setState(() {
+          if (items.isNotEmpty) {
+            _programs = items
+                .whereType<Map<String, dynamic>>()
+                .map((i) => ProgramApplicationItem.fromJson(i))
+                .toList();
+          }
+          _isLoadingPrograms = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoadingPrograms = false;
+        });
+      }
+    }
   }
 
   @override
@@ -326,25 +356,39 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
 
   // 1. Programs Tab List (Screen 36)
   Widget _buildProgramsList() {
-    final items = _filteredPrograms;
-
-    if (items.isEmpty) {
-      return Center(
-        child: Text(
-          'No program applications found.',
-          style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
-        ),
+    if (_isLoadingPrograms) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primaryBlue),
       );
     }
 
-    return ListView.builder(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 4.0),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return _buildProgramCard(item);
-      },
+    final items = _filteredPrograms;
+
+    return RefreshIndicator(
+      onRefresh: _fetchMyProgramApplications,
+      color: AppColors.primaryBlue,
+      child: items.isEmpty
+          ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+              children: [
+                SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                Center(
+                  child: Text(
+                    'No program applications found.',
+                    style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
+                  ),
+                ),
+              ],
+            )
+          : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+              padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 4.0),
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return _buildProgramCard(item);
+              },
+            ),
     );
   }
 

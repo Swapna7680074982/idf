@@ -4,6 +4,49 @@ enum ProgramStatus {
   upcoming,
   ongoing,
   completed,
+  cancelled;
+
+  static ProgramStatus parse(String? statusStr, {String? startDate, String? endDate}) {
+    final s = statusStr?.trim().toLowerCase();
+    if (s == 'cancelled' || s == 'canceled') {
+      return ProgramStatus.cancelled;
+    }
+
+    // Trigger condition based on date comparison:
+    // Today < start_date -> upcoming
+    // start_date <= Today <= end_date -> ongoing
+    // Today > end_date -> completed
+    try {
+      if (startDate != null && startDate.trim().isNotEmpty) {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+        final startDt = DateTime.tryParse(startDate.trim());
+        final endDt = endDate != null && endDate.trim().isNotEmpty
+            ? DateTime.tryParse(endDate.trim())
+            : startDt;
+
+        if (startDt != null) {
+          final startOnly = DateTime(startDt.year, startDt.month, startDt.day);
+          final endOnly = endDt != null
+              ? DateTime(endDt.year, endDt.month, endDt.day)
+              : startOnly;
+
+          if (today.isBefore(startOnly)) {
+            return ProgramStatus.upcoming;
+          } else if (today.isAfter(endOnly)) {
+            return ProgramStatus.completed;
+          } else {
+            return ProgramStatus.ongoing;
+          }
+        }
+      }
+    } catch (_) {}
+
+    // Fallback based on backend event_status string:
+    if (s == 'ongoing') return ProgramStatus.ongoing;
+    if (s == 'completed') return ProgramStatus.completed;
+    return ProgramStatus.upcoming;
+  }
 }
 
 enum ProgramType {
@@ -62,6 +105,8 @@ class ProgramModel {
   final List<int> gradientColors;
   final String? imageUrl;
   final String? category;
+  final String? registrationLink;
+  final String? registrationInstructions;
   final int participantsCount;
   final String targetAudience;
 
@@ -87,6 +132,8 @@ class ProgramModel {
     required this.gradientColors,
     this.imageUrl,
     this.category,
+    this.registrationLink,
+    this.registrationInstructions,
     this.participantsCount = 1200,
     this.targetAudience = 'General Public & Youth',
   });
@@ -113,6 +160,8 @@ class ProgramModel {
     List<int>? gradientColors,
     String? imageUrl,
     String? category,
+    String? registrationLink,
+    String? registrationInstructions,
     int? participantsCount,
     String? targetAudience,
   }) {
@@ -138,6 +187,8 @@ class ProgramModel {
       gradientColors: gradientColors ?? this.gradientColors,
       imageUrl: imageUrl ?? this.imageUrl,
       category: category ?? this.category,
+      registrationLink: registrationLink ?? this.registrationLink,
+      registrationInstructions: registrationInstructions ?? this.registrationInstructions,
       participantsCount: participantsCount ?? this.participantsCount,
       targetAudience: targetAudience ?? this.targetAudience,
     );
@@ -154,16 +205,6 @@ class ProgramModel {
         ? json['registration'] as Map<String, dynamic>
         : <String, dynamic>{};
     final agendaList = json['agenda'] is List ? json['agenda'] as List : [];
-
-    final statusStr = (json['event_status'] ?? '').toString().toLowerCase();
-    final ProgramStatus status;
-    if (statusStr == 'ongoing') {
-      status = ProgramStatus.ongoing;
-    } else if (statusStr == 'completed') {
-      status = ProgramStatus.completed;
-    } else {
-      status = ProgramStatus.upcoming;
-    }
 
     final typeStr = (json['program_type'] ?? '').toString().toLowerCase();
     final ProgramType type;
@@ -188,6 +229,8 @@ class ProgramModel {
     final venue = (eventDetails['venue'] ?? json['venue'] ?? location).toString();
     final startDate = (eventDetails['start_date'] ?? json['start_date'] ?? '').toString();
     final endDate = (eventDetails['end_date'] ?? json['end_date'] ?? startDate).toString();
+    final statusStr = (json['event_status'] ?? '').toString();
+    final status = ProgramStatus.parse(statusStr, startDate: startDate, endDate: endDate);
 
     final parsedAgenda = agendaList.whereType<Map<String, dynamic>>().map((a) {
       return ProgramAgendaItem(
@@ -205,28 +248,35 @@ class ProgramModel {
 
     final isReg = registration['is_registered'] == true || json['is_registered'] == true;
     final canReg = registration['can_register'] != false;
+    final regLink = (registration['registration_link'] ?? json['registration_link'])?.toString();
+    final regInstructions = (registration['registration_instructions'] ?? json['registration_instructions'])?.toString();
+
+    final effectiveBanner = json['banner_image_url'] ?? json['cover_image_url'] ?? json['banner'];
 
     return ProgramModel(
       id: (json['id'] ?? json['program_no'] ?? '').toString(),
-      title: (json['title'] ?? '').toString(),
+      title: (json['title'] ?? json['program_name'] ?? '').toString(),
       tag: (json['program_type'] ?? 'ACTIVITY DRIVE').toString().toUpperCase(),
       type: type,
       status: status,
       organizer: organizer.isNotEmpty ? organizer : 'IDF Active',
-      organizationType: '',
+      organizationType: (json['organization_type'] ?? json['organization_type_text'] ?? '').toString(),
       venue: venue.isNotEmpty ? venue : (location.isNotEmpty ? location : 'TBD'),
       location: location.isNotEmpty ? location : venue,
       country: country,
       city: city,
       startDate: startDate,
       endDate: endDate,
-      description: (json['about'] ?? json['description'] ?? '').toString(),
+      description: (json['about'] ?? json['description'] ?? json['program_description'] ?? '').toString(),
       agenda: parsedAgenda,
       contactInfo: contactInfo,
       isRegistered: isReg,
       canRegister: canReg,
       gradientColors: const [0xFF006097, 0xFF017CC2],
-      imageUrl: ApiConfig.resolveImageUrl(json['cover_image_url']?.toString()),
+      imageUrl: ApiConfig.resolveImageUrl(effectiveBanner?.toString()),
+      category: json['program_type']?.toString(),
+      registrationLink: regLink,
+      registrationInstructions: regInstructions,
     );
   }
 
@@ -234,15 +284,10 @@ class ProgramModel {
     if (apiItem is Map<String, dynamic>) {
       return ProgramModel.fromDetailJson(apiItem);
     }
-    final statusStr = apiItem.eventStatus?.toString().toLowerCase() ?? 'upcoming';
-    final ProgramStatus status;
-    if (statusStr == 'ongoing') {
-      status = ProgramStatus.ongoing;
-    } else if (statusStr == 'completed') {
-      status = ProgramStatus.completed;
-    } else {
-      status = ProgramStatus.upcoming;
-    }
+    final startDate = apiItem.startDate?.toString() ?? '';
+    final endDate = (apiItem.endDate ?? apiItem.startDate)?.toString() ?? '';
+    final statusStr = apiItem.eventStatus?.toString() ?? '';
+    final status = ProgramStatus.parse(statusStr, startDate: startDate, endDate: endDate);
 
     final typeStr = apiItem.programType?.toString().toLowerCase() ?? '';
     final ProgramType type;
@@ -290,7 +335,11 @@ class ProgramModel {
       isRegistered: apiItem.isRegistered == true,
       canRegister: true,
       gradientColors: const [0xFF006097, 0xFF017CC2],
-      imageUrl: ApiConfig.resolveImageUrl(apiItem.coverImageUrl?.toString()),
+      imageUrl: ApiConfig.resolveImageUrl(apiItem.coverImageUrl?.toString() ?? apiItem.bannerImageUrl?.toString()),
+      category: (apiItem.programType?.toString().isNotEmpty ?? false)
+          ? apiItem.programType.toString()
+          : null,
+      registrationLink: apiItem.registrationLink,
     );
   }
 

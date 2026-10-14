@@ -36,6 +36,7 @@ class ProgramApiItem {
   final int? programTypeId;
   final String organizerName;
   final String? coverImageUrl;
+  final String? bannerImageUrl;
   final String? cityText;
   final String? countryText;
   final String? startDate;
@@ -43,6 +44,7 @@ class ProgramApiItem {
   final String eventStatus;
   final bool isRegistered;
   final String? registeredAt;
+  final String? registrationLink;
 
   const ProgramApiItem({
     required this.id,
@@ -51,6 +53,7 @@ class ProgramApiItem {
     this.programTypeId,
     required this.organizerName,
     this.coverImageUrl,
+    this.bannerImageUrl,
     this.cityText,
     this.countryText,
     this.startDate,
@@ -58,25 +61,29 @@ class ProgramApiItem {
     required this.eventStatus,
     this.isRegistered = false,
     this.registeredAt,
+    this.registrationLink,
   });
 
   factory ProgramApiItem.fromJson(Map<String, dynamic> json) {
+    final effectiveCover = json['cover_image_url'] ?? json['banner_image_url'] ?? json['banner'];
     return ProgramApiItem(
       id: json['id'] is int ? json['id'] as int : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
-      title: json['title']?.toString() ?? '',
+      title: (json['title'] ?? json['program_name'])?.toString() ?? '',
       programType: json['program_type']?.toString() ?? '',
       programTypeId: json['program_type_id'] is int
           ? json['program_type_id'] as int
           : int.tryParse(json['program_type_id']?.toString() ?? ''),
-      organizerName: json['organizer_name']?.toString() ?? 'IDF Active',
-      coverImageUrl: json['cover_image_url']?.toString(),
-      cityText: json['city_text']?.toString(),
-      countryText: json['country_text']?.toString(),
+      organizerName: (json['organizer_name'] ?? json['organization_entity_name'])?.toString() ?? 'IDF Active',
+      coverImageUrl: effectiveCover?.toString(),
+      bannerImageUrl: (json['banner_image_url'] ?? json['banner'])?.toString(),
+      cityText: (json['city_text'] ?? json['city'])?.toString(),
+      countryText: (json['country_text'] ?? json['country'])?.toString(),
       startDate: json['start_date']?.toString(),
       endDate: json['end_date']?.toString(),
       eventStatus: json['event_status']?.toString() ?? 'upcoming',
       isRegistered: json['is_registered'] == true || json['registered_at'] != null,
       registeredAt: json['registered_at']?.toString(),
+      registrationLink: json['registration_link']?.toString(),
     );
   }
 }
