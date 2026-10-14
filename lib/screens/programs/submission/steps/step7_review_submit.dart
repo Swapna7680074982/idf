@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme.dart';
@@ -25,6 +26,8 @@ class Step7ReviewSubmit extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasBanner = model.bannerPath != null && model.bannerPath!.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -38,13 +41,75 @@ class Step7ReviewSubmit extends StatelessWidget {
         const SizedBox(height: 16),
 
         // 1. Program Information Card
-        _buildReviewSection(
-          title: 'Program Information',
-          onEdit: () => onEditStep(1),
-          items: [
-            _ReviewItem('Name', model.programName.isNotEmpty ? model.programName : '—'),
-            _ReviewItem('Type', model.programType.isNotEmpty ? model.programType : '—'),
-          ],
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.border, width: 1.1),
+          ),
+          padding: const EdgeInsets.all(14.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Program Information',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => onEditStep(1),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                      child: Text(
+                        'Edit',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryBlue,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Banner thumbnail if uploaded
+              if (hasBanner) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: AspectRatio(
+                    aspectRatio: 16 / 9,
+                    child: File(model.bannerPath!).existsSync()
+                        ? Image.file(File(model.bannerPath!), fit: BoxFit.cover)
+                        : Container(
+                            color: const Color(0xFF006097),
+                            child: const Center(
+                              child: Icon(Icons.image, color: Colors.white),
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+
+              _buildItemRow('Name', model.programName.isNotEmpty ? model.programName : '—'),
+              _buildItemRow('Type', model.programType.isNotEmpty ? model.programType : '—'),
+              _buildItemRow(
+                'Banner',
+                hasBanner
+                    ? (model.bannerFileName ?? 'Uploaded')
+                    : 'None attached',
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 12),
 
@@ -58,8 +123,20 @@ class Step7ReviewSubmit extends StatelessWidget {
               model.organizingEntityName.isNotEmpty ? model.organizingEntityName : '—',
             ),
             _ReviewItem(
+              'Org Type',
+              model.organizationType.isNotEmpty ? model.organizationType : '—',
+            ),
+            _ReviewItem(
               'Contact',
               model.contactPerson.isNotEmpty ? model.contactPerson : '—',
+            ),
+            _ReviewItem(
+              'Email',
+              model.email.isNotEmpty ? model.email : '—',
+            ),
+            _ReviewItem(
+              'Phone',
+              model.phone.isNotEmpty ? model.phone : '—',
             ),
           ],
         ),
@@ -70,15 +147,59 @@ class Step7ReviewSubmit extends StatelessWidget {
           title: 'Date & Location',
           onEdit: () => onEditStep(3),
           items: [
-            _ReviewItem('Start', _formatDate(model.startDate)),
+            _ReviewItem('Start Date', _formatDate(model.startDate)),
+            _ReviewItem('End Date', _formatDate(model.endDate)),
+            _ReviewItem('Country', model.country.isNotEmpty ? model.country : '—'),
+            if (model.regionState.isNotEmpty) _ReviewItem('Region / State', model.regionState),
             _ReviewItem('City', model.city.isNotEmpty ? model.city : '—'),
+            _ReviewItem('Venue', model.venueAddress.isNotEmpty ? model.venueAddress : '—'),
+          ],
+        ),
+        // 4. Content & Agenda Card
+        _buildReviewSection(
+          title: 'Content & Agenda',
+          onEdit: () => onEditStep(4),
+          items: [
+            _ReviewItem(
+              'Description',
+              model.programDescription.isNotEmpty
+                  ? (model.programDescription.length > 80
+                      ? '${model.programDescription.substring(0, 80)}...'
+                      : model.programDescription)
+                  : (model.description.isNotEmpty ? model.description : '—'),
+            ),
+            _ReviewItem(
+              'Agenda',
+              model.agendaItems.isNotEmpty
+                  ? '${model.agendaItems.length} session(s) scheduled'
+                  : (model.agenda.isNotEmpty ? model.agenda : 'None scheduled'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+
+        // 5. Materials Card
+        _buildReviewSection(
+          title: 'Materials & Banner',
+          onEdit: () => onEditStep(6),
+          items: [
+            _ReviewItem(
+              'Program Banner',
+              hasBanner ? (model.bannerFileName ?? 'Selected') : 'None',
+            ),
+            _ReviewItem(
+              'Supporting Files',
+              model.uploadedFileNames.isNotEmpty
+                  ? '${model.uploadedFileNames.length} file(s)'
+                  : 'None',
+            ),
           ],
         ),
         const SizedBox(height: 16),
 
         // AI Review Note
         Text(
-          'Your program application will be reviewed by our AI system within 24 hours, followed by a manual review.',
+          'Your program application will be reviewed by our AI system within 24 hours, followed by an IDF manual review.',
           style: GoogleFonts.inter(
             fontSize: 12,
             color: const Color(0xFF64748B),
@@ -130,6 +251,38 @@ class Step7ReviewSubmit extends StatelessWidget {
     );
   }
 
+  Widget _buildItemRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12.5,
+              color: const Color(0xFF64748B),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Flexible(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.end,
+              style: GoogleFonts.inter(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildReviewSection({
     required String title,
     required VoidCallback onEdit,
@@ -174,37 +327,7 @@ class Step7ReviewSubmit extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          ...items.map((item) {
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 6.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    item.label,
-                    style: GoogleFonts.inter(
-                      fontSize: 12.5,
-                      color: const Color(0xFF64748B),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Flexible(
-                    child: Text(
-                      item.value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      textAlign: TextAlign.end,
-                      style: GoogleFonts.inter(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }),
+          ...items.map((item) => _buildItemRow(item.label, item.value)),
         ],
       ),
     );

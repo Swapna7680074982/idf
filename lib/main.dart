@@ -4,9 +4,23 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'bloc/app_bloc.dart';
 import 'core/theme.dart';
 import 'screens/splash_screen.dart';
+import 'screens/welcome_screen.dart';
+import 'services/api_client.dart';
+import 'services/token_storage.dart';
 
-void main() {
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
+
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await TokenStorage.init();
+
+  ApiClient.onSessionExpired = () {
+    rootNavigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const WelcomeScreen()),
+      (route) => false,
+    );
+  };
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -25,6 +39,7 @@ class IDFDigitalHubApp extends StatelessWidget {
     return BlocProvider(
       create: (context) => AppBloc(),
       child: MaterialApp(
+        navigatorKey: rootNavigatorKey,
         title: 'MDRF',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,

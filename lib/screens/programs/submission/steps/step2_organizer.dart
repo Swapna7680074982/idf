@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme.dart';
+import '../../../../models/meta_models.dart';
 import '../../../../models/program_submission_model.dart';
+import '../../../../services/metadata_service.dart';
 import '../../../../widgets/custom_button.dart';
 
 class Step2Organizer extends StatefulWidget {
@@ -24,17 +26,11 @@ class _Step2OrganizerState extends State<Step2Organizer> {
   late TextEditingController _contactPersonController;
   late TextEditingController _phoneController;
   late TextEditingController _emailController;
-  String? _selectedOrgType;
 
-  final List<String> _orgTypes = [
-    'Hospital / Healthcare Facility',
-    'NGO / Non-profit Organization',
-    'Academic / Research Institution',
-    'Government / Public Health Agency',
-    'Corporate / Fitness Organization',
-    'Community Association',
-    'Other',
-  ];
+  List<OrganizationType> _orgTypes = [];
+  OrganizationType? _selectedOrgType;
+  bool _isLoadingTypes = true;
+  String? _typesError;
 
   @override
   void initState() {
@@ -43,9 +39,46 @@ class _Step2OrganizerState extends State<Step2Organizer> {
     _contactPersonController = TextEditingController(text: widget.model.contactPerson);
     _phoneController = TextEditingController(text: widget.model.phone);
     _emailController = TextEditingController(text: widget.model.email);
-    _selectedOrgType = widget.model.organizationType.isNotEmpty
-        ? widget.model.organizationType
-        : null;
+    _loadOrgTypes();
+  }
+
+  Future<void> _loadOrgTypes() async {
+    setState(() {
+      _isLoadingTypes = true;
+      _typesError = null;
+    });
+
+    try {
+      final types = await MetadataService.getOrganizationTypes();
+      if (mounted) {
+        setState(() {
+          _orgTypes = types;
+          _isLoadingTypes = false;
+
+          // Match by organization_type_id only if user had previously chosen one
+          if (widget.model.organizationTypeId != null) {
+            final matches = _orgTypes.where((t) => t.id == widget.model.organizationTypeId);
+            if (matches.isNotEmpty) {
+              _selectedOrgType = matches.first;
+            }
+          } else if (widget.model.organizationType.isNotEmpty) {
+            final matches = _orgTypes.where(
+              (t) => t.name.toLowerCase() == widget.model.organizationType.toLowerCase(),
+            );
+            if (matches.isNotEmpty) {
+              _selectedOrgType = matches.first;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingTypes = false;
+          _typesError = 'Failed to load organization types: ${e.toString()}';
+        });
+      }
+    }
   }
 
   @override
@@ -60,7 +93,8 @@ class _Step2OrganizerState extends State<Step2Organizer> {
   void _handleContinue() {
     if (_formKey.currentState?.validate() ?? false) {
       widget.model.organizingEntityName = _entityNameController.text.trim();
-      widget.model.organizationType = _selectedOrgType ?? '';
+      widget.model.organizationType = _selectedOrgType?.name ?? '';
+      widget.model.organizationTypeId = _selectedOrgType?.id;
       widget.model.contactPerson = _contactPersonController.text.trim();
       widget.model.phone = _phoneController.text.trim();
       widget.model.email = _emailController.text.trim();
@@ -81,41 +115,90 @@ class _Step2OrganizerState extends State<Step2Organizer> {
           TextFormField(
             controller: _entityNameController,
             decoration: const InputDecoration(
-              hintText: 'e.g. IDF Africa Region',
+              hintText: 'e.g. World Health Centre / University Campus',
             ),
             validator: (val) =>
                 val == null || val.trim().isEmpty ? 'Please enter entity name' : null,
           ),
           const SizedBox(height: 16),
 
-          // Organization Type
+          // Organization Type (Backend API)
           _buildFieldLabel('Organization Type *'),
           const SizedBox(height: 6),
-          DropdownButtonFormField<String>(
-            initialValue: _selectedOrgType,
-            hint: Text(
-              'Select organization type',
-              style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF94A3B8)),
+          if (_isLoadingTypes)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryBlue),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Loading organization types from server...',
+                    style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF64748B)),
+                  ),
+                ],
+              ),
+            )
+          else if (_typesError != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _typesError!,
+                      style: GoogleFonts.inter(fontSize: 12.5, color: const Color(0xFFB91C1C)),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _loadOrgTypes,
+                    child: const Text('Retry'),
+                  ),
+                ],
+              ),
+            )
+          else
+            DropdownButtonFormField<OrganizationType>(
+              initialValue: _selectedOrgType,
+              hint: Text(
+                'Select organization type',
+                style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF94A3B8)),
+              ),
+              decoration: const InputDecoration(
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
+              items: _orgTypes.map((type) {
+                return DropdownMenuItem<OrganizationType>(
+                  value: type,
+                  child: Text(
+                    type.name,
+                    style: GoogleFonts.inter(fontSize: 13.5, color: AppColors.textPrimary),
+                  ),
+                );
+              }).toList(),
+              onChanged: (val) {
+                setState(() => _selectedOrgType = val);
+              },
+              validator: (val) =>
+                  val == null ? 'Please select organization type' : null,
             ),
-            decoration: const InputDecoration(
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            ),
-            icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-            items: _orgTypes.map((type) {
-              return DropdownMenuItem<String>(
-                value: type,
-                child: Text(
-                  type,
-                  style: GoogleFonts.inter(fontSize: 13.5, color: AppColors.textPrimary),
-                ),
-              );
-            }).toList(),
-            onChanged: (val) {
-              setState(() => _selectedOrgType = val);
-            },
-            validator: (val) =>
-                val == null || val.isEmpty ? 'Please select organization type' : null,
-          ),
           const SizedBox(height: 16),
 
           // Contact Person
@@ -138,7 +221,7 @@ class _Step2OrganizerState extends State<Step2Organizer> {
             controller: _phoneController,
             keyboardType: TextInputType.phone,
             decoration: const InputDecoration(
-              hintText: '+1 234 567 8900',
+              hintText: '+91 9876543210',
             ),
             validator: (val) =>
                 val == null || val.trim().isEmpty ? 'Please enter phone number' : null,
@@ -152,7 +235,7 @@ class _Step2OrganizerState extends State<Step2Organizer> {
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
-              hintText: 'organizer@email.com',
+              hintText: 'organizer@institution.org',
             ),
             validator: (val) {
               if (val == null || val.trim().isEmpty) {

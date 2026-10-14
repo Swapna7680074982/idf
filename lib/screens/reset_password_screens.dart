@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../bloc/app_bloc.dart';
-import '../bloc/app_event.dart';
 import '../core/theme.dart';
+import '../services/api_client.dart';
+import '../services/auth_service.dart';
 import '../widgets/auth_header.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
@@ -21,6 +20,7 @@ class ResetPasswordStep1Screen extends StatefulWidget {
 
 class _ResetPasswordStep1ScreenState extends State<ResetPasswordStep1Screen> {
   final _emailController = TextEditingController();
+  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -28,15 +28,72 @@ class _ResetPasswordStep1ScreenState extends State<ResetPasswordStep1Screen> {
     super.dispose();
   }
 
-  void _onContinue() {
+  void _onContinue() async {
     final email = _emailController.text.trim();
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ResetPasswordStep2Screen(
-          email: email.isNotEmpty ? email : '123@gmail.com',
+    if (email.isEmpty || !email.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid email address'),
+          backgroundColor: Colors.redAccent,
         ),
-      ),
-    );
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // POST /api/auth/forgot-password
+      final forgotResult = await AuthService.forgotPassword(email: email);
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('A verification code has been sent to $email'),
+            backgroundColor: const Color(0xFF0284C7),
+          ),
+        );
+
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ResetPasswordStep2Screen(
+              email: email,
+              codeLength: forgotResult.verification.codeLength,
+            ),
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -66,6 +123,7 @@ class _ResetPasswordStep1ScreenState extends State<ResetPasswordStep1Screen> {
                   const SizedBox(height: 28),
                   PrimaryButton(
                     text: 'Continue',
+                    isLoading: _isLoading,
                     onPressed: _onContinue,
                   ),
                 ],
@@ -83,10 +141,12 @@ class _ResetPasswordStep1ScreenState extends State<ResetPasswordStep1Screen> {
 // -------------------------------------------------------------
 class ResetPasswordStep2Screen extends StatefulWidget {
   final String email;
+  final int codeLength;
 
   const ResetPasswordStep2Screen({
     super.key,
     required this.email,
+    this.codeLength = 6,
   });
 
   @override
@@ -95,6 +155,8 @@ class ResetPasswordStep2Screen extends StatefulWidget {
 
 class _ResetPasswordStep2ScreenState extends State<ResetPasswordStep2Screen> {
   final _codeController = TextEditingController();
+  bool _isLoading = false;
+  bool _isResending = false;
 
   @override
   void dispose() {
@@ -102,14 +164,108 @@ class _ResetPasswordStep2ScreenState extends State<ResetPasswordStep2Screen> {
     super.dispose();
   }
 
-  void _onContinue() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ResetPasswordStep3Screen(
-          email: widget.email,
+  void _onContinue() async {
+    final code = _codeController.text.trim();
+    if (code.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter the verification code'),
+          backgroundColor: Colors.redAccent,
         ),
-      ),
-    );
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // POST /api/auth/verify-reset-code
+      final verifyResult = await AuthService.verifyResetCode(
+        email: widget.email,
+        code: code,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ResetPasswordStep3Screen(
+              email: widget.email,
+              resetToken: verifyResult.resetToken,
+            ),
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Verification error: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
+  }
+
+  void _onResendCode() async {
+    if (_isResending) return;
+    setState(() {
+      _isResending = true;
+    });
+
+    try {
+      // POST /api/auth/resend-code
+      await AuthService.resendCode(
+        email: widget.email,
+        purpose: 'password_reset',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Verification code resent to ${widget.email}'),
+            backgroundColor: const Color(0xFF0284C7),
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isResending = false;
+        });
+      }
+    }
   }
 
   @override
@@ -132,28 +288,22 @@ class _ResetPasswordStep2ScreenState extends State<ResetPasswordStep2Screen> {
                 children: [
                   CustomTextField(
                     label: 'Verification Code',
-                    hintText: '6-digit code',
+                    hintText: '${widget.codeLength}-digit code',
                     keyboardType: TextInputType.number,
                     controller: _codeController,
                   ),
                   const SizedBox(height: 28),
                   PrimaryButton(
                     text: 'Continue',
+                    isLoading: _isLoading,
                     onPressed: _onContinue,
                   ),
                   const SizedBox(height: 20),
                   Center(
                     child: GestureDetector(
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Verification code resent successfully!'),
-                            backgroundColor: AppColors.primaryBlue,
-                          ),
-                        );
-                      },
+                      onTap: _isResending ? null : _onResendCode,
                       child: Text(
-                        'Resend Code',
+                        _isResending ? 'Resending...' : 'Resend Code',
                         style: GoogleFonts.inter(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -177,10 +327,12 @@ class _ResetPasswordStep2ScreenState extends State<ResetPasswordStep2Screen> {
 // -------------------------------------------------------------
 class ResetPasswordStep3Screen extends StatefulWidget {
   final String email;
+  final String resetToken;
 
   const ResetPasswordStep3Screen({
     super.key,
-    this.email = '123@gmail.com',
+    this.email = '',
+    this.resetToken = '',
   });
 
   @override
@@ -200,38 +352,86 @@ class _ResetPasswordStep3ScreenState extends State<ResetPasswordStep3Screen> {
   }
 
   void _onResetPassword() async {
+    final newPassword = _newPasswordController.text;
+    final confirmPassword = _confirmPasswordController.text;
+
+    if (newPassword.length < 8) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password must be at least 8 characters long'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    if (newPassword != confirmPassword) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Passwords do not match'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
-    context.read<AppBloc>().add(
-          ResetPasswordRequested(
-            email: widget.email,
-            newPassword: _newPasswordController.text,
+    try {
+      // POST /api/auth/reset-password
+      final successMsg = await AuthService.resetPassword(
+        resetToken: widget.resetToken,
+        newPassword: newPassword,
+        confirmPassword: confirmPassword,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(successMsg),
+            backgroundColor: const Color(0xFF0284C7),
+            duration: const Duration(seconds: 4),
           ),
         );
 
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Password updated successfully! Please log in.'),
-          backgroundColor: AppColors.primaryBlue,
-          duration: Duration(seconds: 3),
-        ),
-      );
-
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => const LoginScreen(),
-        ),
-        (route) => false,
-      );
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const LoginScreen(),
+          ),
+          (route) => false,
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 

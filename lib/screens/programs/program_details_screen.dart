@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../bloc/app_bloc.dart';
+import '../../bloc/app_event.dart';
 import '../../core/theme.dart';
 import '../../models/program_model.dart';
+import '../../services/api_client.dart';
+import '../../services/programs_service.dart';
 import '../../widgets/custom_button.dart';
 import 'registration/program_registration_confirmation_screen.dart';
 import 'widgets/agenda_timeline_widget.dart';
@@ -23,11 +26,36 @@ class ProgramDetailsScreen extends StatefulWidget {
 
 class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
   late ProgramModel _currentProgram;
+  bool _isLoadingDetail = false;
+  bool _isCancelling = false;
 
   @override
   void initState() {
     super.initState();
     _currentProgram = widget.program;
+    _fetchDetail();
+  }
+
+  Future<void> _fetchDetail() async {
+    if (widget.program.id.isEmpty) return;
+    setState(() {
+      _isLoadingDetail = true;
+    });
+    try {
+      final detail = await ProgramsService.getProgramDetail(widget.program.id);
+      if (mounted) {
+        setState(() {
+          _currentProgram = detail;
+          _isLoadingDetail = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingDetail = false;
+        });
+      }
+    }
   }
 
   void _navigateToRegistration(ProgramModel program) async {
@@ -43,16 +71,95 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
       setState(() {
         _currentProgram = result;
       });
+      _fetchDetail();
+    }
+  }
+
+  Future<void> _cancelRegistration() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Cancel Registration',
+          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+        ),
+        content: Text(
+          'Are you sure you want to cancel your registration for "${_currentProgram.title}"?',
+          style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF475569)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text('Keep', style: GoogleFonts.inter(color: const Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.errorRed,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Cancel Registration',
+              style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !mounted) return;
+
+    setState(() {
+      _isCancelling = true;
+    });
+
+    try {
+      await ProgramsService.cancelProgramRegistration(_currentProgram.id);
+      if (mounted) {
+        context.read<AppBloc>().add(CancelProgramRegistrationRequested(_currentProgram.id));
+        setState(() {
+          _currentProgram = _currentProgram.copyWith(isRegistered: false);
+          _isCancelling = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Registration cancelled successfully.'),
+            backgroundColor: AppColors.primaryBlue,
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCancelling = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.displayMessage),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isCancelling = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to cancel registration: $e'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final activeProgram = context.watch<AppBloc>().state.programs.firstWhere(
-      (p) => p.id == widget.program.id,
-      orElse: () => _currentProgram,
-    );
-    final isRegistered = activeProgram.isRegistered;
+    final blocProgram = context.watch<AppBloc>().state.programs.where((p) => p.id == widget.program.id).firstOrNull;
+    final isRegistered = blocProgram?.isRegistered ?? _currentProgram.isRegistered;
+    final activeProgram = _currentProgram.copyWith(isRegistered: isRegistered);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -74,6 +181,17 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                     ),
                     showFloatingStatus: true,
                   ),
+                  if (_isLoadingDetail)
+                    const Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: LinearProgressIndicator(
+                        minHeight: 3,
+                        color: AppColors.primaryBlue,
+                        backgroundColor: Colors.transparent,
+                      ),
+                    ),
                   SafeArea(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
@@ -234,7 +352,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                     const SizedBox(height: 20),
 
                     // Register Button (or Registered confirmation banner) at the end
-                    if (isRegistered)
+                    if (isRegistered) ...[
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -262,8 +380,32 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                             ),
                           ],
                         ),
-                      )
-                    else
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        icon: _isCancelling
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.errorRed),
+                              )
+                            : Icon(Icons.cancel_outlined, color: AppColors.errorRed, size: 18),
+                        label: Text(
+                          _isCancelling ? 'Cancelling...' : 'Cancel Registration',
+                          style: GoogleFonts.inter(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.errorRed,
+                          ),
+                        ),
+                        onPressed: _isCancelling ? null : _cancelRegistration,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(double.infinity, 46),
+                          side: const BorderSide(color: Color(0xFFFCA5A5)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                        ),
+                      ),
+                    ] else
                       PrimaryButton(
                         text: 'Register for this Program',
                         onPressed: () => _navigateToRegistration(activeProgram),

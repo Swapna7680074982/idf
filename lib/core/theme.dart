@@ -51,6 +51,8 @@ class AppColors {
   // Status & Accents
   static const Color success = Color(0xFF22C55E);
   static const Color successBg = Color(0xFFDCFCE7);
+  static const Color errorRed = Color(0xFFEF4444);
+  static const Color errorBg = Color(0xFFFEE2E2);
   static const Color disabledButton = Color(0xFF81BDE2);
 }
 

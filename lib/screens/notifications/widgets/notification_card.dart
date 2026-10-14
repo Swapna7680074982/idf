@@ -122,6 +122,7 @@ class NotificationCard extends StatelessWidget {
           ),
         );
       case NotificationType.programSubmitted:
+      case NotificationType.applicationSubmitted:
         return Container(
           width: 40,
           height: 40,

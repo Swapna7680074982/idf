@@ -1,9 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 import '../../bloc/app_bloc.dart';
 import '../../bloc/app_event.dart';
 import '../../core/theme.dart';
+import '../../services/account_service.dart';
+import '../../services/api_config.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -17,20 +21,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _nameController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
+  bool _isSaving = false;
+  String? _uploadedPhotoUrl;
 
   @override
   void initState() {
     super.initState();
     final user = context.read<AppBloc>().state.user;
-    _nameController = TextEditingController(
-      text: user.fullName.isNotEmpty ? user.fullName : 'Dr. Sarah Osei',
-    );
-    _emailController = TextEditingController(
-      text: user.email.isNotEmpty ? user.email : '123@xyz.com',
-    );
-    _phoneController = TextEditingController(
-      text: user.phone.isNotEmpty ? user.phone : '+1 234 567 8900',
-    );
+    _nameController = TextEditingController(text: user.fullName);
+    _emailController = TextEditingController(text: user.email);
+    _phoneController = TextEditingController(text: user.phone);
+    _loadLiveProfile();
+  }
+
+  Future<void> _loadLiveProfile() async {
+    try {
+      final overview = await AccountService.getAccountOverview();
+      if (mounted) {
+        setState(() {
+          if (overview.fullName.isNotEmpty) {
+            _nameController.text = overview.fullName;
+          }
+          if (overview.email.isNotEmpty) {
+            _emailController.text = overview.email;
+          }
+          final fullPhone = '${overview.phoneCountryCode} ${overview.phoneNumber}'.trim();
+          if (fullPhone.isNotEmpty) {
+            _phoneController.text = fullPhone;
+          }
+          if (overview.profileImageUrl != null) {
+            _uploadedPhotoUrl = overview.profileImageUrl;
+          }
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -41,29 +65,109 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.dispose();
   }
 
-  void _saveChanges() {
+  void _saveChanges() async {
     if (_formKey.currentState?.validate() ?? false) {
-      context.read<AppBloc>().add(
-            UpdateUserProfileRequested(
-              fullName: _nameController.text.trim(),
-              email: _emailController.text.trim(),
-              phone: _phoneController.text.trim(),
+      setState(() => _isSaving = true);
+      try {
+        final rawPhone = _phoneController.text.trim();
+        String countryCode = '+91';
+        String phoneNum = rawPhone;
+        if (rawPhone.startsWith('+')) {
+          final parts = rawPhone.split(' ');
+          if (parts.length > 1) {
+            countryCode = parts.first;
+            phoneNum = parts.sublist(1).join('');
+          }
+        }
+
+        // Live API: PATCH /api/account/profile
+        await AccountService.updateProfile(
+          fullName: _nameController.text.trim(),
+          phoneCountryCode: countryCode,
+          phoneNumber: phoneNum,
+        );
+
+        if (mounted) {
+          context.read<AppBloc>().add(
+                UpdateUserProfileRequested(
+                  fullName: _nameController.text.trim(),
+                  email: _emailController.text.trim(),
+                  phone: _phoneController.text.trim(),
+                ),
+              );
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Profile updated successfully',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+              ),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Profile updated successfully',
-            style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-          ),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isSaving = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update: ${e.toString()}'),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _pickAndUploadPhoto(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 1024,
+        maxHeight: 1024,
+        imageQuality: 85,
       );
 
-      Navigator.of(context).pop();
+      if (picked != null) {
+        // Live API: POST /api/account/profile/photo
+        final file = File(picked.path);
+        final newUrl = await AccountService.uploadProfilePhoto(file);
+
+        if (mounted) {
+          setState(() {
+            if (newUrl != null && newUrl.isNotEmpty) {
+              _uploadedPhotoUrl = newUrl;
+            }
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Profile photo updated successfully',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+              ),
+              backgroundColor: AppColors.primaryBlue,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Upload failed: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -98,12 +202,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                   onTap: () {
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Camera opened'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                    _pickAndUploadPhoto(ImageSource.camera);
                   },
                 ),
                 ListTile(
@@ -114,12 +213,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                   onTap: () {
                     Navigator.pop(ctx);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Gallery opened'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
+                    _pickAndUploadPhoto(ImageSource.gallery);
                   },
                 ),
               ],
@@ -173,33 +267,51 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                       // Avatar & Change Photo
                       Center(
-                        child: Column(
-                          children: [
-                            CircleAvatar(
-                              radius: 46,
-                              backgroundColor: const Color(0xFFF1F5F9),
-                              child: Text(
-                                initialLetter,
-                                style: GoogleFonts.inter(
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFF1E293B),
+                        child: Builder(
+                          builder: (context) {
+                            final rawPhoto = _uploadedPhotoUrl;
+                            final isLocalFile = rawPhoto != null && rawPhoto.isNotEmpty && File(rawPhoto).existsSync();
+                            final resolvedUrl = ApiConfig.resolveImageUrl(rawPhoto);
+
+                            ImageProvider? imageProvider;
+                            if (isLocalFile) {
+                              imageProvider = FileImage(File(rawPhoto));
+                            } else if (resolvedUrl != null && resolvedUrl.isNotEmpty) {
+                              imageProvider = NetworkImage(resolvedUrl);
+                            }
+
+                            return Column(
+                              children: [
+                                CircleAvatar(
+                                  radius: 46,
+                                  backgroundColor: const Color(0xFFF1F5F9),
+                                  backgroundImage: imageProvider,
+                                  child: imageProvider == null
+                                      ? Text(
+                                          initialLetter,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 32,
+                                            fontWeight: FontWeight.w700,
+                                            color: const Color(0xFF1E293B),
+                                          ),
+                                        )
+                                      : null,
                                 ),
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                            GestureDetector(
-                              onTap: _showChangePhotoBottomSheet,
-                              child: Text(
-                                'Change Photo',
-                                style: GoogleFonts.inter(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.primaryBlue,
+                                const SizedBox(height: 12),
+                                GestureDetector(
+                                  onTap: _showChangePhotoBottomSheet,
+                                  child: Text(
+                                    'Change Photo',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primaryBlue,
+                                    ),
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ],
+                              ],
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(height: 32),
@@ -266,7 +378,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: _saveChanges,
+                  onPressed: _isSaving ? null : _saveChanges,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryBlue,
                     foregroundColor: Colors.white,
@@ -275,13 +387,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       borderRadius: BorderRadius.circular(26),
                     ),
                   ),
-                  child: Text(
-                    'Save Changes',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'Save Changes',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
             ),

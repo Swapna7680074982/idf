@@ -11,6 +11,9 @@ import 'home_screen.dart';
 import 'reset_password_screens.dart';
 import 'signup/signup_step1_account.dart';
 
+import '../services/api_client.dart';
+import '../services/auth_service.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -32,32 +35,76 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _onLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your email address'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    if (password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your password'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
 
-    final email = _emailController.text.trim();
-    final password = _passwordController.text;
+    try {
+      final authResult = await AuthService.login(
+        email: email,
+        password: password,
+      );
 
-    context.read<AppBloc>().add(
-          LoginRequested(
-            email: email.isNotEmpty ? email : 'sarah.osei@lasu.edu.ng',
-            password: password.isNotEmpty ? password : 'password123',
+      if (mounted) {
+        context.read<AppBloc>().add(SetAuthenticatedUser(authResult.user));
+        setState(() {
+          _isLoading = false;
+        });
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const HomeScreen(),
+          ),
+          (route) => false,
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 4),
           ),
         );
-
-    await Future.delayed(const Duration(milliseconds: 500));
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(
-          builder: (_) => const HomeScreen(),
-        ),
-        (route) => false,
-      );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Login failed: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 

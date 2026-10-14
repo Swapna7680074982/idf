@@ -4,6 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../bloc/app_bloc.dart';
 import '../../bloc/app_event.dart';
 import '../../core/theme.dart';
+import '../../models/meta_models.dart';
+import '../../services/account_service.dart';
+import '../../services/metadata_service.dart';
 
 class OrganizationDetailsScreen extends StatefulWidget {
   const OrganizationDetailsScreen({super.key});
@@ -21,10 +24,18 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
   late TextEditingController _stateController;
   late TextEditingController _cityController;
   late TextEditingController _addressController;
+  late TextEditingController _contactPersonController;
   late TextEditingController _contactEmailController;
   late TextEditingController _contactPhoneController;
 
   late String _selectedOrgType;
+  int? _selectedOrgTypeId;
+  int? _countryId;
+  int? _regionId;
+  int? _cityId;
+
+  bool _isLoading = true;
+  bool _isSaving = false;
 
   final List<String> _orgTypes = [
     'Institution',
@@ -34,39 +45,176 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
     'Non-Profit / NGO',
     'Other',
   ];
+  final List<OrganizationType> _backendOrgTypesList = [];
 
   @override
   void initState() {
     super.initState();
     final user = context.read<AppBloc>().state.user;
-    _orgNameController = TextEditingController(
-      text: user.organizationName.isNotEmpty
-          ? user.organizationName
-          : 'Lagos State University',
-    );
+    _orgNameController = TextEditingController(text: user.organizationName);
     _selectedOrgType = _orgTypes.contains(user.organizationType)
         ? user.organizationType
         : _orgTypes.first;
-    _countryController = TextEditingController(
-      text: user.country.isNotEmpty ? user.country : 'Nigeria',
-    );
+    _selectedOrgTypeId = user.organizationTypeId;
+    _countryId = user.countryId;
+    _regionId = user.regionId;
+    _cityId = user.cityId;
+
+    _countryController = TextEditingController(text: user.country);
     _stateController = TextEditingController(
-      text: user.state.isNotEmpty ? user.state : 'Lagos State',
+      text: user.state.isNotEmpty ? user.state : '',
     );
     _cityController = TextEditingController(
-      text: user.city.isNotEmpty ? user.city : 'Lagos',
+      text: user.city.isNotEmpty ? user.city : '',
     );
     _addressController = TextEditingController(
-      text: user.address.isNotEmpty ? user.address : 'Street address',
+      text: user.address.isNotEmpty ? user.address : '',
+    );
+    _contactPersonController = TextEditingController(
+      text: user.fullName.isNotEmpty ? user.fullName : '',
     );
     _contactEmailController = TextEditingController(
-      text: user.contactEmail.isNotEmpty ? user.contactEmail : 'contact@org.com',
+      text: user.contactEmail.isNotEmpty ? user.contactEmail : '',
     );
     _contactPhoneController = TextEditingController(
-      text: user.contactPhone.isNotEmpty
-          ? user.contactPhone
-          : '+234 800 000 0000',
+      text: user.contactPhone.isNotEmpty ? user.contactPhone : '',
     );
+
+    _fetchOrganizationDetails();
+  }
+
+  Future<void> _fetchOrganizationDetails() async {
+    try {
+      final org = await AccountService.getOrganizationDetails();
+
+      String resolvedOrgName = org.name.isNotEmpty ? org.name : _orgNameController.text;
+      String resolvedCountry = org.country.isNotEmpty ? org.country : _countryController.text;
+      String resolvedRegion = (org.region != null && org.region!.isNotEmpty)
+          ? org.region!
+          : _stateController.text;
+      String resolvedCity = (org.city != null && org.city!.isNotEmpty)
+          ? org.city!
+          : _cityController.text;
+      String resolvedOrgType = org.organizationType.isNotEmpty
+          ? org.organizationType
+          : _selectedOrgType;
+
+      int? effectiveOrgTypeId = org.organizationTypeId ?? _selectedOrgTypeId;
+      int? effectiveCountryId = org.countryId ?? _countryId;
+      int? effectiveRegionId = org.regionId ?? _regionId;
+      int? effectiveCityId = org.cityId ?? _cityId;
+
+      // 1. Fetch backend dynamic Organization Types
+      try {
+        final backendOrgTypes = await MetadataService.getOrganizationTypes();
+        _backendOrgTypesList.clear();
+        _backendOrgTypesList.addAll(backendOrgTypes);
+
+        for (final t in backendOrgTypes) {
+          if (!_orgTypes.contains(t.name)) {
+            _orgTypes.add(t.name);
+          }
+        }
+        if (effectiveOrgTypeId != null) {
+          final matched = backendOrgTypes.where((t) => t.id == effectiveOrgTypeId).firstOrNull;
+          if (matched != null) {
+            resolvedOrgType = matched.name;
+          }
+        } else if (resolvedOrgType.isNotEmpty) {
+          final matched = backendOrgTypes.where((t) => t.name.toLowerCase() == resolvedOrgType.toLowerCase()).firstOrNull;
+          if (matched != null) {
+            effectiveOrgTypeId = matched.id;
+          }
+        }
+      } catch (_) {}
+
+      // 2. Resolve Country Name / ID
+      if (effectiveCountryId != null && resolvedCountry.isEmpty) {
+        try {
+          final countries = await MetadataService.getCountries();
+          final matched = countries.where((c) => c.id == effectiveCountryId).firstOrNull;
+          if (matched != null) {
+            resolvedCountry = matched.name;
+          }
+        } catch (_) {}
+      } else if (resolvedCountry.isNotEmpty && effectiveCountryId == null) {
+        try {
+          final countries = await MetadataService.getCountries();
+          final matched = countries.where((c) => c.name.toLowerCase() == resolvedCountry.toLowerCase()).firstOrNull;
+          if (matched != null) {
+            effectiveCountryId = matched.id;
+          }
+        } catch (_) {}
+      }
+
+      // 3. Resolve Region/State Name from region_id if region string is missing
+      if (resolvedRegion.isEmpty && effectiveRegionId != null) {
+        try {
+          final regions = await MetadataService.getRegions(effectiveCountryId ?? 1);
+          final matched = regions.where((r) => r.id == effectiveRegionId).firstOrNull;
+          if (matched != null) {
+            resolvedRegion = matched.name;
+          }
+        } catch (_) {}
+      }
+
+      // 4. Resolve City Name from city_id if city string is missing
+      if (resolvedCity.isEmpty && effectiveRegionId != null && effectiveCityId != null) {
+        try {
+          final cities = await MetadataService.getCities(effectiveRegionId);
+          final matched = cities.where((c) => c.id == effectiveCityId).firstOrNull;
+          if (matched != null) {
+            resolvedCity = matched.name;
+          }
+        } catch (_) {}
+      }
+
+      if (mounted) {
+        setState(() {
+          _selectedOrgTypeId = effectiveOrgTypeId;
+          _countryId = effectiveCountryId;
+          _regionId = effectiveRegionId;
+          _cityId = effectiveCityId;
+
+          if (resolvedOrgName.isNotEmpty) _orgNameController.text = resolvedOrgName;
+          if (resolvedCountry.isNotEmpty) _countryController.text = resolvedCountry;
+          if (resolvedRegion.isNotEmpty) _stateController.text = resolvedRegion;
+          if (resolvedCity.isNotEmpty) _cityController.text = resolvedCity;
+          if (org.address.isNotEmpty) _addressController.text = org.address;
+          if (org.contactPerson.isNotEmpty) _contactPersonController.text = org.contactPerson;
+          if (org.contactEmail.isNotEmpty) _contactEmailController.text = org.contactEmail;
+          if (org.contactPhone.isNotEmpty) _contactPhoneController.text = org.contactPhone;
+
+          if (resolvedOrgType.isNotEmpty) {
+            if (!_orgTypes.contains(resolvedOrgType)) {
+              _orgTypes.add(resolvedOrgType);
+            }
+            _selectedOrgType = resolvedOrgType;
+          }
+          _isLoading = false;
+        });
+
+        // Also synchronize AppBloc user state so cached state/city are updated
+        context.read<AppBloc>().add(
+          UpdateUserProfileRequested(
+            organizationName: resolvedOrgName,
+            organizationType: _selectedOrgType,
+            country: resolvedCountry,
+            state: resolvedRegion,
+            city: resolvedCity,
+            address: org.address.isNotEmpty ? org.address : _addressController.text,
+            contactEmail: org.contactEmail.isNotEmpty ? org.contactEmail : _contactEmailController.text,
+            contactPhone: org.contactPhone.isNotEmpty ? org.contactPhone : _contactPhoneController.text,
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
@@ -76,39 +224,94 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
     _stateController.dispose();
     _cityController.dispose();
     _addressController.dispose();
+    _contactPersonController.dispose();
     _contactEmailController.dispose();
     _contactPhoneController.dispose();
     super.dispose();
   }
 
-  void _saveChanges() {
+  Future<void> _saveChanges() async {
     if (_formKey.currentState?.validate() ?? false) {
-      context.read<AppBloc>().add(
-            UpdateUserProfileRequested(
-              organizationName: _orgNameController.text.trim(),
-              organizationType: _selectedOrgType,
-              country: _countryController.text.trim(),
-              state: _stateController.text.trim(),
-              city: _cityController.text.trim(),
-              address: _addressController.text.trim(),
-              contactEmail: _contactEmailController.text.trim(),
-              contactPhone: _contactPhoneController.text.trim(),
+      setState(() {
+        _isSaving = true;
+      });
+
+      final orgName = _orgNameController.text.trim();
+      final address = _addressController.text.trim();
+      final contactPerson = _contactPersonController.text.trim();
+      final contactEmail = _contactEmailController.text.trim();
+      final contactPhone = _contactPhoneController.text.trim();
+
+      // Resolve orgTypeId if null
+      int? orgTypeId = _selectedOrgTypeId;
+      if (orgTypeId == null && _backendOrgTypesList.isNotEmpty) {
+        final match = _backendOrgTypesList
+            .where((t) => t.name.toLowerCase() == _selectedOrgType.toLowerCase())
+            .firstOrNull;
+        if (match != null) {
+          orgTypeId = match.id;
+        }
+      }
+
+      try {
+        await AccountService.updateOrganizationDetails(
+          name: orgName.isNotEmpty ? orgName : null,
+          address: address.isNotEmpty ? address : null,
+          contactPerson: contactPerson.isNotEmpty ? contactPerson : null,
+          contactEmail: contactEmail.isNotEmpty ? contactEmail : null,
+          contactPhone: contactPhone.isNotEmpty ? contactPhone : null,
+          organizationTypeId: orgTypeId,
+          countryId: _countryId,
+          regionId: _regionId,
+          cityId: _cityId,
+        );
+
+        if (mounted) {
+          context.read<AppBloc>().add(
+                UpdateUserProfileRequested(
+                  organizationName: orgName,
+                  organizationType: _selectedOrgType,
+                  country: _countryController.text.trim(),
+                  state: _stateController.text.trim(),
+                  city: _cityController.text.trim(),
+                  address: address,
+                  contactEmail: contactEmail,
+                  contactPhone: contactPhone,
+                ),
+              );
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Organization details updated successfully',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+              ),
+              backgroundColor: AppColors.success,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
             ),
           );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Organization details updated successfully',
-            style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-          ),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-      );
-
-      Navigator.of(context).pop();
+          Navigator.of(context).pop(true);
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isSaving = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Failed to update organization details: $e',
+                style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+              ),
+              backgroundColor: Colors.redAccent,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          );
+        }
+      }
     }
   }
 
@@ -134,9 +337,13 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
         ),
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
+        child: _isLoading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.primaryBlue),
+              )
+            : Column(
+                children: [
+                  Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
@@ -183,9 +390,6 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                       _buildTextField(
                         controller: _stateController,
                         hintText: 'Region / State',
-                        validator: (val) => val == null || val.trim().isEmpty
-                            ? 'Please enter region/state'
-                            : null,
                       ),
                       const SizedBox(height: 20),
 
@@ -195,9 +399,6 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                       _buildTextField(
                         controller: _cityController,
                         hintText: 'City',
-                        validator: (val) => val == null || val.trim().isEmpty
-                            ? 'Please enter city'
-                            : null,
                       ),
                       const SizedBox(height: 20),
 
@@ -207,6 +408,15 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                       _buildTextField(
                         controller: _addressController,
                         hintText: 'Street address',
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Contact Person
+                      _buildFieldLabel('Contact Person'),
+                      const SizedBox(height: 8),
+                      _buildTextField(
+                        controller: _contactPersonController,
+                        hintText: 'Full name of contact person',
                       ),
                       const SizedBox(height: 20),
 
@@ -225,7 +435,7 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                       const SizedBox(height: 8),
                       _buildTextField(
                         controller: _contactPhoneController,
-                        hintText: '+234 800 000 0000',
+                        hintText: '+91 9876543210',
                         keyboardType: TextInputType.phone,
                       ),
                       const SizedBox(height: 32),
@@ -242,7 +452,7 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: _saveChanges,
+                  onPressed: _isSaving ? null : _saveChanges,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryBlue,
                     foregroundColor: Colors.white,
@@ -251,13 +461,22 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                       borderRadius: BorderRadius.circular(26),
                     ),
                   ),
-                  child: Text(
-                    'Save Changes',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'Save Changes',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -306,6 +525,12 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
             if (newValue != null) {
               setState(() {
                 _selectedOrgType = newValue;
+                final match = _backendOrgTypesList
+                    .where((t) => t.name.toLowerCase() == newValue.toLowerCase())
+                    .firstOrNull;
+                if (match != null) {
+                  _selectedOrgTypeId = match.id;
+                }
               });
             }
           },

@@ -81,6 +81,15 @@ class RegisterForProgramRequested extends AppEvent {
   List<Object?> get props => [programId];
 }
 
+class CancelProgramRegistrationRequested extends AppEvent {
+  final String programId;
+
+  const CancelProgramRegistrationRequested(this.programId);
+
+  @override
+  List<Object?> get props => [programId];
+}
+
 class AddProgramRequested extends AppEvent {
   final dynamic program;
 
@@ -132,3 +141,17 @@ class UpdateUserProfileRequested extends AppEvent {
         contactPhone,
       ];
 }
+
+class FetchMetadataRequested extends AppEvent {}
+
+class CheckAuthStatus extends AppEvent {}
+
+class SetAuthenticatedUser extends AppEvent {
+  final dynamic authUser;
+
+  const SetAuthenticatedUser(this.authUser);
+
+  @override
+  List<Object?> get props => [authUser];
+}
+

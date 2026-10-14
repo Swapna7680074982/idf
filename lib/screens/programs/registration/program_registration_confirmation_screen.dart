@@ -5,6 +5,8 @@ import '../../../bloc/app_bloc.dart';
 import '../../../bloc/app_event.dart';
 import '../../../core/theme.dart';
 import '../../../models/program_model.dart';
+import '../../../services/api_client.dart';
+import '../../../services/programs_service.dart';
 import '../../../widgets/custom_button.dart';
 import 'program_registration_success_screen.dart';
 
@@ -30,24 +32,61 @@ class _ProgramRegistrationConfirmationScreenState
       _isConfirming = true;
     });
 
-    await Future.delayed(const Duration(milliseconds: 600));
+    try {
+      await ProgramsService.registerForProgram(widget.program.id);
 
-    if (mounted) {
-      context.read<AppBloc>().add(RegisterForProgramRequested(widget.program.id));
+      if (mounted) {
+        context.read<AppBloc>().add(RegisterForProgramRequested(widget.program.id));
 
-      setState(() {
-        _isConfirming = false;
-      });
+        setState(() {
+          _isConfirming = false;
+        });
 
-      final updatedProgram = widget.program.copyWith(isRegistered: true);
+        final updatedProgram = widget.program.copyWith(isRegistered: true);
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => ProgramRegistrationSuccessScreen(
-            program: updatedProgram,
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => ProgramRegistrationSuccessScreen(
+              program: updatedProgram,
+            ),
           ),
-        ),
-      );
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isConfirming = false;
+        });
+        if (e.code == 'ALREADY_REGISTERED' || e.statusCode == 409) {
+          context.read<AppBloc>().add(RegisterForProgramRequested(widget.program.id));
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.displayMessage),
+              backgroundColor: AppColors.primaryBlue,
+            ),
+          );
+          Navigator.of(context).pop(widget.program.copyWith(isRegistered: true));
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.displayMessage),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isConfirming = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to register: $e'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      }
     }
   }
 

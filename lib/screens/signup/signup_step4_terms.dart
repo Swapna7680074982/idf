@@ -4,6 +4,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../bloc/app_bloc.dart';
 import '../../bloc/app_event.dart';
 import '../../core/theme.dart';
+import '../../services/api_client.dart';
+import '../../services/auth_service.dart';
+import '../../services/metadata_service.dart';
 import '../../widgets/auth_header.dart';
 import '../../widgets/custom_button.dart';
 import 'signup_success.dart';
@@ -19,6 +22,7 @@ class SignUpStep4Screen extends StatefulWidget {
   final String state;
   final String city;
   final String address;
+  final String registrationToken;
 
   const SignUpStep4Screen({
     super.key,
@@ -32,6 +36,7 @@ class SignUpStep4Screen extends StatefulWidget {
     this.state = '',
     this.city = '',
     this.address = '',
+    this.registrationToken = '',
   });
 
   @override
@@ -43,37 +48,83 @@ class _SignUpStep4ScreenState extends State<SignUpStep4Screen> {
   bool _confirmedAccuracy = false;
   bool _isLoading = false;
 
+  String _termsText =
+      'By registering for the IDF Digital Hub, you agree to use this platform solely for legitimate physical activity program submissions and IDF ACTIVE certification applications. You warrant that all information provided is accurate and complete. The International Diabetes Federation reserves the right to verify, reject, or remove any submissions that violate these terms.';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLegalDocuments();
+  }
+
+  Future<void> _loadLegalDocuments() async {
+    try {
+      final docs = await MetadataService.getLegalDocuments();
+      if (docs.isNotEmpty) {
+        final terms = docs.firstWhere(
+          (d) => d.docType == 'terms_of_service',
+          orElse: () => docs.first,
+        );
+        if (mounted && terms.content.isNotEmpty) {
+          setState(() {
+            _termsText = terms.content;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
   void _onCreateAccount() async {
     setState(() {
       _isLoading = true;
     });
 
-    context.read<AppBloc>().add(
-          RegisterAccountRequested(
-            fullName: widget.fullName,
-            email: widget.email,
-            phone: widget.phone,
-            password: widget.password,
-            organizationName: widget.organizationName,
-            organizationType: widget.organizationType,
-            country: widget.country,
-            state: widget.state,
-            city: widget.city,
-            address: widget.address,
+    try {
+      // POST /api/auth/register/complete
+      final authResult = await AuthService.registerComplete(
+        registrationToken: widget.registrationToken,
+        acceptTerms: _agreedToTerms,
+        confirmAccuracy: _confirmedAccuracy,
+        deviceName: 'Mobile App',
+      );
+
+      if (mounted) {
+        context.read<AppBloc>().add(SetAuthenticatedUser(authResult.user));
+        setState(() {
+          _isLoading = false;
+        });
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const AccountCreatedScreen(),
           ),
         );
-
-    await Future.delayed(const Duration(milliseconds: 600));
-
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => const AccountCreatedScreen(),
-        ),
-      );
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            backgroundColor: Colors.redAccent,
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Registration completion error: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 
@@ -125,7 +176,7 @@ class _SignUpStep4ScreenState extends State<SignUpStep4Screen> {
                         ),
                         const SizedBox(height: 10),
                         Text(
-                          'By registering for the IDF Digital Hub, you agree to use this platform solely for legitimate physical activity program submissions and IDF ACTIVE certification applications. You warrant that all information provided is accurate and complete. The International Diabetes Federation reserves the right to verify, reject, or remove any submissions that violate these terms.',
+                          _termsText,
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             color: const Color(0xFF475569),

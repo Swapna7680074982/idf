@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme.dart';
+import '../../models/support_models.dart';
+import '../../services/api_client.dart';
+import '../../services/support_service.dart';
 
 class ContactSupportScreen extends StatefulWidget {
   const ContactSupportScreen({super.key});
@@ -13,22 +16,34 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _messageController;
 
-  String _selectedSubject = 'Select issue type...';
-
-  final List<String> _subjectOptions = [
-    'Select issue type...',
-    'Account & Login',
-    'Certification Application',
-    'Program Submission',
-    'Verification & Approval',
-    'Technical Support',
-    'Other Inquiries',
-  ];
+  List<SupportIssueType> _issueTypes = [];
+  SupportIssueType? _selectedIssueType;
+  bool _isLoadingTypes = true;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
     super.initState();
     _messageController = TextEditingController();
+    _fetchIssueTypes();
+  }
+
+  Future<void> _fetchIssueTypes() async {
+    try {
+      final types = await SupportService.getIssueTypes();
+      if (mounted) {
+        setState(() {
+          _issueTypes = types;
+          _isLoadingTypes = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoadingTypes = false;
+        });
+      }
+    }
   }
 
   @override
@@ -37,8 +52,8 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     super.dispose();
   }
 
-  void _sendMessage() {
-    if (_selectedSubject == 'Select issue type...') {
+  Future<void> _sendMessage() async {
+    if (_selectedIssueType == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -53,7 +68,8 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       return;
     }
 
-    if (_messageController.text.trim().isEmpty) {
+    final message = _messageController.text.trim();
+    if (message.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -68,52 +84,148 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       return;
     }
 
-    // Show confirmation dialog
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 28),
-            const SizedBox(width: 10),
-            Text(
-              'Message Sent',
-              style: GoogleFonts.inter(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF0F172A),
+    if (message.length < 10) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Please describe your issue in more detail (at least 10 characters)',
+            style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+          ),
+          backgroundColor: Colors.redAccent,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      final result = await SupportService.createTicket(
+        issueTypeId: _selectedIssueType!.id,
+        message: message,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+
+        // Show confirmation dialog with ticket number
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 28),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Ticket Created',
+                    style: GoogleFonts.inter(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Ticket Number:',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                      Text(
+                        result.ticket.ticketNo.isNotEmpty
+                            ? result.ticket.ticketNo
+                            : '#${result.ticket.id}',
+                        style: GoogleFonts.inter(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryBlue,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  result.message.isNotEmpty
+                      ? result.message
+                      : 'Your message has been sent. Our support team will get back to you shortly.',
+                  style: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    height: 1.45,
+                    color: const Color(0xFF475569),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.of(context).pop();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryBlue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: Text(
+                    'Done',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                  ),
+                ),
               ),
-            ),
-          ],
-        ),
-        content: Text(
-          'Thank you for contacting IDF Support. A ticket has been created and our team will get back to you shortly.',
-          style: GoogleFonts.inter(
-            fontSize: 14,
-            height: 1.5,
-            color: const Color(0xFF475569),
+            ],
           ),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              Navigator.of(context).pop();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryBlue,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+        final errorText = e is ApiException ? e.displayMessage : '$e';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              errorText,
+              style: GoogleFonts.inter(fontWeight: FontWeight.w500),
             ),
-            child: Text(
-              'Done',
-              style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-            ),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-        ],
-      ),
-    );
+        );
+      }
+    }
   }
 
   @override
@@ -151,8 +263,8 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                     children: [
                       const SizedBox(height: 8),
 
-                      // Subject
-                      _buildFieldLabel('Subject'),
+                      // Issue Type
+                      _buildFieldLabel('Issue Type'),
                       const SizedBox(height: 8),
                       _buildSubjectDropdown(),
                       const SizedBox(height: 24),
@@ -161,7 +273,15 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                       _buildFieldLabel('Message'),
                       const SizedBox(height: 8),
                       _buildMessageTextArea(),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Minimum 10 characters required',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF94A3B8),
+                        ),
+                      ),
+                      const SizedBox(height: 28),
                     ],
                   ),
                 ),
@@ -175,7 +295,7 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: _sendMessage,
+                  onPressed: _isSubmitting ? null : _sendMessage,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryBlue,
                     foregroundColor: Colors.white,
@@ -184,13 +304,22 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
                       borderRadius: BorderRadius.circular(26),
                     ),
                   ),
-                  child: Text(
-                    'Send Message',
-                    style: GoogleFonts.inter(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(
+                          'Submit Ticket',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                 ),
               ),
             ),
@@ -212,6 +341,33 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
   }
 
   Widget _buildSubjectDropdown() {
+    if (_isLoadingTypes) {
+      return Container(
+        height: 50,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.2),
+        ),
+        alignment: Alignment.centerLeft,
+        child: Row(
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryBlue),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Loading issue types...',
+              style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF94A3B8)),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -220,37 +376,33 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
       ),
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedSubject,
+        child: DropdownButton<SupportIssueType>(
+          value: _selectedIssueType,
+          hint: Text(
+            'Select issue type...',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w400,
+              color: const Color(0xFF94A3B8),
+            ),
+          ),
           isExpanded: true,
           icon: const Icon(Icons.keyboard_arrow_down, color: Color(0xFF64748B)),
           style: GoogleFonts.inter(
             fontSize: 15,
             fontWeight: FontWeight.w400,
-            color: _selectedSubject == 'Select issue type...'
-                ? const Color(0xFF94A3B8)
-                : const Color(0xFF0F172A),
+            color: const Color(0xFF0F172A),
           ),
-          items: _subjectOptions.map((String option) {
-            final isPlaceholder = option == 'Select issue type...';
-            return DropdownMenuItem<String>(
-              value: option,
-              child: Text(
-                option,
-                style: GoogleFonts.inter(
-                  color: isPlaceholder
-                      ? const Color(0xFF94A3B8)
-                      : const Color(0xFF0F172A),
-                ),
-              ),
+          items: _issueTypes.map((SupportIssueType type) {
+            return DropdownMenuItem<SupportIssueType>(
+              value: type,
+              child: Text(type.name),
             );
           }).toList(),
-          onChanged: (String? newValue) {
-            if (newValue != null) {
-              setState(() {
-                _selectedSubject = newValue;
-              });
-            }
+          onChanged: (SupportIssueType? newValue) {
+            setState(() {
+              _selectedIssueType = newValue;
+            });
           },
         ),
       ),

@@ -1,5 +1,9 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../models/program_model.dart';
+import '../services/api_client.dart';
+import '../services/auth_service.dart';
+import '../services/metadata_service.dart';
+import '../services/token_storage.dart';
 import 'app_event.dart';
 import 'app_state.dart';
 
@@ -10,8 +14,86 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     on<ResetPasswordRequested>(_onResetPasswordRequested);
     on<LogoutRequested>(_onLogoutRequested);
     on<RegisterForProgramRequested>(_onRegisterForProgramRequested);
+    on<CancelProgramRegistrationRequested>(_onCancelProgramRegistrationRequested);
     on<AddProgramRequested>(_onAddProgramRequested);
     on<UpdateUserProfileRequested>(_onUpdateUserProfileRequested);
+    on<FetchMetadataRequested>(_onFetchMetadataRequested);
+    on<SetAuthenticatedUser>(_onSetAuthenticatedUser);
+    on<CheckAuthStatus>(_onCheckAuthStatus);
+
+    // Automatically check auth status and fetch metadata on creation
+    add(CheckAuthStatus());
+    add(FetchMetadataRequested());
+  }
+
+  Future<void> _onCheckAuthStatus(
+    CheckAuthStatus event,
+    Emitter<AppState> emit,
+  ) async {
+    await TokenStorage.init();
+    final hasTokens = TokenStorage.isAuthenticated ||
+        (TokenStorage.refreshToken != null && TokenStorage.refreshToken!.isNotEmpty);
+
+    if (!hasTokens) {
+      emit(state.copyWith(
+        authStatus: AuthStatus.unauthenticated,
+        user: UserModel.initial(),
+      ));
+      return;
+    }
+
+    if (TokenStorage.currentUser != null) {
+      emit(state.copyWith(
+        authStatus: AuthStatus.authenticated,
+        user: UserModel.fromAuthUser(TokenStorage.currentUser),
+      ));
+    }
+
+    try {
+      final liveUser = await AuthService.getMe();
+      emit(state.copyWith(
+        authStatus: AuthStatus.authenticated,
+        user: UserModel.fromAuthUser(liveUser),
+      ));
+    } on ApiException catch (e) {
+      if (e.statusCode == 401) {
+        await TokenStorage.clearAuth();
+        emit(state.copyWith(
+          authStatus: AuthStatus.unauthenticated,
+          user: UserModel.initial(),
+        ));
+      }
+      // Keep cached user if offline / network error
+    } catch (_) {
+      // Keep cached user if offline / socket error
+    }
+  }
+
+  Future<void> _onFetchMetadataRequested(
+    FetchMetadataRequested event,
+    Emitter<AppState> emit,
+  ) async {
+    try {
+      final orgTypes = await MetadataService.getOrganizationTypes();
+      final countries = await MetadataService.getCountries();
+
+      emit(state.copyWith(
+        organizationTypes: orgTypes.map((o) => o.name).toList(),
+        countries: countries.map((c) => c.name).toList(),
+      ));
+    } catch (_) {}
+  }
+
+  void _onSetAuthenticatedUser(
+    SetAuthenticatedUser event,
+    Emitter<AppState> emit,
+  ) {
+    final userModel = UserModel.fromAuthUser(event.authUser);
+    emit(state.copyWith(
+      authStatus: AuthStatus.authenticated,
+      user: userModel,
+      isLoading: false,
+    ));
   }
 
   Future<void> _onLoginRequested(
@@ -19,26 +101,30 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     Emitter<AppState> emit,
   ) async {
     emit(state.copyWith(isLoading: true, errorMessage: null));
-    await Future.delayed(const Duration(milliseconds: 500));
 
-    final updatedUser = UserModel(
-      fullName: event.email.contains('jane') ? 'Dr. Jane Smith' : 'Dr. Sarah Osei',
-      email: event.email.isNotEmpty ? event.email : 'sarah.osei@lasu.edu.ng',
-      phone: state.user.phone,
-      organizationName: state.user.organizationName,
-      organizationType: state.user.organizationType,
-      country: state.user.country,
-      state: state.user.state,
-      city: state.user.city,
-      address: state.user.address,
-      certificationStatus: 'Changes Required',
-    );
+    try {
+      final result = await AuthService.login(
+        email: event.email,
+        password: event.password,
+      );
 
-    emit(state.copyWith(
-      authStatus: AuthStatus.authenticated,
-      user: updatedUser,
-      isLoading: false,
-    ));
+      final userModel = UserModel.fromAuthUser(result.user);
+      emit(state.copyWith(
+        authStatus: AuthStatus.authenticated,
+        user: userModel,
+        isLoading: false,
+      ));
+    } on ApiException catch (e) {
+      emit(state.copyWith(
+        isLoading: false,
+        errorMessage: e.message,
+      ));
+    } catch (e) {
+      emit(state.copyWith(
+        isLoading: false,
+        errorMessage: e.toString(),
+      ));
+    }
   }
 
   Future<void> _onRegisterAccountRequested(
@@ -46,23 +132,18 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     Emitter<AppState> emit,
   ) async {
     emit(state.copyWith(isLoading: true, errorMessage: null));
-    await Future.delayed(const Duration(milliseconds: 600));
 
     final newUser = UserModel(
-      fullName: event.fullName.isNotEmpty ? event.fullName : 'Dr. Jane Smith',
-      email: event.email.isNotEmpty ? event.email : 'your@email.com',
-      phone: event.phone.isNotEmpty ? event.phone : '+91 0987654321',
-      organizationName: event.organizationName.isNotEmpty
-          ? event.organizationName
-          : 'World Health Centre',
-      organizationType: event.organizationType.isNotEmpty
-          ? event.organizationType
-          : 'Hospital / Healthcare Facility',
-      country: event.country.isNotEmpty ? event.country : 'India',
-      state: event.state.isNotEmpty ? event.state : 'Maharashtra',
-      city: event.city.isNotEmpty ? event.city : 'Mumbai',
-      address: event.address.isNotEmpty ? event.address : 'Central Medical Ave',
-      certificationStatus: 'Under Review',
+      fullName: event.fullName,
+      email: event.email,
+      phone: event.phone,
+      organizationName: event.organizationName,
+      organizationType: event.organizationType,
+      country: event.country,
+      state: event.state,
+      city: event.city,
+      address: event.address,
+      certificationStatus: '',
     );
 
     emit(state.copyWith(
@@ -85,6 +166,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     LogoutRequested event,
     Emitter<AppState> emit,
   ) {
+    AuthService.logout();
     emit(state.copyWith(
       authStatus: AuthStatus.unauthenticated,
     ));
@@ -97,6 +179,19 @@ class AppBloc extends Bloc<AppEvent, AppState> {
     final updatedPrograms = state.programs.map((p) {
       if (p.id == event.programId) {
         return p.copyWith(isRegistered: true);
+      }
+      return p;
+    }).toList();
+    emit(state.copyWith(programs: updatedPrograms));
+  }
+
+  void _onCancelProgramRegistrationRequested(
+    CancelProgramRegistrationRequested event,
+    Emitter<AppState> emit,
+  ) {
+    final updatedPrograms = state.programs.map((p) {
+      if (p.id == event.programId) {
+        return p.copyWith(isRegistered: false);
       }
       return p;
     }).toList();

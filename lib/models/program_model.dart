@@ -1,3 +1,5 @@
+import '../services/api_config.dart';
+
 enum ProgramStatus {
   upcoming,
   ongoing,
@@ -56,6 +58,7 @@ class ProgramModel {
   final List<ProgramAgendaItem> agenda;
   final ProgramContactInfo contactInfo;
   final bool isRegistered;
+  final bool canRegister;
   final List<int> gradientColors;
   final String? imageUrl;
   final String? category;
@@ -80,6 +83,7 @@ class ProgramModel {
     required this.agenda,
     required this.contactInfo,
     this.isRegistered = false,
+    this.canRegister = true,
     required this.gradientColors,
     this.imageUrl,
     this.category,
@@ -105,6 +109,7 @@ class ProgramModel {
     List<ProgramAgendaItem>? agenda,
     ProgramContactInfo? contactInfo,
     bool? isRegistered,
+    bool? canRegister,
     List<int>? gradientColors,
     String? imageUrl,
     String? category,
@@ -129,11 +134,163 @@ class ProgramModel {
       agenda: agenda ?? this.agenda,
       contactInfo: contactInfo ?? this.contactInfo,
       isRegistered: isRegistered ?? this.isRegistered,
+      canRegister: canRegister ?? this.canRegister,
       gradientColors: gradientColors ?? this.gradientColors,
       imageUrl: imageUrl ?? this.imageUrl,
       category: category ?? this.category,
       participantsCount: participantsCount ?? this.participantsCount,
       targetAudience: targetAudience ?? this.targetAudience,
+    );
+  }
+
+  factory ProgramModel.fromDetailJson(Map<String, dynamic> json) {
+    final eventDetails = json['event_details'] is Map<String, dynamic>
+        ? json['event_details'] as Map<String, dynamic>
+        : <String, dynamic>{};
+    final contact = json['contact'] is Map<String, dynamic>
+        ? json['contact'] as Map<String, dynamic>
+        : <String, dynamic>{};
+    final registration = json['registration'] is Map<String, dynamic>
+        ? json['registration'] as Map<String, dynamic>
+        : <String, dynamic>{};
+    final agendaList = json['agenda'] is List ? json['agenda'] as List : [];
+
+    final statusStr = (json['event_status'] ?? '').toString().toLowerCase();
+    final ProgramStatus status;
+    if (statusStr == 'ongoing') {
+      status = ProgramStatus.ongoing;
+    } else if (statusStr == 'completed') {
+      status = ProgramStatus.completed;
+    } else {
+      status = ProgramStatus.upcoming;
+    }
+
+    final typeStr = (json['program_type'] ?? '').toString().toLowerCase();
+    final ProgramType type;
+    if (typeStr.contains('campaign')) {
+      type = ProgramType.campaign;
+    } else if (typeStr.contains('conference')) {
+      type = ProgramType.conference;
+    } else if (typeStr.contains('workshop')) {
+      type = ProgramType.workshop;
+    } else if (typeStr.contains('seminar')) {
+      type = ProgramType.seminar;
+    } else if (typeStr.contains('walk')) {
+      type = ProgramType.communityWalk;
+    } else {
+      type = ProgramType.activityDrive;
+    }
+
+    final city = (eventDetails['city'] ?? json['city_text'] ?? '').toString();
+    final country = (eventDetails['country'] ?? json['country_text'] ?? '').toString();
+    final location = [city, country].where((s) => s.isNotEmpty).join(', ');
+    final organizer = (eventDetails['organizer'] ?? json['organizer_name'] ?? 'IDF Active').toString();
+    final venue = (eventDetails['venue'] ?? json['venue'] ?? location).toString();
+    final startDate = (eventDetails['start_date'] ?? json['start_date'] ?? '').toString();
+    final endDate = (eventDetails['end_date'] ?? json['end_date'] ?? startDate).toString();
+
+    final parsedAgenda = agendaList.whereType<Map<String, dynamic>>().map((a) {
+      return ProgramAgendaItem(
+        time: (a['time'] ?? a['start_time'] ?? '').toString(),
+        title: (a['title'] ?? '').toString(),
+        description: a['description']?.toString(),
+      );
+    }).toList();
+
+    final contactInfo = ProgramContactInfo(
+      contactPerson: (contact['person'] ?? contact['contact_person'] ?? '').toString(),
+      phone: (contact['phone'] ?? contact['contact_phone'] ?? '').toString(),
+      email: (contact['email'] ?? contact['contact_email'] ?? '').toString(),
+    );
+
+    final isReg = registration['is_registered'] == true || json['is_registered'] == true;
+    final canReg = registration['can_register'] != false;
+
+    return ProgramModel(
+      id: (json['id'] ?? json['program_no'] ?? '').toString(),
+      title: (json['title'] ?? '').toString(),
+      tag: (json['program_type'] ?? 'ACTIVITY DRIVE').toString().toUpperCase(),
+      type: type,
+      status: status,
+      organizer: organizer.isNotEmpty ? organizer : 'IDF Active',
+      organizationType: '',
+      venue: venue.isNotEmpty ? venue : (location.isNotEmpty ? location : 'TBD'),
+      location: location.isNotEmpty ? location : venue,
+      country: country,
+      city: city,
+      startDate: startDate,
+      endDate: endDate,
+      description: (json['about'] ?? json['description'] ?? '').toString(),
+      agenda: parsedAgenda,
+      contactInfo: contactInfo,
+      isRegistered: isReg,
+      canRegister: canReg,
+      gradientColors: const [0xFF006097, 0xFF017CC2],
+      imageUrl: ApiConfig.resolveImageUrl(json['cover_image_url']?.toString()),
+    );
+  }
+
+  factory ProgramModel.fromApiItem(dynamic apiItem) {
+    if (apiItem is Map<String, dynamic>) {
+      return ProgramModel.fromDetailJson(apiItem);
+    }
+    final statusStr = apiItem.eventStatus?.toString().toLowerCase() ?? 'upcoming';
+    final ProgramStatus status;
+    if (statusStr == 'ongoing') {
+      status = ProgramStatus.ongoing;
+    } else if (statusStr == 'completed') {
+      status = ProgramStatus.completed;
+    } else {
+      status = ProgramStatus.upcoming;
+    }
+
+    final typeStr = apiItem.programType?.toString().toLowerCase() ?? '';
+    final ProgramType type;
+    if (typeStr.contains('campaign')) {
+      type = ProgramType.campaign;
+    } else if (typeStr.contains('conference')) {
+      type = ProgramType.conference;
+    } else if (typeStr.contains('workshop')) {
+      type = ProgramType.workshop;
+    } else if (typeStr.contains('seminar')) {
+      type = ProgramType.seminar;
+    } else if (typeStr.contains('walk')) {
+      type = ProgramType.communityWalk;
+    } else {
+      type = ProgramType.activityDrive;
+    }
+
+    final city = apiItem.cityText?.toString() ?? '';
+    final country = apiItem.countryText?.toString() ?? '';
+    final location = [city, country].where((s) => s.isNotEmpty).join(', ');
+
+    return ProgramModel(
+      id: apiItem.id?.toString() ?? '',
+      title: apiItem.title?.toString() ?? '',
+      tag: apiItem.programType?.toString().toUpperCase() ?? 'ACTIVITY DRIVE',
+      type: type,
+      status: status,
+      organizer: (apiItem.organizerName?.toString().isNotEmpty ?? false)
+          ? apiItem.organizerName!.toString()
+          : 'IDF Active',
+      organizationType: '',
+      venue: location.isNotEmpty ? location : 'IDF Active Venue',
+      location: location.isNotEmpty ? location : 'International',
+      country: country,
+      city: city,
+      startDate: apiItem.startDate?.toString() ?? '',
+      endDate: (apiItem.endDate ?? apiItem.startDate)?.toString() ?? '',
+      description: '',
+      agenda: const [],
+      contactInfo: const ProgramContactInfo(
+        contactPerson: '',
+        phone: '',
+        email: '',
+      ),
+      isRegistered: apiItem.isRegistered == true,
+      canRegister: true,
+      gradientColors: const [0xFF006097, 0xFF017CC2],
+      imageUrl: ApiConfig.resolveImageUrl(apiItem.coverImageUrl?.toString()),
     );
   }
 

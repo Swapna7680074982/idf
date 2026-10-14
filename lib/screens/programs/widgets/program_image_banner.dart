@@ -1,5 +1,7 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../../../models/program_model.dart';
+import '../../../services/api_config.dart';
 
 class ProgramImageBanner extends StatelessWidget {
   final ProgramModel program;
@@ -21,7 +23,14 @@ class ProgramImageBanner extends StatelessWidget {
         ? program.gradientColors.map((c) => Color(c)).toList()
         : [const Color(0xFF006097), const Color(0xFF017CC2)];
 
-    final hasImage = program.imageUrl != null && program.imageUrl!.isNotEmpty;
+    final rawUrl = program.imageUrl;
+    final hasImage = rawUrl != null && rawUrl.isNotEmpty;
+    final isLocalFile = hasImage && File(rawUrl).existsSync();
+
+    String effectiveUrl = rawUrl ?? '';
+    if (hasImage && !isLocalFile && effectiveUrl.startsWith('/')) {
+      effectiveUrl = '${ApiConfig.baseUrl}$effectiveUrl';
+    }
 
     return ClipRRect(
       borderRadius: borderRadius ?? BorderRadius.circular(16),
@@ -38,9 +47,15 @@ class ProgramImageBanner extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            if (hasImage)
+            if (isLocalFile)
+              Image.file(
+                File(rawUrl),
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => _buildArtisticBackground(colors),
+              )
+            else if (hasImage)
               Image.network(
-                program.imageUrl!,
+                effectiveUrl,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => _buildArtisticBackground(colors),
                 loadingBuilder: (context, child, loadingProgress) {

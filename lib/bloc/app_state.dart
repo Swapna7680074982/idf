@@ -3,95 +3,163 @@ import '../models/program_model.dart';
 
 // Models
 class UserModel extends Equatable {
+  final int? id;
   final String fullName;
   final String email;
   final String phone;
   final String organizationName;
+  final int? organizationTypeId;
   final String organizationType;
+  final int? countryId;
   final String country;
+  final int? regionId;
   final String state;
+  final int? cityId;
   final String city;
   final String address;
   final String certificationStatus;
   final String contactEmail;
   final String contactPhone;
+  final String role;
 
   const UserModel({
+    this.id,
     required this.fullName,
     required this.email,
     required this.phone,
     required this.organizationName,
+    this.organizationTypeId,
     required this.organizationType,
+    this.countryId,
     required this.country,
+    this.regionId,
     required this.state,
+    this.cityId,
     required this.city,
     required this.address,
     required this.certificationStatus,
-    this.contactEmail = 'contact@org.com',
-    this.contactPhone = '+234 800 000 0000',
+    this.contactEmail = '',
+    this.contactPhone = '',
+    this.role = 'user',
   });
 
   factory UserModel.initial() {
     return const UserModel(
-      fullName: 'Dr. Sarah Osei',
-      email: '123@xyz.com',
-      phone: '+1 234 567 8900',
-      organizationName: 'Lagos State University',
-      organizationType: 'Institution',
-      country: 'Nigeria',
-      state: 'Lagos State',
-      city: 'Lagos',
-      address: 'Street address',
-      certificationStatus: 'Changes Required',
-      contactEmail: 'contact@org.com',
-      contactPhone: '+234 800 000 0000',
+      id: null,
+      fullName: '',
+      email: '',
+      phone: '',
+      organizationName: '',
+      organizationTypeId: null,
+      organizationType: '',
+      countryId: null,
+      country: '',
+      regionId: null,
+      state: '',
+      cityId: null,
+      city: '',
+      address: '',
+      certificationStatus: '',
+      contactEmail: '',
+      contactPhone: '',
+      role: 'user',
+    );
+  }
+
+  factory UserModel.fromAuthUser(dynamic authUser) {
+    if (authUser == null) return UserModel.initial();
+    return UserModel(
+      id: authUser.id is int ? authUser.id as int : null,
+      fullName: authUser.fullName?.toString() ?? '',
+      email: authUser.email?.toString() ?? '',
+      phone: authUser.phoneNumber?.toString() ?? '',
+      organizationName: authUser.organization?.name?.toString() ?? '',
+      organizationTypeId: authUser.organization?.organizationTypeId is int
+          ? authUser.organization?.organizationTypeId as int
+          : int.tryParse(authUser.organization?.organizationTypeId?.toString() ?? ''),
+      organizationType: authUser.organization?.organizationType?.toString() ?? '',
+      countryId: authUser.organization?.countryId is int
+          ? authUser.organization?.countryId as int
+          : int.tryParse(authUser.organization?.countryId?.toString() ?? ''),
+      country: authUser.organization?.country?.toString() ?? '',
+      regionId: authUser.organization?.regionId is int
+          ? authUser.organization?.regionId as int
+          : int.tryParse(authUser.organization?.regionId?.toString() ?? ''),
+      state: authUser.organization?.region?.toString() ?? '',
+      cityId: authUser.organization?.cityId is int
+          ? authUser.organization?.cityId as int
+          : int.tryParse(authUser.organization?.cityId?.toString() ?? ''),
+      city: authUser.organization?.city?.toString() ?? '',
+      address: authUser.organization?.address?.toString() ?? '',
+      certificationStatus: '',
+      contactEmail: authUser.organization?.contactEmail?.toString() ?? authUser.email?.toString() ?? '',
+      contactPhone: authUser.organization?.contactPhone?.toString() ?? authUser.phoneNumber?.toString() ?? '',
+      role: authUser.role?.toString() ?? 'user',
     );
   }
 
   UserModel copyWith({
+    int? id,
     String? fullName,
     String? email,
     String? phone,
     String? organizationName,
+    int? organizationTypeId,
     String? organizationType,
+    int? countryId,
     String? country,
+    int? regionId,
     String? state,
+    int? cityId,
     String? city,
     String? address,
     String? certificationStatus,
     String? contactEmail,
     String? contactPhone,
+    String? role,
   }) {
     return UserModel(
+      id: id ?? this.id,
       fullName: fullName ?? this.fullName,
       email: email ?? this.email,
       phone: phone ?? this.phone,
       organizationName: organizationName ?? this.organizationName,
+      organizationTypeId: organizationTypeId ?? this.organizationTypeId,
       organizationType: organizationType ?? this.organizationType,
+      countryId: countryId ?? this.countryId,
       country: country ?? this.country,
+      regionId: regionId ?? this.regionId,
       state: state ?? this.state,
+      cityId: cityId ?? this.cityId,
       city: city ?? this.city,
       address: address ?? this.address,
       certificationStatus: certificationStatus ?? this.certificationStatus,
       contactEmail: contactEmail ?? this.contactEmail,
       contactPhone: contactPhone ?? this.contactPhone,
+      role: role ?? this.role,
     );
   }
 
   @override
   List<Object?> get props => [
+        id,
         fullName,
         email,
         phone,
         organizationName,
+        organizationTypeId,
         organizationType,
+        countryId,
         country,
+        regionId,
         state,
+        cityId,
         city,
         address,
         certificationStatus,
         contactEmail,
         contactPhone,
+        role,
       ];
 }
 
@@ -156,85 +224,14 @@ class AppState extends Equatable {
     return AppState(
       authStatus: AuthStatus.unauthenticated,
       user: UserModel.initial(),
-      programApplicationsCount: 2,
-      certificationApplicationsCount: 1,
-      registeredPrograms: const [
-        ProgramItem(
-          tag: 'CAMPAIGN',
-          title: 'Diabetes Awareness Walk 2026',
-          date: '18 Sep 2026',
-          location: 'Hyderabad, India',
-          isRegistered: true,
-          gradientColors: [0xFFEA580C, 0xFFF97316],
-          imageUrl: 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=800&auto=format&fit=crop&q=80',
-        ),
-        ProgramItem(
-          tag: 'ACTIVITY DRIVE',
-          title: 'Global Walk for Diabetes 2025',
-          date: '14 Nov 2025',
-          location: 'Nairobi, Kenya',
-          isRegistered: true,
-          gradientColors: [0xFF006097, 0xFF017CC2],
-          imageUrl: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&auto=format&fit=crop&q=80',
-        ),
-        ProgramItem(
-          tag: 'CAMPAIGN',
-          title: 'Community Cycling Campaign – SEA',
-          date: '10 Aug 2025',
-          location: 'Bangkok, Thailand',
-          isRegistered: true,
-          gradientColors: [0xFF059669, 0xFF10B981],
-          imageUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&auto=format&fit=crop&q=80',
-        ),
-      ],
-      programs: ProgramModel.samplePrograms(),
-      organizationTypes: const [
-        'Hospital / Healthcare Facility',
-        'NGO / Non-profit Organization',
-        'Academic / Research Institution',
-        'Government / Public Health Agency',
-        'Corporate / Fitness Organization',
-        'Other',
-      ],
-      countries: const [
-        'India',
-        'United States',
-        'United Kingdom',
-        'Canada',
-        'Australia',
-        'Germany',
-        'France',
-        'Singapore',
-        'Nigeria',
-        'United Arab Emirates',
-      ],
-      states: const [
-        'Maharashtra',
-        'Delhi',
-        'Karnataka',
-        'Tamil Nadu',
-        'Telangana',
-        'Gujarat',
-        'West Bengal',
-        'California',
-        'New York',
-        'London Region',
-        'Lagos',
-        'Other',
-      ],
-      cities: const [
-        'Mumbai',
-        'New Delhi',
-        'Bengaluru',
-        'Chennai',
-        'Hyderabad',
-        'Pune',
-        'Kolkata',
-        'San Francisco',
-        'London',
-        'Ikeja',
-        'Other',
-      ],
+      programApplicationsCount: 0,
+      certificationApplicationsCount: 0,
+      registeredPrograms: const [],
+      programs: const [],
+      organizationTypes: const [],
+      countries: const [],
+      states: const [],
+      cities: const [],
     );
   }
 

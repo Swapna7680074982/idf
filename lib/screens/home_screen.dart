@@ -14,6 +14,9 @@ import 'certification/certification_tab_screen.dart';
 import 'certification/certification_wizard_screen.dart';
 import '../models/certification_model.dart';
 import '../models/application_item_model.dart';
+import '../models/home_models.dart';
+import '../services/api_config.dart';
+import '../services/home_service.dart';
 import 'applications/my_applications_screen.dart';
 import 'account/account_screen.dart';
 
@@ -35,12 +38,25 @@ class _HomeScreenState extends State<HomeScreen> {
   late int _currentTabIndex;
   late int _appTabIndex;
   DateTime? _lastBackPressTime;
+  HomeSummaryResponse? _homeSummary;
 
   @override
   void initState() {
     super.initState();
     _currentTabIndex = widget.initialTabIndex;
     _appTabIndex = widget.initialAppTabIndex;
+    _fetchHomeData();
+  }
+
+  Future<void> _fetchHomeData() async {
+    try {
+      final summary = await HomeService.getHomeSummary();
+      if (mounted) {
+        setState(() {
+          _homeSummary = summary;
+        });
+      }
+    } catch (_) {}
   }
 
   void _handlePopScope(bool didPop) {
@@ -247,92 +263,100 @@ class _HomeScreenState extends State<HomeScreen> {
   // -------------------------------------------------------------
   Widget _buildHomeDashboardTab(AppState state) {
     final user = state.user;
+    final displayName = _homeSummary?.userFullName.isNotEmpty == true
+        ? _homeSummary!.userFullName
+        : (user.fullName.isNotEmpty ? user.fullName : '');
+    final unreadCount = _homeSummary?.unreadNotifications ?? 0;
 
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Top Header Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome back,',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      user.fullName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        fontSize: 19,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  IconButton(
-                    icon: const Icon(
-                      Icons.notifications_none_rounded,
-                      color: Color(0xFF334155),
-                      size: 26,
-                    ),
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const NotificationsScreen(),
+    return RefreshIndicator(
+      onRefresh: _fetchHomeData,
+      color: AppColors.primaryBlue,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.only(left: 16, right: 16, top: 12, bottom: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Top Header Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Welcome back,',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
                         ),
-                      );
-                    },
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        displayName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ],
                   ),
-                  Positioned(
-                    top: 6,
-                    right: 6,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    IconButton(
+                      icon: const Icon(
+                        Icons.notifications_none_rounded,
+                        color: Color(0xFF334155),
+                        size: 26,
                       ),
-                      constraints: const BoxConstraints(
-                        minWidth: 16,
-                        minHeight: 16,
-                      ),
-                      child: Center(
-                        child: Text(
-                          '2',
-                          style: GoogleFonts.inter(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const NotificationsScreen(),
+                          ),
+                        ).then((_) => _fetchHomeData());
+                      },
+                    ),
+                    if (unreadCount > 0)
+                      Positioned(
+                        top: 6,
+                        right: 6,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEF4444),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          constraints: const BoxConstraints(
+                            minWidth: 16,
+                            minHeight: 16,
+                          ),
+                          child: Center(
+                            child: Text(
+                              '$unreadCount',
+                              style: GoogleFonts.inter(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+                  ],
+                ),
+              ],
+            ),
           const SizedBox(height: 12),
 
           // Hero Initiative Banner
@@ -484,8 +508,9 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 16),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   // -------------------------------------------------------------
   // Hero Banner Widget (Responsive)
@@ -688,6 +713,9 @@ class _HomeScreenState extends State<HomeScreen> {
   // My Applications Card
   // -------------------------------------------------------------
   Widget _buildMyApplicationsCard(AppState state) {
+    final progCount = _homeSummary?.programApplicationsCount ?? state.programApplicationsCount;
+    final certCount = _homeSummary?.certificationApplicationsCount ?? state.certificationApplicationsCount;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -724,7 +752,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${state.programApplicationsCount} active submissions',
+                          '$progCount active submissions',
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             color: const Color(0xFF64748B),
@@ -734,7 +762,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   Text(
-                    '${state.programApplicationsCount}',
+                    '$progCount',
                     style: GoogleFonts.inter(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
@@ -774,7 +802,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${state.certificationApplicationsCount} active application',
+                          '$certCount active application',
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             color: const Color(0xFF64748B),
@@ -784,7 +812,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   Text(
-                    '${state.certificationApplicationsCount}',
+                    '$certCount',
                     style: GoogleFonts.inter(
                       fontSize: 22,
                       fontWeight: FontWeight.w700,
@@ -804,15 +832,56 @@ class _HomeScreenState extends State<HomeScreen> {
   // Programs Carousel (Safe Height & Shared State)
   // -------------------------------------------------------------
   Widget _buildProgramsCarousel(AppState state) {
+    final List<ProgramModel> programsToDisplay = _homeSummary != null
+        ? _homeSummary!.registeredPrograms
+            .map((reg) => ProgramModel.fromApiItem(reg))
+            .toList()
+        : [];
+
+    if (programsToDisplay.isEmpty) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border, width: 1.1),
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.event_available_outlined, size: 30, color: Color(0xFF94A3B8)),
+            const SizedBox(height: 8),
+            Text(
+              'No registered programs yet',
+              style: GoogleFonts.inter(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w600,
+                color: const Color(0xFF475569),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Explore and join upcoming diabetes prevention programs',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                color: const Color(0xFF94A3B8),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return SizedBox(
       height: 245,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         physics: const BouncingScrollPhysics(),
-        itemCount: state.programs.length,
+        itemCount: programsToDisplay.length,
         separatorBuilder: (context, index) => const SizedBox(width: 14),
         itemBuilder: (context, index) {
-          final program = state.programs[index];
+          final program = programsToDisplay[index];
           return _buildProgramCard(program: program);
         },
       ),
@@ -858,9 +927,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    if (program.imageUrl != null && program.imageUrl!.isNotEmpty)
+                    if (ApiConfig.resolveImageUrl(program.imageUrl) != null)
                       Image.network(
-                        program.imageUrl!,
+                        ApiConfig.resolveImageUrl(program.imageUrl)!,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) => Center(
                           child: Icon(
@@ -1008,6 +1077,105 @@ class _HomeScreenState extends State<HomeScreen> {
   // IDF Active Certification Card
   // -------------------------------------------------------------
   Widget _buildCertificationCard(UserModel user) {
+    final cert = _homeSummary?.certification;
+
+    if (cert == null) {
+      return InkWell(
+        onTap: () {
+          setState(() {
+            _currentTabIndex = 2;
+          });
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border, width: 1.1),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF3C7),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Center(
+                  child: Text(
+                    '🏅',
+                    style: TextStyle(fontSize: 24),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'IDF Active Certification',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Get your institution certified today',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE0F2FE),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        'Apply Now',
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: const Color(0xFF0284C7),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(
+                Icons.arrow_forward_rounded,
+                color: AppColors.primaryBlue,
+                size: 20,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final instName = cert.institutionName?.isNotEmpty == true
+        ? cert.institutionName!
+        : user.organizationName;
+    final catName = cert.category?.isNotEmpty == true
+        ? cert.category!
+        : user.organizationType;
+    final statusText = cert.displayStatus?.isNotEmpty == true
+        ? cert.displayStatus!
+        : 'Submitted';
+    final appNo = cert.applicationNo ?? '';
+
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
@@ -1016,20 +1184,14 @@ class _HomeScreenState extends State<HomeScreen> {
               initialModel:
                   CertificationApplicationModel.prefilledForCertificate(
                 CertificateApplicationItem(
-                  id: '2',
-                  institutionName: user.organizationName.isNotEmpty
-                      ? user.organizationName
-                      : 'Lagos State University',
-                  institutionType: user.organizationType.isNotEmpty
-                      ? user.organizationType
-                      : 'College / University',
-                  certificateId: 'APP-CERT-2025-0018',
-                  issuedDate: '01 Sep 2025',
-                  expiresDate: '01 Sep 2027',
-                  status: user.certificationStatus.isNotEmpty
-                      ? user.certificationStatus
-                      : 'Changes Required',
-                  score: '7/10',
+                  id: cert.applicationId?.toString() ?? '1',
+                  institutionName: instName,
+                  institutionType: catName,
+                  certificateId: appNo,
+                  issuedDate: '',
+                  expiresDate: cert.expiresOn ?? '',
+                  status: statusText,
+                  score: '',
                 ),
               ),
             ),
@@ -1066,7 +1228,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    user.organizationName,
+                    instName.isNotEmpty ? instName : 'Certification Application',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.inter(
@@ -1075,29 +1237,35 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    user.organizationType,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: const Color(0xFF64748B),
+                  if (catName.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      catName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        color: const Color(0xFF64748B),
+                      ),
                     ),
-                  ),
+                  ],
                   const SizedBox(height: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFEE2E2),
+                      color: statusText.toLowerCase().contains('submit') || statusText.toLowerCase().contains('approv')
+                          ? const Color(0xFFE0F2FE)
+                          : const Color(0xFFFEE2E2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
-                      user.certificationStatus,
+                      statusText,
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: const Color(0xFFDC2626),
+                        color: statusText.toLowerCase().contains('submit') || statusText.toLowerCase().contains('approv')
+                            ? const Color(0xFF0284C7)
+                            : const Color(0xFFDC2626),
                       ),
                     ),
                   ),

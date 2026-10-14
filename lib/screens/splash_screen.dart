@@ -1,8 +1,15 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../bloc/app_bloc.dart';
+import '../bloc/app_event.dart';
 import '../core/theme.dart';
+import '../services/api_client.dart';
+import '../services/auth_service.dart';
+import '../services/token_storage.dart';
 import '../widgets/dr_mohans_logo.dart';
+import 'home_screen.dart';
 import 'welcome_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -13,30 +20,73 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  Timer? _timer;
-
   @override
   void initState() {
     super.initState();
-    _timer = Timer(const Duration(seconds: 2), () {
-      if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) => const WelcomeScreen(),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-            transitionDuration: const Duration(milliseconds: 600),
-          ),
-        );
-      }
-    });
+    _checkSessionAndNavigate();
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
+  Future<void> _checkSessionAndNavigate() async {
+    // Keep splash visible for at least 1.5 seconds for branding animation
+    final minSplashDuration = Future.delayed(const Duration(milliseconds: 1500));
+
+    await TokenStorage.init();
+
+    final hasTokens = TokenStorage.isAuthenticated ||
+        (TokenStorage.refreshToken != null && TokenStorage.refreshToken!.isNotEmpty);
+
+    bool shouldNavigateToHome = false;
+
+    if (hasTokens) {
+      try {
+        final authUser = await AuthService.getMe();
+        if (mounted) {
+          context.read<AppBloc>().add(SetAuthenticatedUser(authUser));
+        }
+        shouldNavigateToHome = true;
+      } on ApiException catch (e) {
+        if (e.statusCode == 401) {
+          // Token has expired and refresh token rotation failed
+          await TokenStorage.clearAuth();
+          shouldNavigateToHome = false;
+        } else {
+          // Network error or server glitch: if cached user exists, stay logged in
+          if (TokenStorage.currentUser != null) {
+            if (mounted) {
+              context.read<AppBloc>().add(SetAuthenticatedUser(TokenStorage.currentUser!));
+            }
+            shouldNavigateToHome = true;
+          } else {
+            shouldNavigateToHome = false;
+          }
+        }
+      } catch (_) {
+        // Offline / socket error: keep session if user data was previously saved
+        if (TokenStorage.currentUser != null) {
+          if (mounted) {
+            context.read<AppBloc>().add(SetAuthenticatedUser(TokenStorage.currentUser!));
+          }
+          shouldNavigateToHome = true;
+        } else {
+          shouldNavigateToHome = false;
+        }
+      }
+    }
+
+    await minSplashDuration;
+    if (!mounted) return;
+
+    final targetScreen = shouldNavigateToHome ? const HomeScreen() : const WelcomeScreen();
+
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => targetScreen,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 500),
+      ),
+    );
   }
 
   @override

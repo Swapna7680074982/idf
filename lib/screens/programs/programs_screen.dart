@@ -1,9 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../bloc/app_bloc.dart';
 import '../../core/theme.dart';
 import '../../models/program_model.dart';
+import '../../services/programs_service.dart';
 import 'program_details_screen.dart';
 import 'submission/submit_program_wizard_screen.dart';
 import 'widgets/program_card.dart';
@@ -23,47 +23,103 @@ class ProgramsScreen extends StatefulWidget {
 
 class _ProgramsScreenState extends State<ProgramsScreen> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _debounceTimer;
+
+  int _selectedScopeIndex = 0; // 0: Explore Programs, 1: My Registrations
   String _searchQuery = '';
   String _selectedFilter = 'All';
   ProgramType? _selectedType;
 
+  bool _isLoading = true;
+  String? _errorMessage;
+  List<ProgramModel> _apiPrograms = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchPrograms();
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
-  List<ProgramModel> _getFilteredPrograms(List<ProgramModel> allPrograms) {
-    return allPrograms.where((prog) {
-      // 1. Search Query Filter
-      if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery.toLowerCase();
-        final matchesTitle = prog.title.toLowerCase().contains(q);
-        final matchesOrganizer = prog.organizer.toLowerCase().contains(q);
-        final matchesLocation = prog.location.toLowerCase().contains(q);
-        final matchesTag = prog.tag.toLowerCase().contains(q);
-        if (!matchesTitle && !matchesOrganizer && !matchesLocation && !matchesTag) {
-          return false;
-        }
-      }
+  Future<void> _fetchPrograms() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
-      // 2. Tab Filter (All, Upcoming, Ongoing)
-      if (_selectedType == null) {
-        if (_selectedFilter == 'Upcoming' && prog.status != ProgramStatus.upcoming) {
-          return false;
+    try {
+      if (_selectedScopeIndex == 0) {
+        // Browse Public Programs
+        String status = 'all';
+        if (_selectedFilter == 'Upcoming') {
+          status = 'upcoming';
+        } else if (_selectedFilter == 'Ongoing') {
+          status = 'ongoing';
+        } else if (_selectedFilter == 'Completed') {
+          status = 'completed';
         }
-        if (_selectedFilter == 'Ongoing' && prog.status != ProgramStatus.ongoing) {
-          return false;
+
+        int? typeId;
+        if (_selectedType != null) {
+          typeId = _selectedType!.index + 1;
+        }
+
+        final res = await ProgramsService.getPrograms(
+          search: _searchQuery.isNotEmpty ? _searchQuery : null,
+          status: status,
+          typeId: typeId,
+          page: 1,
+          limit: 50,
+        );
+
+        if (mounted) {
+          setState(() {
+            _apiPrograms = res.items
+                .map((item) => ProgramModel.fromApiItem(item))
+                .toList();
+            _isLoading = false;
+          });
         }
       } else {
-        // 3. Type Filter
-        if (prog.type != _selectedType) {
-          return false;
+        // My Registrations
+        final res = await ProgramsService.getRegisteredPrograms(
+          page: 1,
+          limit: 50,
+        );
+
+        if (mounted) {
+          setState(() {
+            _apiPrograms = res.items
+                .map((item) => ProgramModel.fromApiItem(item))
+                .toList();
+            _isLoading = false;
+          });
         }
       }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
-      return true;
-    }).toList();
+  void _onSearchChanged(String val) {
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 350), () {
+      setState(() {
+        _searchQuery = val.trim();
+      });
+      _fetchPrograms();
+    });
   }
 
   void _openSubmitProgramWizard() {
@@ -71,7 +127,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       MaterialPageRoute(
         builder: (_) => const SubmitProgramWizardScreen(),
       ),
-    );
+    ).then((_) => _fetchPrograms());
   }
 
   void _openProgramDetails(ProgramModel program) {
@@ -79,13 +135,12 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       MaterialPageRoute(
         builder: (_) => ProgramDetailsScreen(program: program),
       ),
-    );
+    ).then((_) => _fetchPrograms());
   }
 
   @override
   Widget build(BuildContext context) {
-    final allPrograms = context.watch<AppBloc>().state.programs;
-    final filteredList = _getFilteredPrograms(allPrograms);
+    final displayList = _apiPrograms;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -104,7 +159,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           children: [
             // Top Header: Title & "+ New" Button
             Padding(
-              padding: const EdgeInsets.only(left: 18.0, right: 18.0, top: 14.0, bottom: 10.0),
+              padding: const EdgeInsets.only(left: 18.0, right: 18.0, top: 14.0, bottom: 8.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -155,139 +210,255 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
               ),
             ),
 
-            // Search Bar
+            // Scope Switcher: [ Explore Programs | My Registrations ]
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 6.0),
               child: Container(
+                height: 42,
+                padding: const EdgeInsets.all(3.5),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border, width: 1.1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withAlpha(4),
-                      blurRadius: 6,
-                      offset: const Offset(0, 1),
+                  color: const Color(0xFFE2E8F0),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          if (_selectedScopeIndex != 0) {
+                            setState(() {
+                              _selectedScopeIndex = 0;
+                            });
+                            _fetchPrograms();
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(9),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: _selectedScopeIndex == 0 ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(9),
+                            boxShadow: _selectedScopeIndex == 0
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withAlpha(12),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    )
+                                  ]
+                                : null,
+                          ),
+                          child: Text(
+                            'Explore Catalog',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: _selectedScopeIndex == 0 ? FontWeight.w700 : FontWeight.w500,
+                              color: _selectedScopeIndex == 0 ? AppColors.primaryBlue : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          if (_selectedScopeIndex != 1) {
+                            setState(() {
+                              _selectedScopeIndex = 1;
+                            });
+                            _fetchPrograms();
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(9),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: _selectedScopeIndex == 1 ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(9),
+                            boxShadow: _selectedScopeIndex == 1
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withAlpha(12),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 1),
+                                    )
+                                  ]
+                                : null,
+                          ),
+                          child: Text(
+                            'My Registrations',
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: _selectedScopeIndex == 1 ? FontWeight.w700 : FontWeight.w500,
+                              color: _selectedScopeIndex == 1 ? AppColors.primaryBlue : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
-                child: TextField(
-                  controller: _searchController,
-                  onChanged: (val) {
-                    setState(() {
-                      _searchQuery = val.trim();
-                    });
-                  },
-                  style: GoogleFonts.inter(
-                    fontSize: 13.5,
-                    color: AppColors.textPrimary,
+              ),
+            ),
+
+            // Search Bar & Filter Chips (Only for Explore Catalog)
+            if (_selectedScopeIndex == 0) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 6.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.border, width: 1.1),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(4),
+                        blurRadius: 6,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
                   ),
-                  decoration: InputDecoration(
-                    hintText: 'Search programs, organizer, location...',
-                    hintStyle: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: const Color(0xFFB0BAC9),
+                  child: TextField(
+                    controller: _searchController,
+                    onChanged: _onSearchChanged,
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      color: AppColors.textPrimary,
                     ),
-                    prefixIcon: const Icon(
-                      Icons.search_rounded,
-                      size: 20,
-                      color: Color(0xFFB0BAC9),
+                    decoration: InputDecoration(
+                      hintText: 'Search title, organizer, city...',
+                      hintStyle: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: const Color(0xFFB0BAC9),
+                      ),
+                      prefixIcon: const Icon(
+                        Icons.search_rounded,
+                        size: 20,
+                        color: Color(0xFFB0BAC9),
+                      ),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                              onPressed: () {
+                                _searchController.clear();
+                                setState(() {
+                                  _searchQuery = '';
+                                });
+                                _fetchPrograms();
+                              },
+                            )
+                          : null,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     ),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _searchQuery = '';
-                              });
-                            },
-                          )
-                        : null,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   ),
                 ),
               ),
-            ),
 
-            // Filter Chips Bar
-            Padding(
-              padding: const EdgeInsets.only(left: 18.0, right: 18.0, top: 8.0, bottom: 12.0),
-              child: ProgramFilterChips(
-                selectedFilter: _selectedFilter,
-                selectedType: _selectedType,
-                onFilterSelected: (filter) {
-                  setState(() {
-                    _selectedFilter = filter;
-                  });
-                },
-                onTypeSelected: (type) {
-                  setState(() {
-                    _selectedType = type;
-                  });
-                },
+              // Filter Chips Bar
+              Padding(
+                padding: const EdgeInsets.only(left: 18.0, right: 18.0, top: 4.0, bottom: 8.0),
+                child: ProgramFilterChips(
+                  selectedFilter: _selectedFilter,
+                  selectedType: _selectedType,
+                  onFilterSelected: (filter) {
+                    setState(() {
+                      _selectedFilter = filter;
+                    });
+                    _fetchPrograms();
+                  },
+                  onTypeSelected: (type) {
+                    setState(() {
+                      _selectedType = type;
+                    });
+                    _fetchPrograms();
+                  },
+                ),
               ),
-            ),
+            ],
 
-            // Programs List
+            // Content Area (Loading / Error / Empty / List)
             Expanded(
-              child: filteredList.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF1F5F9),
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.search_off_rounded,
-                                size: 32,
-                                color: Color(0xFF94A3B8),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              'No programs found',
-                              style: GoogleFonts.inter(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Try searching with different keywords or reset filters',
-                              textAlign: TextAlign.center,
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: const Color(0xFF64748B),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: AppColors.primaryBlue),
                     )
-                  : ListView.separated(
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.only(left: 18.0, right: 18.0, top: 4.0, bottom: 24.0),
-                      itemCount: filteredList.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 14),
-                      itemBuilder: (context, index) {
-                        final program = filteredList[index];
-                        return ProgramCard(
-                          program: program,
-                          onTap: () => _openProgramDetails(program),
-                        );
-                      },
+                  : RefreshIndicator(
+                      onRefresh: _fetchPrograms,
+                      color: AppColors.primaryBlue,
+                      child: displayList.isEmpty
+                          ? ListView(
+                              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                              children: [
+                                SizedBox(height: MediaQuery.of(context).size.height * 0.15),
+                                Center(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(24.0),
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Container(
+                                          width: 64,
+                                          height: 64,
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFFF1F5F9),
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: Icon(
+                                            _selectedScopeIndex == 1
+                                                ? Icons.event_busy_rounded
+                                                : Icons.search_off_rounded,
+                                            size: 32,
+                                            color: const Color(0xFF94A3B8),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 14),
+                                        Text(
+                                          _selectedScopeIndex == 1
+                                              ? 'No registered programs yet'
+                                              : 'No programs found',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.textPrimary,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          _selectedScopeIndex == 1
+                                              ? 'Explore public programs and register to participate!'
+                                              : (_errorMessage != null
+                                                  ? 'Could not connect to server. Pull down to retry.'
+                                                  : 'Try searching with different keywords or reset filters'),
+                                          textAlign: TextAlign.center,
+                                          style: GoogleFonts.inter(
+                                            fontSize: 13,
+                                            color: const Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          : ListView.separated(
+                              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                              padding: const EdgeInsets.only(left: 18.0, right: 18.0, top: 6.0, bottom: 24.0),
+                              itemCount: displayList.length,
+                              separatorBuilder: (context, index) => const SizedBox(height: 14),
+                              itemBuilder: (context, index) {
+                                final program = displayList[index];
+                                return ProgramCard(
+                                  program: program,
+                                  onTap: () => _openProgramDetails(program),
+                                );
+                              },
+                            ),
                     ),
             ),
           ],
