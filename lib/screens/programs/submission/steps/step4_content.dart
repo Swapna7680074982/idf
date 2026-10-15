@@ -34,15 +34,12 @@ class _AgendaSession {
 
 class _Step4ContentState extends State<Step4Content> {
   final _formKey = GlobalKey<FormState>();
-  late TextEditingController _programDescController;
   final List<_AgendaSession> _sessions = [];
   String? _agendaError;
 
   @override
   void initState() {
     super.initState();
-    _programDescController =
-        TextEditingController(text: widget.model.programDescription);
 
     if (widget.model.agendaItems.isNotEmpty) {
       for (final item in widget.model.agendaItems) {
@@ -54,7 +51,6 @@ class _Step4ContentState extends State<Step4Content> {
         );
       }
     } else if (widget.model.agenda.trim().isNotEmpty) {
-      // Parse any multiline text if previously set
       final lines = widget.model.agenda.split('\n').where((l) => l.trim().isNotEmpty);
       for (final line in lines) {
         final match = RegExp(r'^(\d{1,2}:\d{2})\s*[-:]?\s*(.*)$').firstMatch(line.trim());
@@ -78,7 +74,6 @@ class _Step4ContentState extends State<Step4Content> {
 
   @override
   void dispose() {
-    _programDescController.dispose();
     for (final s in _sessions) {
       s.dispose();
     }
@@ -146,39 +141,36 @@ class _Step4ContentState extends State<Step4Content> {
   }
 
   void _handleContinue() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-
     final validSessions = <Map<String, String>>[];
     for (var i = 0; i < _sessions.length; i++) {
       final s = _sessions[i];
       final title = s.titleController.text.trim();
       final time = s.time.trim();
 
+      // If either title or time is entered, treat as a session
       if (title.isNotEmpty || time.isNotEmpty) {
-        if (time.isEmpty) {
-          setState(() {
-            _agendaError = 'Please pick a start time for Session #${i + 1}';
-          });
-          return;
-        }
         if (title.isEmpty) {
           setState(() {
-            _agendaError = 'Please enter a title for Session #${i + 1}';
+            _agendaError = 'Please enter a title for Session ${i + 1}';
           });
           return;
         }
         validSessions.add({
-          'start_time': time,
+          'start_time': time.isNotEmpty ? time : '09:00',
           'title': title,
         });
       }
     }
 
-    widget.model.programDescription = _programDescController.text.trim();
     widget.model.agendaItems = validSessions;
     widget.model.agenda = validSessions
         .map((s) => '${s['start_time']} - ${s['title']}')
         .join('\n');
+
+    // Make sure programDescription has the description from Step 1
+    if (widget.model.programDescription.isEmpty) {
+      widget.model.programDescription = widget.model.description;
+    }
 
     widget.onContinue();
   }
@@ -190,31 +182,23 @@ class _Step4ContentState extends State<Step4Content> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Program Description
-          _buildFieldLabel('Program Description *'),
-          const SizedBox(height: 6),
-          TextFormField(
-            controller: _programDescController,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              hintText: 'Detailed description of the program...',
-              alignLabelWithHint: true,
-            ),
-            validator: (val) =>
-                val == null || val.trim().isEmpty ? 'Please provide detailed description' : null,
-          ),
-          const SizedBox(height: 22),
-
-          // Agenda Header Row
+          // Section Title & Add Action
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildFieldLabel('Program Agenda Schedule'),
+              Text(
+                'Program Agenda & Schedule',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
               InkWell(
                 onTap: _addSession,
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   child: Row(
                     children: [
                       const Icon(Icons.add_circle_outline_rounded, size: 16, color: AppColors.primaryBlue),
@@ -235,19 +219,19 @@ class _Step4ContentState extends State<Step4Content> {
           ),
           const SizedBox(height: 4),
           Text(
-            'Specify start times and activity titles for your program agenda.',
+            'Schedule key activities, talks, and timings for attendees (Optional).',
             style: GoogleFonts.inter(
               fontSize: 12,
               color: const Color(0xFF64748B),
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
 
           // Error box if validation failed
           if (_agendaError != null) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              margin: const EdgeInsets.only(bottom: 12),
+              margin: const EdgeInsets.only(bottom: 14),
               decoration: BoxDecoration(
                 color: const Color(0xFFFEE2E2),
                 borderRadius: BorderRadius.circular(8),
@@ -278,12 +262,12 @@ class _Step4ContentState extends State<Step4Content> {
             final hasTime = session.time.isNotEmpty;
 
             return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border, width: 1.1),
+                border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withAlpha(4),
@@ -295,17 +279,40 @@ class _Step4ContentState extends State<Step4Content> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Session Header (No '#' symbol!)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        'SESSION #${index + 1}',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF64748B),
-                          letterSpacing: 0.5,
-                        ),
+                      Row(
+                        children: [
+                          Container(
+                            width: 22,
+                            height: 22,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFE0F2FE),
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${index + 1}',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF0284C7),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Session ${index + 1}',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF334155),
+                            ),
+                          ),
+                        ],
                       ),
                       if (_sessions.length > 1)
                         InkWell(
@@ -318,7 +325,7 @@ class _Step4ContentState extends State<Step4Content> {
                         ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 12),
 
                   // Time Picker Container
                   InkWell(
@@ -342,7 +349,7 @@ class _Step4ContentState extends State<Step4Content> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            hasTime ? 'Start Time: ${session.time}' : 'Select Start Time *',
+                            hasTime ? 'Start Time: ${session.time}' : 'Select Start Time (e.g. 09:00)',
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               fontWeight: hasTime ? FontWeight.w700 : FontWeight.w500,
@@ -365,7 +372,7 @@ class _Step4ContentState extends State<Step4Content> {
                     },
                     style: GoogleFonts.inter(fontSize: 13.5, color: AppColors.textPrimary),
                     decoration: const InputDecoration(
-                      hintText: 'Session title (e.g. Opening Keynote & Warm-up)',
+                      hintText: 'Session title (e.g. Registration & Blood Glucose Screening)',
                       contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     ),
                   ),
@@ -383,17 +390,6 @@ class _Step4ContentState extends State<Step4Content> {
           ),
           const SizedBox(height: 20),
         ],
-      ),
-    );
-  }
-
-  Widget _buildFieldLabel(String label) {
-    return Text(
-      label,
-      style: GoogleFonts.inter(
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
       ),
     );
   }

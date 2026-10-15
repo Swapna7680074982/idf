@@ -40,7 +40,7 @@ class ProgramCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Program Banner with top-right Event Status Pill
+              // Program Banner with top-right Event Status Pill & top-left Review/Organizer Pill
               Stack(
                 children: [
                   ProgramImageBanner(
@@ -53,6 +53,57 @@ class ProgramCard extends StatelessWidget {
                     right: 10,
                     child: ProgramStatusPill(status: program.status),
                   ),
+                  if (program.isOrganizer || (program.reviewStatus != null && program.reviewStatus!.isNotEmpty && program.reviewStatus != 'approved'))
+                    Positioned(
+                      top: 10,
+                      left: 10,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                        decoration: BoxDecoration(
+                          color: program.reviewStatus == 'submitted'
+                              ? const Color(0xFFD97706)
+                              : (program.reviewStatus == 'draft'
+                                  ? const Color(0xFF64748B)
+                                  : AppColors.primaryBlue),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(45),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              program.reviewStatus == 'submitted'
+                                  ? Icons.schedule_rounded
+                                  : (program.reviewStatus == 'draft'
+                                      ? Icons.edit_note_rounded
+                                      : Icons.person_rounded),
+                              size: 11,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              program.reviewStatus != null && program.reviewStatus!.isNotEmpty
+                                  ? (program.reviewStatus == 'submitted'
+                                      ? 'SUBMITTED'
+                                      : (program.reviewStatus == 'draft' ? 'DRAFT' : program.reviewStatus!.toUpperCase()))
+                                  : 'ORGANIZER',
+                              style: GoogleFonts.inter(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                 ],
               ),
 
@@ -62,26 +113,73 @@ class ProgramCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Program Type / Category Badge
+                    // Program Type / Category Badge & Registration Status
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            (program.category ?? program.tag).toUpperCase(),
-                            style: GoogleFonts.inter(
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF475569),
-                              letterSpacing: 0.3,
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                (program.category ?? program.tag).toUpperCase(),
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF475569),
+                                  letterSpacing: 0.3,
+                                ),
+                              ),
+                            ),
+                            if (program.programNo != null && program.programNo!.isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFBFDBFE), width: 0.8),
+                                ),
+                                child: Text(
+                                  program.programNo!,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF1D4ED8),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        if (program.isRegistered)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.check_circle_rounded, size: 11, color: Color(0xFF16A34A)),
+                                const SizedBox(width: 3.5),
+                                Text(
+                                  'REGISTERED',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF16A34A),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
@@ -141,7 +239,9 @@ class ProgramCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          program.startDate,
+                          (program.endDate.isNotEmpty && program.endDate != program.startDate)
+                              ? '${program.startDate} - ${program.endDate}'
+                              : program.startDate,
                           style: GoogleFonts.inter(
                             fontSize: 11,
                             color: const Color(0xFF64748B),

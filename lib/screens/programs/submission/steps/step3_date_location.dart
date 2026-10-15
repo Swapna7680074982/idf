@@ -232,9 +232,9 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
         if (isStart) {
           _startDate = picked;
           _startDateController.text = _formatDate(picked);
-          if (_endDate != null && _endDate!.isBefore(_startDate!)) {
-            _endDate = _startDate;
-            _endDateController.text = _formatDate(_endDate!);
+          if (_endDate == null || _endDate!.isBefore(_startDate!)) {
+            _endDate = picked;
+            _endDateController.text = _formatDate(picked);
           }
         } else {
           _endDate = picked;
@@ -247,14 +247,16 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
   void _handleContinue() {
     if (_formKey.currentState?.validate() ?? false) {
       widget.model.startDate = _startDate;
-      widget.model.endDate = _endDate;
+      widget.model.endDate = _endDate ?? _startDate;
       widget.model.country = _selectedCountry?.name ?? '';
       widget.model.countryId = _selectedCountry?.id;
       widget.model.regionState = _selectedRegion?.name ?? _regionController.text.trim();
       widget.model.regionId = _selectedRegion?.id;
       widget.model.city = _selectedCity?.name ?? _cityController.text.trim();
       widget.model.cityId = _selectedCity?.id;
-      widget.model.venueAddress = _venueController.text.trim();
+      widget.model.venueAddress = _venueController.text.trim().isNotEmpty
+          ? _venueController.text.trim()
+          : 'To be announced';
       widget.onContinue();
     }
   }
@@ -282,17 +284,16 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
           const SizedBox(height: 16),
 
           // End Date
-          _buildFieldLabel('End Date *'),
+          _buildFieldLabel('End Date (Optional)'),
           const SizedBox(height: 6),
           TextFormField(
             controller: _endDateController,
             readOnly: true,
             onTap: () => _pickDate(false),
             decoration: const InputDecoration(
-              hintText: 'YYYY-MM-DD',
+              hintText: 'YYYY-MM-DD (Defaults to start date)',
               suffixIcon: Icon(Icons.calendar_today_outlined, size: 18, color: Color(0xFF64748B)),
             ),
-            validator: (val) => val == null || val.isEmpty ? 'Please select end date' : null,
           ),
           const SizedBox(height: 16),
 
@@ -513,15 +514,13 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
           const SizedBox(height: 16),
 
           // Venue Address
-          _buildFieldLabel('Venue Address *'),
+          _buildFieldLabel('Venue Address (Optional)'),
           const SizedBox(height: 6),
           TextFormField(
             controller: _venueController,
             decoration: const InputDecoration(
-              hintText: 'Full venue address',
+              hintText: 'Full venue address or online location',
             ),
-            validator: (val) =>
-                val == null || val.trim().isEmpty ? 'Please enter venue address' : null,
           ),
           const SizedBox(height: 28),
 

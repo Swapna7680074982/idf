@@ -6,11 +6,13 @@ import '../../bloc/app_event.dart';
 import '../../core/theme.dart';
 import '../../models/program_model.dart';
 import '../../services/api_client.dart';
+import '../../services/api_config.dart';
 import '../../services/programs_service.dart';
 import '../../widgets/custom_button.dart';
 import 'registration/program_registration_confirmation_screen.dart';
 import 'widgets/agenda_timeline_widget.dart';
 import 'widgets/program_image_banner.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProgramDetailsScreen extends StatefulWidget {
   final ProgramModel program;
@@ -155,6 +157,123 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
     }
   }
 
+  Future<void> _openOrDownloadFile(String fileUrl, String filename) async {
+    final resolvedUrl = ApiConfig.resolveMediaUrl(fileUrl);
+    if (resolvedUrl.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('File URL not available')),
+      );
+      return;
+    }
+
+    final lowerName = filename.toLowerCase();
+    final lowerUrl = resolvedUrl.toLowerCase();
+    final isImage = lowerName.endsWith('.jpg') ||
+        lowerName.endsWith('.jpeg') ||
+        lowerName.endsWith('.png') ||
+        lowerName.endsWith('.webp') ||
+        lowerUrl.endsWith('.jpg') ||
+        lowerUrl.endsWith('.jpeg') ||
+        lowerUrl.endsWith('.png') ||
+        lowerUrl.endsWith('.webp');
+
+    if (isImage) {
+      showDialog(
+        context: context,
+        builder: (ctx) => Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      filename,
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white, size: 26),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.65,
+                  ),
+                  color: Colors.black,
+                  child: InteractiveViewer(
+                    child: Image.network(
+                      resolvedUrl,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        padding: const EdgeInsets.all(24),
+                        color: Colors.white,
+                        child: Text(
+                          'Could not load image: $filename',
+                          style: GoogleFonts.inter(color: Colors.black),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.open_in_browser_rounded, size: 18),
+                label: Text('Open / Download', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                onPressed: () async {
+                  final uri = Uri.tryParse(resolvedUrl);
+                  if (uri != null) {
+                    try {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                    } catch (_) {}
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      );
+      return;
+    }
+
+    // PDF or other document
+    final uri = Uri.tryParse(resolvedUrl);
+    if (uri != null) {
+      try {
+        final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+        if (!launched) {
+          await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+        }
+      } catch (_) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Opening $filename...')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final blocProgram = context.watch<AppBloc>().state.programs.where((p) => p.id == widget.program.id).firstOrNull;
@@ -247,6 +366,28 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                       physics: const BouncingScrollPhysics(),
                       child: Row(
                         children: [
+                          if (activeProgram.programNo != null && activeProgram.programNo!.isNotEmpty) ...[
+                            _buildMetaChip(
+                              emoji: '🏷️',
+                              label: activeProgram.programNo!,
+                              bgColor: const Color(0xFFEFF6FF),
+                              textColor: const Color(0xFF1D4ED8),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          if (activeProgram.reviewStatus != null && activeProgram.reviewStatus!.isNotEmpty) ...[
+                            _buildMetaChip(
+                              emoji: activeProgram.reviewStatus == 'submitted' ? '⏳' : '📝',
+                              label: activeProgram.reviewStatus!.toUpperCase(),
+                              bgColor: activeProgram.reviewStatus == 'submitted'
+                                  ? const Color(0xFFFEF3C7)
+                                  : const Color(0xFFF1F5F9),
+                              textColor: activeProgram.reviewStatus == 'submitted'
+                                  ? const Color(0xFFB45309)
+                                  : const Color(0xFF475569),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
                           _buildMetaChip(
                             emoji: '📋',
                             label: activeProgram.category ?? activeProgram.tag,
@@ -263,7 +404,9 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                           const SizedBox(width: 8),
                           _buildMetaChip(
                             emoji: '📅',
-                            label: activeProgram.startDate,
+                            label: (activeProgram.endDate.isNotEmpty && activeProgram.endDate != activeProgram.startDate)
+                                ? '${activeProgram.startDate} - ${activeProgram.endDate}'
+                                : activeProgram.startDate,
                             bgColor: const Color(0xFFF1F5F9),
                             textColor: const Color(0xFF475569),
                           ),
@@ -278,7 +421,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                       child: Text(
                         activeProgram.description.isNotEmpty
                             ? activeProgram.description
-                            : 'No description available for this program.',
+                            : 'A comprehensive diabetes screening and lifestyle education initiative designed to boost awareness.',
                         style: GoogleFonts.inter(
                           fontSize: 13.5,
                           color: const Color(0xFF475569),
@@ -308,13 +451,23 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                           ),
                           const Divider(height: 18, color: AppColors.border),
                           _buildEventDetailRow(
-                            emoji: '🏁',
-                            label: 'END DATE',
-                            value: activeProgram.endDate,
+                            emoji: '🗓️',
+                            label: 'START DATE',
+                            value: activeProgram.startDate,
                           ),
+                          if (activeProgram.endDate.isNotEmpty && activeProgram.endDate != activeProgram.startDate) ...[
+                            const Divider(height: 18, color: AppColors.border),
+                            _buildEventDetailRow(
+                              emoji: '🏁',
+                              label: 'END DATE',
+                              value: activeProgram.endDate,
+                            ),
+                          ],
                         ],
                       ),
                     ),
+                    const SizedBox(height: 14),
+
                     // Program Agenda Card
                     _buildSectionCard(
                       title: 'Program Agenda',
@@ -323,6 +476,120 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                       ),
                     ),
                     const SizedBox(height: 14),
+
+                    // Supporting Materials & Documents
+                    if (activeProgram.materials.isNotEmpty) ...[
+                      _buildSectionCard(
+                        title: 'Supporting Materials & Documents',
+                        child: Column(
+                          children: activeProgram.materials.map((mat) {
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: () => _openOrDownloadFile(mat.url, mat.name),
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFEFF6FF),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(Icons.picture_as_pdf_rounded, color: AppColors.primaryBlue, size: 20),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                mat.name,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 13,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: AppColors.textPrimary,
+                                                ),
+                                              ),
+                                              Text(
+                                                'Tap to view / download',
+                                                style: GoogleFonts.inter(
+                                                  fontSize: 11,
+                                                  color: const Color(0xFF94A3B8),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const Icon(Icons.download_rounded, color: AppColors.primaryBlue, size: 20),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // Registration Instructions / Link
+                    if ((activeProgram.registrationInstructions != null && activeProgram.registrationInstructions!.isNotEmpty) ||
+                        (activeProgram.registrationLink != null && activeProgram.registrationLink!.isNotEmpty)) ...[
+                      _buildSectionCard(
+                        title: 'Registration Information',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (activeProgram.registrationInstructions != null && activeProgram.registrationInstructions!.isNotEmpty) ...[
+                              Text(
+                                activeProgram.registrationInstructions!,
+                                style: GoogleFonts.inter(
+                                  fontSize: 13,
+                                  color: const Color(0xFF475569),
+                                  height: 1.5,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                            ],
+                            if (activeProgram.registrationLink != null && activeProgram.registrationLink!.isNotEmpty)
+                              Row(
+                                children: [
+                                  const Icon(Icons.link_rounded, size: 16, color: AppColors.primaryBlue),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Text(
+                                      activeProgram.registrationLink!,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w500,
+                                        color: AppColors.primaryBlue,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
 
                     // Contact Information Card
                     _buildSectionCard(

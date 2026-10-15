@@ -37,29 +37,34 @@ class ProgramsService {
     return <String, dynamic>{};
   }
 
-  /// 6. GET /api/programs - Browse Public Programs
+  /// 6. GET /api/programs - Browse Public Programs (Header Token)
   static Future<ProgramsResponse> getPrograms({
     String? search,
-    String status = 'all',
+    String? status,
     int? typeId,
-    int page = 1,
-    int limit = 20,
+    int? page,
+    int? limit,
   }) async {
-    final queryParams = <String, String>{
-      'status': status,
-      'page': page.toString(),
-      'limit': limit.toString(),
-    };
+    final queryParams = <String, String>{};
     if (search != null && search.trim().isNotEmpty) {
       queryParams['search'] = search.trim();
+    }
+    if (status != null && status.trim().isNotEmpty && status.trim().toLowerCase() != 'all') {
+      queryParams['status'] = status.trim();
     }
     if (typeId != null) {
       queryParams['type_id'] = typeId.toString();
     }
+    if (page != null && page > 1) {
+      queryParams['page'] = page.toString();
+    }
+    if (limit != null && limit != 20) {
+      queryParams['limit'] = limit.toString();
+    }
 
     final response = await ApiClient.get(
       ApiConfig.programs,
-      queryParams: queryParams,
+      queryParams: queryParams.isNotEmpty ? queryParams : null,
     );
 
     if (response is Map<String, dynamic>) {
@@ -103,15 +108,37 @@ class ProgramsService {
     );
   }
 
-  /// 3. POST /api/programs - Create / Submit Program Proposal (Supports all Field Aliases)
-  static Future<Map<String, dynamic>> submitProgramProposal({
+  /// Direct POST /api/programs with exact JSON body
+  static Future<ProgramSubmissionResponse> createProgramJson(Map<String, dynamic> body) async {
+    final response = await ApiClient.post(
+      ApiConfig.programs,
+      body: body,
+    );
+
+    if (response is Map<String, dynamic>) {
+      return ProgramSubmissionResponse.fromJson(response);
+    }
+    throw const ApiException(
+      code: 'SUBMISSION_FAILED',
+      message: 'Failed to submit program.',
+      statusCode: 500,
+    );
+  }
+
+  /// Direct POST /api/programs with ProgramCreateRequest model
+  static Future<ProgramSubmissionResponse> createProgram(ProgramCreateRequest request) async {
+    return createProgramJson(request.toJson());
+  }
+
+  /// 3. POST /api/programs - Create / Submit Program Proposal (Exact Match)
+  static Future<ProgramSubmissionResponse> submitProgramProposal({
     required String title,
     required int programTypeId,
     required String organizerName,
     String? organizationType,
     required String about,
     required String venue,
-    required int countryId,
+    int? countryId,
     required String cityText,
     required String countryText,
     String? regionText,
@@ -124,6 +151,7 @@ class ProgramsService {
     String? registrationInstructions,
     List<Map<String, dynamic>> agenda = const [],
     List<int> supportingFileIds = const [],
+    List<Map<String, dynamic>> materials = const [],
     String? bannerImageUrl,
     String? coverImageUrl,
     int? bannerFileId,
@@ -132,55 +160,36 @@ class ProgramsService {
     String? customStatus,
   }) async {
     final effectiveStatus = customStatus ?? (submit ? 'submitted' : 'draft');
+    final effectiveBanner = (bannerImageUrl != null && bannerImageUrl.trim().isNotEmpty)
+        ? bannerImageUrl.trim()
+        : ((coverImageUrl != null && coverImageUrl.trim().isNotEmpty)
+            ? coverImageUrl.trim()
+            : '${ApiConfig.baseUrl}/uploads/banner_sample.jpg');
+
     final body = <String, dynamic>{
       'program_name': title,
-      'title': title,
       'program_type_id': programTypeId,
-      'organization_entity_name': organizerName,
-      'organizer_name': organizerName,
-      if (organizationType != null && organizationType.isNotEmpty)
-        'organization_type': organizationType,
+      'banner': effectiveBanner,
       'description': about,
-      'about': about,
-      'program_description': about,
-      'venue': venue,
-      'country_id': countryId,
-      'country': countryText,
-      'country_text': countryText,
-      if (regionText != null && regionText.isNotEmpty) 'region': regionText,
-      'city': cityText,
-      'city_text': cityText,
-      'start_date': startDate,
-      'end_date': endDate,
+      'organization_entity_name': organizerName,
+      'organization_type': (organizationType != null && organizationType.isNotEmpty)
+          ? organizationType
+          : 'NGO / Non-Profit',
       'contact_person': contactPerson,
       'phone': contactPhone,
-      'contact_phone': contactPhone,
       'email': contactEmail,
-      'contact_email': contactEmail,
+      'start_date': startDate,
+      'end_date': endDate,
+      'country': countryText,
+      'region': (regionText != null && regionText.isNotEmpty) ? regionText : 'Telangana',
+      'city': cityText,
+      'venue': venue,
       'program_agenda_schedule': agenda,
-      'agenda': agenda,
-      'materials': supportingFileIds,
-      'supporting_file_ids': supportingFileIds,
-      if (registrationLink != null && registrationLink.isNotEmpty)
-        'registration_link': registrationLink,
-      if (registrationInstructions != null && registrationInstructions.isNotEmpty)
-        'registration_instructions': registrationInstructions,
+      'materials': materials,
+      'registration_link': registrationLink ?? '',
+      'registration_instructions': registrationInstructions ?? '',
       'status': effectiveStatus,
-      'submit': submit,
     };
-
-    final effectiveBannerUrl = bannerImageUrl ?? coverImageUrl;
-    if (effectiveBannerUrl != null && effectiveBannerUrl.trim().isNotEmpty) {
-      body['banner'] = effectiveBannerUrl.trim();
-      body['banner_image_url'] = effectiveBannerUrl.trim();
-      body['cover_image_url'] = effectiveBannerUrl.trim();
-    }
-
-    final effectiveBannerId = bannerFileId ?? coverFileId;
-    if (effectiveBannerId != null) {
-      body['banner_file_id'] = effectiveBannerId;
-      body['cover_file_id'] = effectiveBannerId;
-    }
 
     final response = await ApiClient.post(
       ApiConfig.programs,
@@ -188,7 +197,7 @@ class ProgramsService {
     );
 
     if (response is Map<String, dynamic>) {
-      return response;
+      return ProgramSubmissionResponse.fromJson(response);
     }
     throw const ApiException(
       code: 'SUBMISSION_FAILED',
@@ -219,6 +228,7 @@ class ProgramsService {
     String? registrationInstructions,
     List<Map<String, dynamic>> agenda = const [],
     List<int> supportingFileIds = const [],
+    List<Map<String, dynamic>> materials = const [],
     String? bannerImageUrl,
     String? coverImageUrl,
     int? bannerFileId,
@@ -227,48 +237,54 @@ class ProgramsService {
     String? customStatus,
   }) async {
     final effectiveStatus = customStatus ?? (submit ? 'submitted' : 'draft');
+    final effectiveBanner = (bannerImageUrl ?? coverImageUrl ?? '').trim();
+    final effectiveMaterials = materials.isNotEmpty
+        ? materials
+        : (supportingFileIds.isNotEmpty ? supportingFileIds : <dynamic>[]);
+
     final body = <String, dynamic>{
       'program_name': title,
-      'title': title,
       'program_type_id': programTypeId,
+      'banner': effectiveBanner,
+      'description': about,
       'organization_entity_name': organizerName,
-      'organizer_name': organizerName,
       if (organizationType != null && organizationType.isNotEmpty)
         'organization_type': organizationType,
-      'description': about,
-      'about': about,
-      'program_description': about,
-      'venue': venue,
-      'country_id': countryId,
-      'country': countryText,
-      'country_text': countryText,
-      if (regionText != null && regionText.isNotEmpty) 'region': regionText,
-      'city': cityText,
-      'city_text': cityText,
-      'start_date': startDate,
-      'end_date': endDate,
       'contact_person': contactPerson,
       'phone': contactPhone,
-      'contact_phone': contactPhone,
       'email': contactEmail,
-      'contact_email': contactEmail,
+      'start_date': startDate,
+      'end_date': endDate,
+      'country': countryText,
+      if (regionText != null && regionText.isNotEmpty) 'region': regionText,
+      'city': cityText,
+      'venue': venue,
       'program_agenda_schedule': agenda,
-      'agenda': agenda,
-      'materials': supportingFileIds,
-      'supporting_file_ids': supportingFileIds,
+      'materials': effectiveMaterials,
       if (registrationLink != null && registrationLink.isNotEmpty)
         'registration_link': registrationLink,
       if (registrationInstructions != null && registrationInstructions.isNotEmpty)
         'registration_instructions': registrationInstructions,
       'status': effectiveStatus,
+
+      // Compatibility aliases
+      'title': title,
+      'organizer_name': organizerName,
+      'about': about,
+      'program_description': about,
+      'country_id': countryId,
+      'country_text': countryText,
+      'city_text': cityText,
+      'contact_phone': contactPhone,
+      'contact_email': contactEmail,
+      'agenda': agenda,
+      'supporting_file_ids': supportingFileIds,
       'submit': submit,
     };
 
-    final effectiveBannerUrl = bannerImageUrl ?? coverImageUrl;
-    if (effectiveBannerUrl != null && effectiveBannerUrl.trim().isNotEmpty) {
-      body['banner'] = effectiveBannerUrl.trim();
-      body['banner_image_url'] = effectiveBannerUrl.trim();
-      body['cover_image_url'] = effectiveBannerUrl.trim();
+    if (effectiveBanner.isNotEmpty) {
+      body['banner_image_url'] = effectiveBanner;
+      body['cover_image_url'] = effectiveBanner;
     }
 
     final effectiveBannerId = bannerFileId ?? coverFileId;

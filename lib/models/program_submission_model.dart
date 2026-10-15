@@ -35,14 +35,14 @@ class ProgramSubmissionModel {
   String agenda;
   List<Map<String, String>> agendaItems;
 
-  // Step 5: Objectives & Target
-  String targetAudience;
-  String expectedParticipants;
-  String objectives;
+  // Step 5: Registration Details
+  String registrationInstructions;
+  String registrationLink;
 
   // Step 6: Materials
   List<String> uploadedFileNames;
   List<int> supportingFileIds;
+  List<Map<String, dynamic>> materials;
 
   // Metadata generated upon submission
   String? referenceNumber;
@@ -76,17 +76,18 @@ class ProgramSubmissionModel {
     this.programDescription = '',
     this.agenda = '',
     List<Map<String, String>>? agendaItems,
-    this.targetAudience = '',
-    this.expectedParticipants = '',
-    this.objectives = '',
+    this.registrationInstructions = '',
+    this.registrationLink = '',
     List<String>? uploadedFileNames,
     List<int>? supportingFileIds,
+    List<Map<String, dynamic>>? materials,
     this.referenceNumber,
     this.submissionDate,
     this.status = 'AI Review',
   })  : agendaItems = agendaItems ?? [],
         uploadedFileNames = uploadedFileNames ?? [],
-        supportingFileIds = supportingFileIds ?? [];
+        supportingFileIds = supportingFileIds ?? [],
+        materials = materials ?? [];
 
   ProgramSubmissionModel copyWith({
     String? programName,
@@ -114,11 +115,11 @@ class ProgramSubmissionModel {
     String? venueAddress,
     String? programDescription,
     String? agenda,
-    String? targetAudience,
-    String? expectedParticipants,
-    String? objectives,
+    String? registrationInstructions,
+    String? registrationLink,
     List<String>? uploadedFileNames,
     List<int>? supportingFileIds,
+    List<Map<String, dynamic>>? materials,
     String? referenceNumber,
     DateTime? submissionDate,
     String? status,
@@ -149,11 +150,11 @@ class ProgramSubmissionModel {
       venueAddress: venueAddress ?? this.venueAddress,
       programDescription: programDescription ?? this.programDescription,
       agenda: agenda ?? this.agenda,
-      targetAudience: targetAudience ?? this.targetAudience,
-      expectedParticipants: expectedParticipants ?? this.expectedParticipants,
-      objectives: objectives ?? this.objectives,
+      registrationInstructions: registrationInstructions ?? this.registrationInstructions,
+      registrationLink: registrationLink ?? this.registrationLink,
       uploadedFileNames: uploadedFileNames ?? List.from(this.uploadedFileNames),
       supportingFileIds: supportingFileIds ?? List.from(this.supportingFileIds),
+      materials: materials ?? List.from(this.materials),
       referenceNumber: referenceNumber ?? this.referenceNumber,
       submissionDate: submissionDate ?? this.submissionDate,
       status: status ?? this.status,

@@ -1,37 +1,74 @@
 class HomeRegisteredProgram {
   final int id;
+  final String? programNo;
   final String title;
+  final String? programName;
   final String programType;
   final String? coverImageUrl;
+  final String? bannerImageUrl;
+  final String? banner;
   final String? cityText;
   final String? countryText;
   final String? startDate;
+  final String? endDate;
   final String eventStatus;
   final bool isRegistered;
+  final String? organizerName;
+  final String? registrationLink;
+  final String? reviewStatus;
+  final String? status;
+  final bool isOrganizer;
 
   const HomeRegisteredProgram({
     required this.id,
+    this.programNo,
     required this.title,
+    this.programName,
     required this.programType,
     this.coverImageUrl,
+    this.bannerImageUrl,
+    this.banner,
     this.cityText,
     this.countryText,
     this.startDate,
+    this.endDate,
     required this.eventStatus,
     this.isRegistered = true,
+    this.organizerName,
+    this.registrationLink,
+    this.reviewStatus,
+    this.status,
+    this.isOrganizer = false,
   });
 
   factory HomeRegisteredProgram.fromJson(Map<String, dynamic> json) {
+    final effectiveCover = json['cover_image_url'] ?? json['banner_image_url'] ?? json['banner'];
+    final effectiveBanner = json['banner_image_url'] ?? json['banner'] ?? json['cover_image_url'];
+    final isOrg = json['is_organizer'] == 1 || json['is_organizer'] == true || json['is_organizer'] == '1';
+
     return HomeRegisteredProgram(
       id: json['id'] is int ? json['id'] as int : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
-      title: json['title']?.toString() ?? '',
+      programNo: json['program_no']?.toString(),
+      title: (json['title'] ?? json['program_name'])?.toString() ?? '',
+      programName: json['program_name']?.toString(),
       programType: json['program_type']?.toString() ?? '',
-      coverImageUrl: json['cover_image_url']?.toString(),
-      cityText: json['city_text']?.toString(),
-      countryText: json['country_text']?.toString(),
+      coverImageUrl: effectiveCover?.toString(),
+      bannerImageUrl: effectiveBanner?.toString(),
+      banner: json['banner']?.toString(),
+      cityText: (json['city_text'] ?? json['city'])?.toString(),
+      countryText: (json['country_text'] ?? json['country'])?.toString(),
       startDate: json['start_date']?.toString(),
-      eventStatus: json['event_status']?.toString() ?? '',
-      isRegistered: json['is_registered'] == true,
+      endDate: json['end_date']?.toString(),
+      eventStatus: json['event_status']?.toString() ?? 'upcoming',
+      isRegistered: json['is_registered'] == true ||
+          json['is_registered'] == 1 ||
+          json['is_registered'] == '1' ||
+          json['registered_at'] != null,
+      organizerName: (json['organizer_name'] ?? json['organization_entity_name'])?.toString(),
+      registrationLink: json['registration_link']?.toString(),
+      reviewStatus: (json['review_status'] ?? json['status'])?.toString(),
+      status: json['status']?.toString(),
+      isOrganizer: isOrg,
     );
   }
 }

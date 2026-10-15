@@ -1,3 +1,6 @@
+import 'program_api_models.dart';
+import 'program_model.dart';
+
 class ProgramApplicationItem {
   final String id;
   final String programName;
@@ -5,12 +8,21 @@ class ProgramApplicationItem {
   final String category;
   final String referenceNumber;
   final String startDate;
+  final String? endDate;
   final String location;
+  final String? venue;
   final String organizer;
   final String submittedDate;
   final String lastUpdatedDate;
-  final String status; // 'In Review', 'Submitted', 'Approved', 'Completed'
+  final String status; // 'In Review', 'Submitted', 'Approved', 'Completed', 'Draft'
+  final String? description;
+  final String? banner;
+  final String? contactPerson;
+  final String? contactPhone;
+  final String? contactEmail;
   final List<String> supportingMaterials;
+  final List<Map<String, dynamic>> materials;
+  final List<Map<String, dynamic>> agenda;
 
   const ProgramApplicationItem({
     required this.id,
@@ -19,15 +31,37 @@ class ProgramApplicationItem {
     required this.category,
     required this.referenceNumber,
     required this.startDate,
+    this.endDate,
     required this.location,
+    this.venue,
     required this.organizer,
     required this.submittedDate,
     required this.lastUpdatedDate,
     required this.status,
-    this.supportingMaterials = const ['Program flyer.pdf', 'Schedule 2026.pdf'],
+    this.description,
+    this.banner,
+    this.contactPerson,
+    this.contactPhone,
+    this.contactEmail,
+    this.supportingMaterials = const [],
+    this.materials = const [],
+    this.agenda = const [],
   });
 
   factory ProgramApplicationItem.fromJson(Map<String, dynamic> json) {
+    final rawMaterials = json['materials'] is List
+        ? (json['materials'] as List).whereType<Map<String, dynamic>>().toList()
+        : <Map<String, dynamic>>[];
+    final rawAgenda = json['agenda'] is List
+        ? (json['agenda'] as List).whereType<Map<String, dynamic>>().toList()
+        : <Map<String, dynamic>>[];
+    final materialNames = rawMaterials
+        .map((m) => (m['name'] ?? m['file_name'] ?? 'Document').toString())
+        .toList();
+
+    final statusStr = (json['display_status'] ?? json['review_status'] ?? json['status'] ?? 'Submitted').toString();
+    String normalizedStatus = _normalizeStatus(statusStr);
+
     return ProgramApplicationItem(
       id: (json['id'] ?? '').toString(),
       programName: (json['title'] ?? json['program_name'] ?? '').toString(),
@@ -35,70 +69,104 @@ class ProgramApplicationItem {
       category: (json['program_type'] ?? '').toString(),
       referenceNumber: (json['program_no'] ?? json['application_id'] ?? '').toString(),
       startDate: (json['start_date'] ?? '').toString(),
+      endDate: json['end_date']?.toString(),
       location: (json['city_text'] ?? json['city'] ?? json['location'] ?? '').toString(),
-      organizer: (json['organizer_name'] ?? json['organizer'] ?? '').toString(),
-      submittedDate: (json['submitted_at'] ?? json['submitted'] ?? '').toString(),
-      lastUpdatedDate: (json['last_updated'] ?? '').toString(),
-      status: (json['display_status'] ?? json['status'] ?? 'Submitted').toString(),
+      venue: json['venue']?.toString(),
+      organizer: (json['organizer_name'] ?? json['organizer'] ?? json['organization_entity_name'] ?? '').toString(),
+      submittedDate: (json['submitted_at'] ?? json['submitted'] ?? json['registered_at'] ?? '').toString(),
+      lastUpdatedDate: (json['last_updated'] ?? json['updated_at'] ?? json['registered_at'] ?? '').toString(),
+      status: normalizedStatus,
+      description: (json['description'] ?? json['about'] ?? '').toString(),
+      banner: (json['banner_image_url'] ?? json['cover_image_url'] ?? json['banner'])?.toString(),
+      contactPerson: json['contact_person']?.toString(),
+      contactPhone: json['phone']?.toString(),
+      contactEmail: json['email']?.toString(),
+      supportingMaterials: materialNames,
+      materials: rawMaterials,
+      agenda: rawAgenda,
     );
   }
 
-  static List<ProgramApplicationItem> sampleItems() {
-    return const [
-      ProgramApplicationItem(
-        id: '1',
-        programName: 'Diabetes Awareness Walk 2026',
-        programType: 'Campaign',
-        category: 'Campaign',
-        referenceNumber: 'PRG-2026-00124',
-        startDate: '14 Nov 2026',
-        location: 'Nairobi, Kenya',
-        organizer: 'IDF Africa Region',
-        submittedDate: '18 Sep 2026',
-        lastUpdatedDate: '21 Sep 2026',
-        status: 'In Review',
-      ),
-      ProgramApplicationItem(
-        id: '2',
-        programName: 'Youth Fitness Drive – Lagos',
-        programType: 'Activity Drive',
-        category: 'Activity Drive',
-        referenceNumber: 'PRG-2026-00089',
-        startDate: '05 Dec 2026',
-        location: 'Lagos, Nigeria',
-        organizer: 'Lagos State Sports Council',
-        submittedDate: '10 Sep 2026',
-        lastUpdatedDate: '11 Sep 2026',
-        status: 'Submitted',
-      ),
-      ProgramApplicationItem(
-        id: '3',
-        programName: 'Marathon for Health 2025',
-        programType: 'Activity Drive',
-        category: 'Activity Drive',
-        referenceNumber: 'PRG-2025-00031',
-        startDate: '12 Oct 2025',
-        location: 'Bangkok, Thailand',
-        organizer: 'IDF Western Pacific',
-        submittedDate: '15 Jul 2025',
-        lastUpdatedDate: '20 Aug 2025',
-        status: 'Approved',
-      ),
-      ProgramApplicationItem(
-        id: '4',
-        programName: 'Community Cycling Campaign 2025',
-        programType: 'Campaign',
-        category: 'Campaign',
-        referenceNumber: 'PRG-2025-00015',
-        startDate: '01 Jun 2025',
-        location: 'Hyderabad, India',
-        organizer: 'IDF South-East Asia',
-        submittedDate: '01 Jun 2025',
-        lastUpdatedDate: '02 Sep 2025',
-        status: 'Completed',
-      ),
-    ];
+  factory ProgramApplicationItem.fromProgramApiItem(ProgramApiItem item) {
+    final statusStr = (item.reviewStatus != null && item.reviewStatus!.isNotEmpty)
+        ? item.reviewStatus!
+        : (item.status ?? 'Submitted');
+    final normalizedStatus = _normalizeStatus(statusStr);
+
+    final loc = [item.cityText, item.countryText].where((s) => s != null && s.isNotEmpty).join(', ');
+
+    return ProgramApplicationItem(
+      id: item.id.toString(),
+      programName: item.programName ?? item.title,
+      programType: item.programType,
+      category: item.programType,
+      referenceNumber: item.programNo ?? (item.id > 0 ? 'PRG-2026-0000${item.id}' : ''),
+      startDate: item.startDate ?? '',
+      endDate: item.endDate ?? item.startDate,
+      location: loc,
+      organizer: item.organizerName,
+      submittedDate: item.registeredAt ?? item.startDate ?? '',
+      lastUpdatedDate: item.registeredAt ?? item.startDate ?? '',
+      status: normalizedStatus,
+      banner: item.coverImageUrl ?? item.bannerImageUrl ?? item.banner,
+      supportingMaterials: const [],
+      materials: const [],
+      agenda: const [],
+    );
   }
+
+  factory ProgramApplicationItem.fromProgramModel(ProgramModel model) {
+    final statusStr = (model.reviewStatus != null && model.reviewStatus!.isNotEmpty)
+        ? model.reviewStatus!
+        : (model.status == ProgramStatus.completed ? 'Completed' : 'Submitted');
+    final normalizedStatus = _normalizeStatus(statusStr);
+
+    final matNames = model.materials.map((m) => m.name).toList();
+    final matMaps = model.materials
+        .map((m) => {'name': m.name, 'url': m.url, 'mime_type': m.mimeType})
+        .toList();
+    final agendaMaps = model.agenda
+        .map((a) => {'start_time': a.time, 'title': a.title})
+        .toList();
+
+    return ProgramApplicationItem(
+      id: model.id,
+      programName: model.title,
+      programType: model.tag,
+      category: model.category ?? model.tag,
+      referenceNumber: model.programNo ?? (model.id.isNotEmpty ? 'PRG-2026-0000${model.id}' : ''),
+      startDate: model.startDate,
+      endDate: model.endDate,
+      location: model.location,
+      venue: model.venue,
+      organizer: model.organizer,
+      submittedDate: model.startDate,
+      lastUpdatedDate: model.startDate,
+      status: normalizedStatus,
+      description: model.description,
+      banner: model.imageUrl,
+      contactPerson: model.contactInfo.contactPerson,
+      contactPhone: model.contactInfo.phone,
+      contactEmail: model.contactInfo.email,
+      supportingMaterials: matNames,
+      materials: matMaps,
+      agenda: agendaMaps,
+    );
+  }
+
+  static String _normalizeStatus(String raw) {
+    final lower = raw.trim().toLowerCase();
+    if (lower == 'submitted') return 'Submitted';
+    if (lower == 'approved') return 'Approved';
+    if (lower == 'draft') return 'Draft';
+    if (lower == 'in review' || lower == 'in_review' || lower == 'review') return 'In Review';
+    if (lower == 'completed') return 'Completed';
+    if (lower == 'rejected') return 'Rejected';
+    return raw;
+  }
+
+  /// Empty list by default — no static fallback or dummy data
+  static List<ProgramApplicationItem> sampleItems() => const [];
 }
 
 class CertificateApplicationItem {
@@ -124,41 +192,20 @@ class CertificateApplicationItem {
     this.emoji = '🏅',
   });
 
-  static List<CertificateApplicationItem> sampleItems() {
-    return const [
-      CertificateApplicationItem(
-        id: '1',
-        institutionName: 'ABC Healthcare Institute',
-        institutionType: 'Health Facility',
-        certificateId: 'IDF-ACT-2026-00125',
-        issuedDate: '20 Sep 2026',
-        expiresDate: '20 Sep 2028',
-        status: 'Active',
-        score: '8/10',
-        emoji: '🏥',
-      ),
-      CertificateApplicationItem(
-        id: '2',
-        institutionName: 'Lagos State University',
-        institutionType: 'College / University',
-        certificateId: 'APP-CERT-2025-0018',
-        issuedDate: '01 Sep 2025',
-        expiresDate: '01 Sep 2027',
-        status: 'Changes Required',
-        score: '7/10',
-        emoji: '🏫',
-      ),
-      CertificateApplicationItem(
-        id: '3',
-        institutionName: 'Green Valley Workplace',
-        institutionType: 'Workplace / Worksite',
-        certificateId: 'IDF-ACT-2024-00041',
-        issuedDate: '15 Feb 2024',
-        expiresDate: '15 Feb 2026',
-        status: 'Expired',
-        score: '74%',
-        emoji: '🏢',
-      ),
-    ];
+  factory CertificateApplicationItem.fromJson(Map<String, dynamic> json) {
+    return CertificateApplicationItem(
+      id: (json['id'] ?? json['application_id'] ?? '').toString(),
+      institutionName: (json['institution_name'] ?? '').toString(),
+      institutionType: (json['institution_type'] ?? json['category'] ?? '').toString(),
+      certificateId: (json['certificate_id'] ?? json['application_no'] ?? '').toString(),
+      issuedDate: (json['issued_date'] ?? json['applied_at'] ?? '').toString(),
+      expiresDate: (json['expires_date'] ?? json['expires_on'] ?? '').toString(),
+      status: (json['status'] ?? json['display_status'] ?? 'Submitted').toString(),
+      score: (json['score'] ?? '').toString(),
+      emoji: (json['emoji'] ?? '🏅').toString(),
+    );
   }
+
+  /// Empty list by default — no static fallback or dummy data
+  static List<CertificateApplicationItem> sampleItems() => const [];
 }

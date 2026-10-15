@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme.dart';
 import '../../../../models/program_submission_model.dart';
+import '../../../../services/api_config.dart';
 import '../../../../services/files_service.dart';
 import '../../../../widgets/custom_button.dart';
 
@@ -243,6 +244,14 @@ class _Step6MaterialsState extends State<Step6Materials> {
           if (!widget.model.supportingFileIds.contains(uploaded.id)) {
             widget.model.supportingFileIds.add(uploaded.id);
           }
+          final effectiveUrl = uploaded.url.isNotEmpty
+              ? uploaded.url
+              : (ApiConfig.resolveImageUrl(uploaded.storageUrl) ?? uploaded.storageUrl);
+          widget.model.materials.add({
+            'name': uploaded.originalName.isNotEmpty ? uploaded.originalName : file.name,
+            'url': effectiveUrl,
+            'mime_type': uploaded.mimeType.isNotEmpty ? uploaded.mimeType : 'application/pdf',
+          });
         } catch (_) {}
       }
     } catch (e) {
@@ -277,6 +286,14 @@ class _Step6MaterialsState extends State<Step6Materials> {
             if (!widget.model.supportingFileIds.contains(uploaded.id)) {
               widget.model.supportingFileIds.add(uploaded.id);
             }
+            final effectiveUrl = uploaded.url.isNotEmpty
+                ? uploaded.url
+                : (ApiConfig.resolveImageUrl(uploaded.storageUrl) ?? uploaded.storageUrl);
+            widget.model.materials.add({
+              'name': uploaded.originalName.isNotEmpty ? uploaded.originalName : f.name,
+              'url': effectiveUrl,
+              'mime_type': uploaded.mimeType.isNotEmpty ? uploaded.mimeType : 'application/pdf',
+            });
           } catch (_) {}
         }
       }
@@ -290,6 +307,7 @@ class _Step6MaterialsState extends State<Step6Materials> {
   void _addSampleSupportingFile() {
     setState(() {
       final sampleNames = [
+        'Screening_Schedule_2026.pdf',
         'event_brochure.pdf',
         'route_map_schedule.pdf',
         'safety_guidelines.pdf',
@@ -300,6 +318,11 @@ class _Step6MaterialsState extends State<Step6Materials> {
         orElse: () => 'document_${_uploadedFiles.length + 1}.pdf',
       );
       _uploadedFiles.add(nextFile);
+      widget.model.materials.add({
+        'name': nextFile,
+        'url': '${ApiConfig.baseUrl}/uploads/$nextFile',
+        'mime_type': 'application/pdf',
+      });
     });
   }
 
@@ -308,6 +331,9 @@ class _Step6MaterialsState extends State<Step6Materials> {
       _uploadedFiles.removeAt(index);
       if (index < widget.model.supportingFileIds.length) {
         widget.model.supportingFileIds.removeAt(index);
+      }
+      if (index < widget.model.materials.length) {
+        widget.model.materials.removeAt(index);
       }
     });
   }

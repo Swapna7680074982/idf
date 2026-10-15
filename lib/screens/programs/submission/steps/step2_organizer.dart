@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme.dart';
 import '../../../../models/meta_models.dart';
@@ -37,7 +38,9 @@ class _Step2OrganizerState extends State<Step2Organizer> {
     super.initState();
     _entityNameController = TextEditingController(text: widget.model.organizingEntityName);
     _contactPersonController = TextEditingController(text: widget.model.contactPerson);
-    _phoneController = TextEditingController(text: widget.model.phone);
+    final rawPhone = widget.model.phone.replaceAll(RegExp(r'\D'), '');
+    final cleanPhone = rawPhone.length > 10 ? rawPhone.substring(rawPhone.length - 10) : rawPhone;
+    _phoneController = TextEditingController(text: cleanPhone);
     _emailController = TextEditingController(text: widget.model.email);
     _loadOrgTypes();
   }
@@ -214,17 +217,30 @@ class _Step2OrganizerState extends State<Step2Organizer> {
           ),
           const SizedBox(height: 16),
 
-          // Phone
-          _buildFieldLabel('Phone *'),
+          // Phone (10 Digits)
+          _buildFieldLabel('Phone (10 Digits) *'),
           const SizedBox(height: 6),
           TextFormField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
             decoration: const InputDecoration(
-              hintText: '+91 9876543210',
+              hintText: '9876543210',
+              prefixText: '+91 ',
             ),
-            validator: (val) =>
-                val == null || val.trim().isEmpty ? 'Please enter phone number' : null,
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) {
+                return 'Please enter 10-digit phone number';
+              }
+              final clean = val.replaceAll(RegExp(r'\D'), '');
+              if (clean.length != 10) {
+                return 'Phone number must be exactly 10 digits';
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 16),
 

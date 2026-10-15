@@ -28,10 +28,7 @@ class ProgramImageBanner extends StatelessWidget {
     final hasImage = rawUrl != null && rawUrl.isNotEmpty;
     final isLocalFile = hasImage && File(rawUrl).existsSync();
 
-    String effectiveUrl = rawUrl ?? '';
-    if (hasImage && !isLocalFile && effectiveUrl.startsWith('/')) {
-      effectiveUrl = '${ApiConfig.baseUrl}$effectiveUrl';
-    }
+    final String effectiveUrl = isLocalFile ? rawUrl : ApiConfig.resolveMediaUrl(rawUrl);
 
     return ClipRRect(
       borderRadius: borderRadius ?? BorderRadius.circular(16),

@@ -48,8 +48,8 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     'Expired',
   ];
 
-  List<ProgramApplicationItem> _programs = ProgramApplicationItem.sampleItems();
-  final List<CertificateApplicationItem> _certificates = CertificateApplicationItem.sampleItems();
+  List<ProgramApplicationItem> _programs = [];
+  final List<CertificateApplicationItem> _certificates = [];
   bool _isLoadingPrograms = false;
 
   @override
@@ -63,17 +63,39 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     setState(() {
       _isLoadingPrograms = true;
     });
+
     try {
-      final res = await ProgramsService.getMyApplications();
-      final items = res['items'] is List ? res['items'] as List : [];
+      final List<ProgramApplicationItem> fetchedList = [];
+
+      // 1. Fetch from /api/applications/programs
+      try {
+        final res = await ProgramsService.getMyApplications();
+        final items = res['items'] is List ? res['items'] as List : [];
+        for (final item in items) {
+          if (item is Map<String, dynamic>) {
+            fetchedList.add(ProgramApplicationItem.fromJson(item));
+          }
+        }
+      } catch (_) {}
+
+      // 2. Also fetch real submitted programs from /api/programs
+      try {
+        final progRes = await ProgramsService.getPrograms();
+        for (final p in progRes.items) {
+          final alreadyExists = fetchedList.any(
+            (existing) =>
+                existing.id == p.id.toString() ||
+                (existing.referenceNumber.isNotEmpty && existing.referenceNumber == p.programNo),
+          );
+          if (!alreadyExists) {
+            fetchedList.add(ProgramApplicationItem.fromProgramApiItem(p));
+          }
+        }
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
-          if (items.isNotEmpty) {
-            _programs = items
-                .whereType<Map<String, dynamic>>()
-                .map((i) => ProgramApplicationItem.fromJson(i))
-                .toList();
-          }
+          _programs = fetchedList;
           _isLoadingPrograms = false;
         });
       }
@@ -371,11 +393,46 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
           ? ListView(
               physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
               children: [
-                SizedBox(height: MediaQuery.of(context).size.height * 0.2),
+                SizedBox(height: MediaQuery.of(context).size.height * 0.18),
                 Center(
-                  child: Text(
-                    'No program applications found.',
-                    style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFF1F5F9),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.description_outlined,
+                            size: 28,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'No program applications found',
+                          style: GoogleFonts.inter(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Submit a program proposal to track its review and approval status here.',
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],

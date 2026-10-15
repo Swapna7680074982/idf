@@ -305,6 +305,7 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
       widget.model.programType = _selectedProgramType?.name ?? '';
       widget.model.programTypeId = _selectedProgramType?.id;
       widget.model.description = _descriptionController.text.trim();
+      widget.model.programDescription = widget.model.description;
       widget.onContinue();
     }
   }

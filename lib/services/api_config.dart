@@ -2,6 +2,16 @@ class ApiConfig {
   /// Base API URL set to user's server IP
   static String baseUrl = 'http://192.168.215.232:4000';
 
+  /// Helper to safely resolve media & file URLs whether relative or absolute
+  static String resolveMediaUrl(String? path) {
+    if (path == null) return '';
+    final p = path.trim();
+    if (p.isEmpty) return '';
+    if (p.startsWith('http://') || p.startsWith('https://')) return p;
+    if (p.startsWith('/')) return '$baseUrl$p';
+    return '$baseUrl/$p';
+  }
+
   // System & Health
   static String get health => '$baseUrl/health';
 
@@ -68,6 +78,15 @@ class ApiConfig {
   static String? resolveImageUrl(String? url) {
     if (url == null || url.trim().isEmpty) return null;
     final trimmed = url.trim();
+    if (trimmed.contains('{{') || trimmed.contains('}}')) {
+      return null;
+    }
+    if (trimmed.startsWith('http://localhost:4000')) {
+      return trimmed.replaceFirst('http://localhost:4000', baseUrl);
+    }
+    if (trimmed.startsWith('http://127.0.0.1:4000')) {
+      return trimmed.replaceFirst('http://127.0.0.1:4000', baseUrl);
+    }
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       return trimmed;
     }

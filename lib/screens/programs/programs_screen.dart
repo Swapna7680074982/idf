@@ -27,7 +27,6 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _debounceTimer;
 
-  int _selectedScopeIndex = 0; // 0: Explore Programs, 1: My Registrations
   String _searchQuery = '';
   String _selectedFilter = 'All';
   ProgramTypeItem? _selectedProgramType;
@@ -69,48 +68,18 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
     });
 
     try {
-      if (_selectedScopeIndex == 0) {
-        // Browse Public Programs
-        String status = 'all';
-        if (_selectedFilter == 'Upcoming') {
-          status = 'upcoming';
-        } else if (_selectedFilter == 'Ongoing') {
-          status = 'ongoing';
-        } else if (_selectedFilter == 'Completed') {
-          status = 'completed';
-        }
+      final res = await ProgramsService.getPrograms(
+        search: _searchQuery.isNotEmpty ? _searchQuery : null,
+        typeId: _selectedProgramType?.id,
+      );
 
-        final res = await ProgramsService.getPrograms(
-          search: _searchQuery.isNotEmpty ? _searchQuery : null,
-          status: status,
-          typeId: _selectedProgramType?.id,
-          page: 1,
-          limit: 50,
-        );
-
-        if (mounted) {
-          setState(() {
-            _apiPrograms = res.items
-                .map((item) => ProgramModel.fromApiItem(item))
-                .toList();
-            _isLoading = false;
-          });
-        }
-      } else {
-        // My Registrations
-        final res = await ProgramsService.getRegisteredPrograms(
-          page: 1,
-          limit: 50,
-        );
-
-        if (mounted) {
-          setState(() {
-            _apiPrograms = res.items
-                .map((item) => ProgramModel.fromApiItem(item))
-                .toList();
-            _isLoading = false;
-          });
-        }
+      if (mounted) {
+        setState(() {
+          _apiPrograms = res.items
+              .map((item) => ProgramModel.fromApiItem(item))
+              .toList();
+          _isLoading = false;
+        });
       }
     } catch (e) {
       if (mounted) {
@@ -150,7 +119,15 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final displayList = _apiPrograms;
+    var displayList = _apiPrograms;
+
+    if (_selectedFilter == 'Upcoming') {
+      displayList = displayList.where((p) => p.status == ProgramStatus.upcoming).toList();
+    } else if (_selectedFilter == 'Ongoing') {
+      displayList = displayList.where((p) => p.status == ProgramStatus.ongoing).toList();
+    } else if (_selectedFilter == 'Completed') {
+      displayList = displayList.where((p) => p.status == ProgramStatus.completed).toList();
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -220,177 +197,83 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
               ),
             ),
 
-            // Scope Switcher: [ Explore Programs | My Registrations ]
+            const SizedBox(height: 4),
+
+            // Search Bar & Filter Chips
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 6.0),
               child: Container(
-                height: 42,
-                padding: const EdgeInsets.all(3.5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          if (_selectedScopeIndex != 0) {
-                            setState(() {
-                              _selectedScopeIndex = 0;
-                            });
-                            _fetchPrograms();
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(9),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: _selectedScopeIndex == 0 ? Colors.white : Colors.transparent,
-                            borderRadius: BorderRadius.circular(9),
-                            boxShadow: _selectedScopeIndex == 0
-                                ? [
-                                    BoxShadow(
-                                      color: Colors.black.withAlpha(12),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 1),
-                                    )
-                                  ]
-                                : null,
-                          ),
-                          child: Text(
-                            'Explore Catalog',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: _selectedScopeIndex == 0 ? FontWeight.w700 : FontWeight.w500,
-                              color: _selectedScopeIndex == 0 ? AppColors.primaryBlue : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          if (_selectedScopeIndex != 1) {
-                            setState(() {
-                              _selectedScopeIndex = 1;
-                            });
-                            _fetchPrograms();
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(9),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 180),
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: _selectedScopeIndex == 1 ? Colors.white : Colors.transparent,
-                            borderRadius: BorderRadius.circular(9),
-                            boxShadow: _selectedScopeIndex == 1
-                                ? [
-                                    BoxShadow(
-                                      color: Colors.black.withAlpha(12),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 1),
-                                    )
-                                  ]
-                                : null,
-                          ),
-                          child: Text(
-                            'My Registrations',
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: _selectedScopeIndex == 1 ? FontWeight.w700 : FontWeight.w500,
-                              color: _selectedScopeIndex == 1 ? AppColors.primaryBlue : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ),
-                      ),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border, width: 1.1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withAlpha(4),
+                      blurRadius: 6,
+                      offset: const Offset(0, 1),
                     ),
                   ],
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: _onSearchChanged,
+                  style: GoogleFonts.inter(
+                    fontSize: 13.5,
+                    color: AppColors.textPrimary,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Search title, organizer, city...',
+                    hintStyle: GoogleFonts.inter(
+                      fontSize: 13,
+                      color: const Color(0xFFB0BAC9),
+                    ),
+                    prefixIcon: const Icon(
+                      Icons.search_rounded,
+                      size: 20,
+                      color: Color(0xFFB0BAC9),
+                    ),
+                    suffixIcon: _searchQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                              _fetchPrograms();
+                            },
+                          )
+                        : null,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  ),
                 ),
               ),
             ),
 
-            // Search Bar & Filter Chips (Only for Explore Catalog)
-            if (_selectedScopeIndex == 0) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 6.0),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.border, width: 1.1),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withAlpha(4),
-                        blurRadius: 6,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: TextField(
-                    controller: _searchController,
-                    onChanged: _onSearchChanged,
-                    style: GoogleFonts.inter(
-                      fontSize: 13.5,
-                      color: AppColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: 'Search title, organizer, city...',
-                      hintStyle: GoogleFonts.inter(
-                        fontSize: 13,
-                        color: const Color(0xFFB0BAC9),
-                      ),
-                      prefixIcon: const Icon(
-                        Icons.search_rounded,
-                        size: 20,
-                        color: Color(0xFFB0BAC9),
-                      ),
-                      suffixIcon: _searchQuery.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _searchQuery = '';
-                                });
-                                _fetchPrograms();
-                              },
-                            )
-                          : null,
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    ),
-                  ),
-                ),
+            // Filter Chips Bar
+            Padding(
+              padding: const EdgeInsets.only(left: 18.0, right: 18.0, top: 4.0, bottom: 8.0),
+              child: ProgramFilterChips(
+                programTypes: _programTypes,
+                selectedFilter: _selectedFilter,
+                selectedType: _selectedProgramType,
+                onFilterSelected: (filter) {
+                  setState(() {
+                    _selectedFilter = filter;
+                  });
+                },
+                onTypeSelected: (type) {
+                  setState(() {
+                    _selectedProgramType = type;
+                  });
+                  _fetchPrograms();
+                },
               ),
-
-              // Filter Chips Bar
-              Padding(
-                padding: const EdgeInsets.only(left: 18.0, right: 18.0, top: 4.0, bottom: 8.0),
-                child: ProgramFilterChips(
-                  programTypes: _programTypes,
-                  selectedFilter: _selectedFilter,
-                  selectedType: _selectedProgramType,
-                  onFilterSelected: (filter) {
-                    setState(() {
-                      _selectedFilter = filter;
-                    });
-                    _fetchPrograms();
-                  },
-                  onTypeSelected: (type) {
-                    setState(() {
-                      _selectedProgramType = type;
-                    });
-                    _fetchPrograms();
-                  },
-                ),
-              ),
-            ],
+            ),
 
             // Content Area (Loading / Error / Empty / List)
             Expanded(
@@ -419,19 +302,15 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                                             color: Color(0xFFF1F5F9),
                                             shape: BoxShape.circle,
                                           ),
-                                          child: Icon(
-                                            _selectedScopeIndex == 1
-                                                ? Icons.event_busy_rounded
-                                                : Icons.search_off_rounded,
+                                          child: const Icon(
+                                            Icons.event_note_outlined,
                                             size: 32,
-                                            color: const Color(0xFF94A3B8),
+                                            color: Color(0xFF94A3B8),
                                           ),
                                         ),
                                         const SizedBox(height: 14),
                                         Text(
-                                          _selectedScopeIndex == 1
-                                              ? 'No registered programs yet'
-                                              : 'No programs found',
+                                          'No programs found',
                                           style: GoogleFonts.inter(
                                             fontSize: 16,
                                             fontWeight: FontWeight.w700,
@@ -440,11 +319,9 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                                         ),
                                         const SizedBox(height: 6),
                                         Text(
-                                          _selectedScopeIndex == 1
-                                              ? 'Explore public programs and register to participate!'
-                                              : (_errorMessage != null
-                                                  ? 'Could not connect to server. Pull down to retry.'
-                                                  : 'Try searching with different keywords or reset filters'),
+                                          _errorMessage != null
+                                              ? 'Could not connect to server. Pull down to retry.'
+                                              : 'Try searching with different keywords or reset filters.',
                                           textAlign: TextAlign.center,
                                           style: GoogleFonts.inter(
                                             fontSize: 13,

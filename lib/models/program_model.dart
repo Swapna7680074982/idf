@@ -1,4 +1,6 @@
 import '../services/api_config.dart';
+import 'home_models.dart';
+import 'program_api_models.dart';
 
 enum ProgramStatus {
   upcoming,
@@ -83,8 +85,29 @@ class ProgramContactInfo {
   });
 }
 
+class ProgramMaterialItem {
+  final String name;
+  final String url;
+  final String mimeType;
+
+  const ProgramMaterialItem({
+    required this.name,
+    required this.url,
+    required this.mimeType,
+  });
+
+  factory ProgramMaterialItem.fromJson(Map<String, dynamic> json) {
+    return ProgramMaterialItem(
+      name: (json['name'] ?? json['file_name'] ?? 'Supporting Document').toString(),
+      url: (json['url'] ?? json['file_url'] ?? '').toString(),
+      mimeType: (json['mime_type'] ?? 'application/pdf').toString(),
+    );
+  }
+}
+
 class ProgramModel {
   final String id;
+  final String? programNo;
   final String title;
   final String tag;
   final ProgramType type;
@@ -99,6 +122,7 @@ class ProgramModel {
   final String endDate;
   final String description;
   final List<ProgramAgendaItem> agenda;
+  final List<ProgramMaterialItem> materials;
   final ProgramContactInfo contactInfo;
   final bool isRegistered;
   final bool canRegister;
@@ -109,9 +133,12 @@ class ProgramModel {
   final String? registrationInstructions;
   final int participantsCount;
   final String targetAudience;
+  final String? reviewStatus;
+  final bool isOrganizer;
 
   const ProgramModel({
     required this.id,
+    this.programNo,
     required this.title,
     required this.tag,
     required this.type,
@@ -126,6 +153,7 @@ class ProgramModel {
     required this.endDate,
     required this.description,
     required this.agenda,
+    this.materials = const [],
     required this.contactInfo,
     this.isRegistered = false,
     this.canRegister = true,
@@ -136,10 +164,13 @@ class ProgramModel {
     this.registrationInstructions,
     this.participantsCount = 1200,
     this.targetAudience = 'General Public & Youth',
+    this.reviewStatus,
+    this.isOrganizer = false,
   });
 
   ProgramModel copyWith({
     String? id,
+    String? programNo,
     String? title,
     String? tag,
     ProgramType? type,
@@ -154,6 +185,7 @@ class ProgramModel {
     String? endDate,
     String? description,
     List<ProgramAgendaItem>? agenda,
+    List<ProgramMaterialItem>? materials,
     ProgramContactInfo? contactInfo,
     bool? isRegistered,
     bool? canRegister,
@@ -164,9 +196,12 @@ class ProgramModel {
     String? registrationInstructions,
     int? participantsCount,
     String? targetAudience,
+    String? reviewStatus,
+    bool? isOrganizer,
   }) {
     return ProgramModel(
       id: id ?? this.id,
+      programNo: programNo ?? this.programNo,
       title: title ?? this.title,
       tag: tag ?? this.tag,
       type: type ?? this.type,
@@ -181,6 +216,7 @@ class ProgramModel {
       endDate: endDate ?? this.endDate,
       description: description ?? this.description,
       agenda: agenda ?? this.agenda,
+      materials: materials ?? this.materials,
       contactInfo: contactInfo ?? this.contactInfo,
       isRegistered: isRegistered ?? this.isRegistered,
       canRegister: canRegister ?? this.canRegister,
@@ -191,6 +227,8 @@ class ProgramModel {
       registrationInstructions: registrationInstructions ?? this.registrationInstructions,
       participantsCount: participantsCount ?? this.participantsCount,
       targetAudience: targetAudience ?? this.targetAudience,
+      reviewStatus: reviewStatus ?? this.reviewStatus,
+      isOrganizer: isOrganizer ?? this.isOrganizer,
     );
   }
 
@@ -205,6 +243,7 @@ class ProgramModel {
         ? json['registration'] as Map<String, dynamic>
         : <String, dynamic>{};
     final agendaList = json['agenda'] is List ? json['agenda'] as List : [];
+    final materialsList = json['materials'] is List ? json['materials'] as List : [];
 
     final typeStr = (json['program_type'] ?? '').toString().toLowerCase();
     final ProgramType type;
@@ -222,10 +261,11 @@ class ProgramModel {
       type = ProgramType.activityDrive;
     }
 
-    final city = (eventDetails['city'] ?? json['city_text'] ?? '').toString();
-    final country = (eventDetails['country'] ?? json['country_text'] ?? '').toString();
+    final isOrg = json['is_organizer'] == 1 || json['is_organizer'] == true || json['is_organizer'] == '1';
+    final city = (eventDetails['city'] ?? json['city_text'] ?? json['city'] ?? '').toString();
+    final country = (eventDetails['country'] ?? json['country_text'] ?? json['country'] ?? '').toString();
     final location = [city, country].where((s) => s.isNotEmpty).join(', ');
-    final organizer = (eventDetails['organizer'] ?? json['organizer_name'] ?? 'IDF Active').toString();
+    final organizer = (eventDetails['organizer'] ?? json['organizer_name'] ?? json['organization_entity_name'] ?? (isOrg ? 'You (Organizer)' : 'IDF Active')).toString();
     final venue = (eventDetails['venue'] ?? json['venue'] ?? location).toString();
     final startDate = (eventDetails['start_date'] ?? json['start_date'] ?? '').toString();
     final endDate = (eventDetails['end_date'] ?? json['end_date'] ?? startDate).toString();
@@ -238,6 +278,10 @@ class ProgramModel {
         title: (a['title'] ?? '').toString(),
         description: a['description']?.toString(),
       );
+    }).toList();
+
+    final parsedMaterials = materialsList.whereType<Map<String, dynamic>>().map((m) {
+      return ProgramMaterialItem.fromJson(m);
     }).toList();
 
     final contactInfo = ProgramContactInfo(
@@ -255,6 +299,7 @@ class ProgramModel {
 
     return ProgramModel(
       id: (json['id'] ?? json['program_no'] ?? '').toString(),
+      programNo: json['program_no']?.toString(),
       title: (json['title'] ?? json['program_name'] ?? '').toString(),
       tag: (json['program_type'] ?? 'ACTIVITY DRIVE').toString().toUpperCase(),
       type: type,
@@ -269,6 +314,7 @@ class ProgramModel {
       endDate: endDate,
       description: (json['about'] ?? json['description'] ?? json['program_description'] ?? '').toString(),
       agenda: parsedAgenda,
+      materials: parsedMaterials,
       contactInfo: contactInfo,
       isRegistered: isReg,
       canRegister: canReg,
@@ -277,6 +323,8 @@ class ProgramModel {
       category: json['program_type']?.toString(),
       registrationLink: regLink,
       registrationInstructions: regInstructions,
+      reviewStatus: (json['review_status'] ?? json['status'])?.toString(),
+      isOrganizer: isOrg,
     );
   }
 
@@ -284,12 +332,161 @@ class ProgramModel {
     if (apiItem is Map<String, dynamic>) {
       return ProgramModel.fromDetailJson(apiItem);
     }
-    final startDate = apiItem.startDate?.toString() ?? '';
-    final endDate = (apiItem.endDate ?? apiItem.startDate)?.toString() ?? '';
-    final statusStr = apiItem.eventStatus?.toString() ?? '';
+
+    if (apiItem is ProgramApiItem) {
+      final startDate = apiItem.startDate?.toString() ?? '';
+      final endDate = (apiItem.endDate ?? apiItem.startDate)?.toString() ?? '';
+      final statusStr = apiItem.eventStatus;
+      final status = ProgramStatus.parse(statusStr, startDate: startDate, endDate: endDate);
+
+      final typeStr = apiItem.programType.toLowerCase();
+      final ProgramType type;
+      if (typeStr.contains('campaign')) {
+        type = ProgramType.campaign;
+      } else if (typeStr.contains('conference')) {
+        type = ProgramType.conference;
+      } else if (typeStr.contains('workshop')) {
+        type = ProgramType.workshop;
+      } else if (typeStr.contains('seminar')) {
+        type = ProgramType.seminar;
+      } else if (typeStr.contains('walk')) {
+        type = ProgramType.communityWalk;
+      } else {
+        type = ProgramType.activityDrive;
+      }
+
+      final city = apiItem.cityText?.toString() ?? '';
+      final country = apiItem.countryText?.toString() ?? '';
+      final location = [city, country].where((s) => s.isNotEmpty).join(', ');
+
+      return ProgramModel(
+        id: apiItem.id.toString(),
+        programNo: apiItem.programNo ?? (apiItem.id > 0 ? 'PRG-2026-0000${apiItem.id}' : null),
+        title: apiItem.title,
+        tag: apiItem.programType.isNotEmpty ? apiItem.programType.toUpperCase() : 'ACTIVITY DRIVE',
+        type: type,
+        status: status,
+        organizer: (apiItem.organizerName.isNotEmpty)
+            ? apiItem.organizerName
+            : (apiItem.isOrganizer ? 'You (Organizer)' : 'IDF Active'),
+        organizationType: '',
+        venue: location.isNotEmpty ? location : 'IDF Active Venue',
+        location: location.isNotEmpty ? location : 'International',
+        country: country,
+        city: city,
+        startDate: apiItem.startDate ?? '',
+        endDate: apiItem.endDate ?? apiItem.startDate ?? '',
+        description: '',
+        agenda: const [],
+        materials: const [],
+        contactInfo: const ProgramContactInfo(
+          contactPerson: '',
+          phone: '',
+          email: '',
+        ),
+        isRegistered: apiItem.isRegistered,
+        canRegister: true,
+        gradientColors: const [0xFF006097, 0xFF017CC2],
+        imageUrl: ApiConfig.resolveImageUrl(apiItem.coverImageUrl ?? apiItem.bannerImageUrl ?? apiItem.banner),
+        category: apiItem.programType.isNotEmpty ? apiItem.programType : null,
+        registrationLink: apiItem.registrationLink,
+        reviewStatus: apiItem.reviewStatus ?? apiItem.status,
+        isOrganizer: apiItem.isOrganizer,
+      );
+    }
+
+    if (apiItem is HomeRegisteredProgram) {
+      final startDate = apiItem.startDate?.toString() ?? '';
+      final endDate = (apiItem.endDate ?? apiItem.startDate)?.toString() ?? '';
+      final statusStr = apiItem.eventStatus;
+      final status = ProgramStatus.parse(statusStr, startDate: startDate, endDate: endDate);
+
+      final typeStr = apiItem.programType.toLowerCase();
+      final ProgramType type;
+      if (typeStr.contains('campaign')) {
+        type = ProgramType.campaign;
+      } else if (typeStr.contains('conference')) {
+        type = ProgramType.conference;
+      } else if (typeStr.contains('workshop')) {
+        type = ProgramType.workshop;
+      } else if (typeStr.contains('seminar')) {
+        type = ProgramType.seminar;
+      } else if (typeStr.contains('walk')) {
+        type = ProgramType.communityWalk;
+      } else {
+        type = ProgramType.activityDrive;
+      }
+
+      final city = apiItem.cityText?.toString() ?? '';
+      final country = apiItem.countryText?.toString() ?? '';
+      final location = [city, country].where((s) => s.isNotEmpty).join(', ');
+
+      return ProgramModel(
+        id: apiItem.id.toString(),
+        programNo: apiItem.programNo ?? (apiItem.id > 0 ? 'PRG-2026-0000${apiItem.id}' : null),
+        title: apiItem.title,
+        tag: apiItem.programType.isNotEmpty ? apiItem.programType.toUpperCase() : 'ACTIVITY DRIVE',
+        type: type,
+        status: status,
+        organizer: (apiItem.organizerName?.isNotEmpty ?? false)
+            ? apiItem.organizerName!
+            : (apiItem.isOrganizer ? 'You (Organizer)' : 'IDF Active'),
+        organizationType: '',
+        venue: location.isNotEmpty ? location : 'IDF Active Venue',
+        location: location.isNotEmpty ? location : 'International',
+        country: country,
+        city: city,
+        startDate: apiItem.startDate ?? '',
+        endDate: apiItem.endDate ?? apiItem.startDate ?? '',
+        description: '',
+        agenda: const [],
+        materials: const [],
+        contactInfo: const ProgramContactInfo(
+          contactPerson: '',
+          phone: '',
+          email: '',
+        ),
+        isRegistered: apiItem.isRegistered,
+        canRegister: true,
+        gradientColors: const [0xFF006097, 0xFF017CC2],
+        imageUrl: ApiConfig.resolveImageUrl(apiItem.coverImageUrl ?? apiItem.bannerImageUrl ?? apiItem.banner),
+        category: apiItem.programType.isNotEmpty ? apiItem.programType : null,
+        registrationLink: apiItem.registrationLink,
+        reviewStatus: apiItem.reviewStatus ?? apiItem.status,
+        isOrganizer: apiItem.isOrganizer,
+      );
+    }
+
+    // Defensive fallback using safe reflection-free property access
+    String? safeProp(String prop) {
+      try {
+        switch (prop) {
+          case 'id': return apiItem.id?.toString();
+          case 'title': return (apiItem.title ?? apiItem.programName)?.toString();
+          case 'programType': return apiItem.programType?.toString();
+          case 'cityText': return apiItem.cityText?.toString();
+          case 'countryText': return apiItem.countryText?.toString();
+          case 'startDate': return apiItem.startDate?.toString();
+          case 'endDate': return apiItem.endDate?.toString();
+          case 'eventStatus': return apiItem.eventStatus?.toString();
+          case 'coverImageUrl': return apiItem.coverImageUrl?.toString();
+          case 'bannerImageUrl': return apiItem.bannerImageUrl?.toString();
+          case 'banner': return apiItem.banner?.toString();
+          case 'organizerName': return apiItem.organizerName?.toString();
+          case 'registrationLink': return apiItem.registrationLink?.toString();
+          case 'reviewStatus': return apiItem.reviewStatus?.toString();
+          case 'status': return apiItem.status?.toString();
+        }
+      } catch (_) {}
+      return null;
+    }
+
+    final startDate = safeProp('startDate') ?? '';
+    final endDate = safeProp('endDate') ?? startDate;
+    final statusStr = safeProp('eventStatus') ?? '';
     final status = ProgramStatus.parse(statusStr, startDate: startDate, endDate: endDate);
 
-    final typeStr = apiItem.programType?.toString().toLowerCase() ?? '';
+    final typeStr = (safeProp('programType') ?? '').toLowerCase();
     final ProgramType type;
     if (typeStr.contains('campaign')) {
       type = ProgramType.campaign;
@@ -305,41 +502,42 @@ class ProgramModel {
       type = ProgramType.activityDrive;
     }
 
-    final city = apiItem.cityText?.toString() ?? '';
-    final country = apiItem.countryText?.toString() ?? '';
+    final city = safeProp('cityText') ?? '';
+    final country = safeProp('countryText') ?? '';
     final location = [city, country].where((s) => s.isNotEmpty).join(', ');
+    final rawId = safeProp('id') ?? '0';
 
     return ProgramModel(
-      id: apiItem.id?.toString() ?? '',
-      title: apiItem.title?.toString() ?? '',
-      tag: apiItem.programType?.toString().toUpperCase() ?? 'ACTIVITY DRIVE',
+      id: rawId,
+      programNo: 'PRG-2026-0000$rawId',
+      title: safeProp('title') ?? 'IDF Program',
+      tag: (safeProp('programType') ?? 'ACTIVITY DRIVE').toUpperCase(),
       type: type,
       status: status,
-      organizer: (apiItem.organizerName?.toString().isNotEmpty ?? false)
-          ? apiItem.organizerName!.toString()
-          : 'IDF Active',
+      organizer: safeProp('organizerName') ?? 'IDF Active',
       organizationType: '',
       venue: location.isNotEmpty ? location : 'IDF Active Venue',
       location: location.isNotEmpty ? location : 'International',
       country: country,
       city: city,
-      startDate: apiItem.startDate?.toString() ?? '',
-      endDate: (apiItem.endDate ?? apiItem.startDate)?.toString() ?? '',
+      startDate: startDate,
+      endDate: endDate,
       description: '',
       agenda: const [],
+      materials: const [],
       contactInfo: const ProgramContactInfo(
         contactPerson: '',
         phone: '',
         email: '',
       ),
-      isRegistered: apiItem.isRegistered == true,
+      isRegistered: true,
       canRegister: true,
       gradientColors: const [0xFF006097, 0xFF017CC2],
-      imageUrl: ApiConfig.resolveImageUrl(apiItem.coverImageUrl?.toString() ?? apiItem.bannerImageUrl?.toString()),
-      category: (apiItem.programType?.toString().isNotEmpty ?? false)
-          ? apiItem.programType.toString()
-          : null,
-      registrationLink: apiItem.registrationLink,
+      imageUrl: ApiConfig.resolveImageUrl(safeProp('coverImageUrl') ?? safeProp('bannerImageUrl') ?? safeProp('banner')),
+      category: safeProp('programType'),
+      registrationLink: safeProp('registrationLink'),
+      reviewStatus: safeProp('reviewStatus') ?? safeProp('status'),
+      isOrganizer: false,
     );
   }
 
