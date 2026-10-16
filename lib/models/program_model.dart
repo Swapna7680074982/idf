@@ -242,8 +242,12 @@ class ProgramModel {
     final registration = json['registration'] is Map<String, dynamic>
         ? json['registration'] as Map<String, dynamic>
         : <String, dynamic>{};
-    final agendaList = json['agenda'] is List ? json['agenda'] as List : [];
-    final materialsList = json['materials'] is List ? json['materials'] as List : [];
+    final agendaList = json['agenda'] is List
+        ? json['agenda'] as List
+        : (json['schedule'] is List ? json['schedule'] as List : []);
+    final materialsList = json['materials'] is List
+        ? json['materials'] as List
+        : (json['supporting_material'] is List ? json['supporting_material'] as List : []);
 
     final typeStr = (json['program_type'] ?? '').toString().toLowerCase();
     final ProgramType type;
@@ -261,11 +265,16 @@ class ProgramModel {
       type = ProgramType.activityDrive;
     }
 
-    final isOrg = json['is_organizer'] == 1 || json['is_organizer'] == true || json['is_organizer'] == '1';
+    final detailStatusStr = (json['review_status'] ?? json['status'])?.toString().toLowerCase() ?? '';
+    final isSubmittedOrDraft = detailStatusStr == 'submitted' || detailStatusStr == 'draft' || detailStatusStr == 'in_review';
+    final isOrg = json['is_organizer'] == 1 ||
+        json['is_organizer'] == true ||
+        json['is_organizer'] == '1' ||
+        isSubmittedOrDraft;
     final city = (eventDetails['city'] ?? json['city_text'] ?? json['city'] ?? '').toString();
     final country = (eventDetails['country'] ?? json['country_text'] ?? json['country'] ?? '').toString();
     final location = [city, country].where((s) => s.isNotEmpty).join(', ');
-    final organizer = (eventDetails['organizer'] ?? json['organizer_name'] ?? json['organization_entity_name'] ?? (isOrg ? 'You (Organizer)' : 'IDF Active')).toString();
+    final organizer = (eventDetails['organizer'] ?? json['organizer_name'] ?? json['organization_entity_name'] ?? (isOrg ? 'You (Organizer)' : '')).toString();
     final venue = (eventDetails['venue'] ?? json['venue'] ?? location).toString();
     final startDate = (eventDetails['start_date'] ?? json['start_date'] ?? '').toString();
     final endDate = (eventDetails['end_date'] ?? json['end_date'] ?? startDate).toString();
@@ -290,7 +299,8 @@ class ProgramModel {
       email: (contact['email'] ?? contact['contact_email'] ?? '').toString(),
     );
 
-    final isReg = registration['is_registered'] == true || json['is_registered'] == true;
+    final rawIsReg = registration['is_registered'] == true || json['is_registered'] == true;
+    final isReg = rawIsReg && !isOrg;
     final canReg = registration['can_register'] != false;
     final regLink = (registration['registration_link'] ?? json['registration_link'])?.toString();
     final regInstructions = (registration['registration_instructions'] ?? json['registration_instructions'])?.toString();
@@ -304,9 +314,9 @@ class ProgramModel {
       tag: (json['program_type'] ?? 'ACTIVITY DRIVE').toString().toUpperCase(),
       type: type,
       status: status,
-      organizer: organizer.isNotEmpty ? organizer : 'IDF Active',
+      organizer: organizer.isNotEmpty ? organizer : (isOrg ? 'You (Organizer)' : ''),
       organizationType: (json['organization_type'] ?? json['organization_type_text'] ?? '').toString(),
-      venue: venue.isNotEmpty ? venue : (location.isNotEmpty ? location : 'TBD'),
+      venue: venue.isNotEmpty ? venue : location,
       location: location.isNotEmpty ? location : venue,
       country: country,
       city: city,
@@ -361,17 +371,17 @@ class ProgramModel {
 
       return ProgramModel(
         id: apiItem.id.toString(),
-        programNo: apiItem.programNo ?? (apiItem.id > 0 ? 'PRG-2026-0000${apiItem.id}' : null),
+        programNo: apiItem.programNo,
         title: apiItem.title,
         tag: apiItem.programType.isNotEmpty ? apiItem.programType.toUpperCase() : 'ACTIVITY DRIVE',
         type: type,
         status: status,
         organizer: (apiItem.organizerName.isNotEmpty)
             ? apiItem.organizerName
-            : (apiItem.isOrganizer ? 'You (Organizer)' : 'IDF Active'),
+            : (apiItem.isOrganizer ? 'You (Organizer)' : ''),
         organizationType: '',
-        venue: location.isNotEmpty ? location : 'IDF Active Venue',
-        location: location.isNotEmpty ? location : 'International',
+        venue: location,
+        location: location,
         country: country,
         city: city,
         startDate: apiItem.startDate ?? '',
@@ -384,7 +394,7 @@ class ProgramModel {
           phone: '',
           email: '',
         ),
-        isRegistered: apiItem.isRegistered,
+        isRegistered: apiItem.isRegistered && !apiItem.isOrganizer,
         canRegister: true,
         gradientColors: const [0xFF006097, 0xFF017CC2],
         imageUrl: ApiConfig.resolveImageUrl(apiItem.coverImageUrl ?? apiItem.bannerImageUrl ?? apiItem.banner),
@@ -423,17 +433,17 @@ class ProgramModel {
 
       return ProgramModel(
         id: apiItem.id.toString(),
-        programNo: apiItem.programNo ?? (apiItem.id > 0 ? 'PRG-2026-0000${apiItem.id}' : null),
+        programNo: apiItem.programNo,
         title: apiItem.title,
         tag: apiItem.programType.isNotEmpty ? apiItem.programType.toUpperCase() : 'ACTIVITY DRIVE',
         type: type,
         status: status,
         organizer: (apiItem.organizerName?.isNotEmpty ?? false)
             ? apiItem.organizerName!
-            : (apiItem.isOrganizer ? 'You (Organizer)' : 'IDF Active'),
+            : (apiItem.isOrganizer ? 'You (Organizer)' : ''),
         organizationType: '',
-        venue: location.isNotEmpty ? location : 'IDF Active Venue',
-        location: location.isNotEmpty ? location : 'International',
+        venue: location,
+        location: location,
         country: country,
         city: city,
         startDate: apiItem.startDate ?? '',
@@ -446,7 +456,7 @@ class ProgramModel {
           phone: '',
           email: '',
         ),
-        isRegistered: apiItem.isRegistered,
+        isRegistered: apiItem.isRegistered && !apiItem.isOrganizer,
         canRegister: true,
         gradientColors: const [0xFF006097, 0xFF017CC2],
         imageUrl: ApiConfig.resolveImageUrl(apiItem.coverImageUrl ?? apiItem.bannerImageUrl ?? apiItem.banner),
@@ -507,17 +517,26 @@ class ProgramModel {
     final location = [city, country].where((s) => s.isNotEmpty).join(', ');
     final rawId = safeProp('id') ?? '0';
 
+    final rawIsReg = safeProp('isRegistered') == 'true' ||
+        safeProp('is_registered') == 'true' ||
+        safeProp('is_registered') == '1';
+    final isOrg = safeProp('isOrganizer') == 'true' ||
+        safeProp('is_organizer') == 'true' ||
+        safeProp('is_organizer') == '1' ||
+        safeProp('reviewStatus') == 'submitted' ||
+        safeProp('status') == 'submitted';
+
     return ProgramModel(
       id: rawId,
-      programNo: 'PRG-2026-0000$rawId',
-      title: safeProp('title') ?? 'IDF Program',
+      programNo: safeProp('programNo') ?? safeProp('program_no') ?? (rawId.isNotEmpty ? rawId : null),
+      title: safeProp('title') ?? '',
       tag: (safeProp('programType') ?? 'ACTIVITY DRIVE').toUpperCase(),
       type: type,
       status: status,
-      organizer: safeProp('organizerName') ?? 'IDF Active',
+      organizer: safeProp('organizerName') ?? (isOrg ? 'You (Organizer)' : ''),
       organizationType: '',
-      venue: location.isNotEmpty ? location : 'IDF Active Venue',
-      location: location.isNotEmpty ? location : 'International',
+      venue: location,
+      location: location,
       country: country,
       city: city,
       startDate: startDate,
@@ -530,196 +549,17 @@ class ProgramModel {
         phone: '',
         email: '',
       ),
-      isRegistered: true,
+      isRegistered: rawIsReg && !isOrg,
       canRegister: true,
       gradientColors: const [0xFF006097, 0xFF017CC2],
       imageUrl: ApiConfig.resolveImageUrl(safeProp('coverImageUrl') ?? safeProp('bannerImageUrl') ?? safeProp('banner')),
       category: safeProp('programType'),
       registrationLink: safeProp('registrationLink'),
       reviewStatus: safeProp('reviewStatus') ?? safeProp('status'),
-      isOrganizer: false,
+      isOrganizer: isOrg,
     );
   }
 
-  static List<ProgramModel> samplePrograms() {
-    return [
-      ProgramModel(
-        id: 'PRG-2025-001',
-        title: 'Global Walk for Diabetes 2025',
-        tag: 'ACTIVITY DRIVE',
-        type: ProgramType.activityDrive,
-        status: ProgramStatus.upcoming,
-        organizer: 'IDF Africa Region',
-        organizationType: 'NGO / Non-profit Organization',
-        venue: 'Uhuru Park, Nairobi, Kenya',
-        location: 'Nairobi, Kenya',
-        country: 'Kenya',
-        city: 'Nairobi',
-        startDate: '2025-11-14',
-        endDate: '2025-11-14',
-        description:
-            'Join thousands of people worldwide in a global walk to raise awareness about diabetes and the importance of physical activity. The Global Walk for Diabetes is an annual event organized by IDF as part of the ACTIVATE initiative.',
-        agenda: const [
-          ProgramAgendaItem(
-            time: '08:00',
-            title: 'Registration & warm-up',
-            description: 'Participant check-in, bib distribution, and aerobic warm-up session led by certified fitness trainers.',
-          ),
-          ProgramAgendaItem(
-            time: '09:00',
-            title: 'Opening ceremony',
-            description: 'Welcome address by IDF Regional Director and special guest dignitary.',
-          ),
-          ProgramAgendaItem(
-            time: '09:30',
-            title: 'Walk begins (5km route)',
-            description: 'Scenic community walk through Nairobi central parks with medical support and hydration stations.',
-          ),
-          ProgramAgendaItem(
-            time: '11:00',
-            title: 'Cool-down & refreshments',
-            description: 'Guided stretching, complimentary glucose screenings, and healthy refreshments.',
-          ),
-          ProgramAgendaItem(
-            time: '11:30',
-            title: 'Guest speakers & closing',
-            description: 'Keynote on physical activity in diabetes prevention and prize distribution.',
-          ),
-        ],
-        contactInfo: const ProgramContactInfo(
-          contactPerson: 'Dr. Amina Osei',
-          phone: '+254 700 123 456',
-          email: 'africa@idf.org',
-        ),
-        isRegistered: false,
-        gradientColors: [0xFF006097, 0xFF017CC2],
-        imageUrl: 'https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&auto=format&fit=crop&q=80',
-        category: 'Activity Drive',
-      ),
-      ProgramModel(
-        id: 'PRG-2025-002',
-        title: 'ACTIVATE Physical Activity Summit',
-        tag: 'CONFERENCE',
-        type: ProgramType.conference,
-        status: ProgramStatus.upcoming,
-        organizer: 'IDF Global Headquarters',
-        organizationType: 'Academic / Research Institution',
-        venue: 'Brussels International Convention Centre',
-        location: 'Brussels, Belgium',
-        country: 'Belgium',
-        city: 'Brussels',
-        startDate: '2025-12-05',
-        endDate: '2025-12-07',
-        description:
-            'A global gathering of healthcare leaders, sports medicine experts, and policymakers dedicated to integrating physical activity into standard diabetes prevention and management regimens.',
-        agenda: const [
-          ProgramAgendaItem(
-            time: '09:00',
-            title: 'Welcome & Global Policy Briefing',
-          ),
-          ProgramAgendaItem(
-            time: '11:00',
-            title: 'Clinical Guidelines for Prescribing Exercise in T2D',
-          ),
-          ProgramAgendaItem(
-            time: '14:00',
-            title: 'Workshops & Technology Demonstrations',
-          ),
-          ProgramAgendaItem(
-            time: '16:30',
-            title: 'Regional Action Plan Roundtables',
-          ),
-        ],
-        contactInfo: const ProgramContactInfo(
-          contactPerson: 'Prof. Jean-Marc Dupont',
-          phone: '+32 2 543 16 00',
-          email: 'activate@idf.org',
-        ),
-        isRegistered: false,
-        gradientColors: [0xFF4F46E5, 0xFF7C3AED],
-        imageUrl: 'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=800&auto=format&fit=crop&q=80',
-        category: 'Conference',
-      ),
-      ProgramModel(
-        id: 'PRG-2025-003',
-        title: 'Community Cycling Campaign – SEA',
-        tag: 'CAMPAIGN',
-        type: ProgramType.campaign,
-        status: ProgramStatus.ongoing,
-        organizer: 'IDF Western Pacific',
-        organizationType: 'NGO / Non-profit Organization',
-        venue: 'Lumpini Park Circuit, Bangkok',
-        location: 'Bangkok, Thailand',
-        country: 'Thailand',
-        city: 'Bangkok',
-        startDate: '2025-08-10',
-        endDate: '2025-10-30',
-        description:
-            'A 3-month regional cycling campaign encouraging workplace commuters and families to cycle daily, tracking collective mileage towards 1,000,000 km for diabetes awareness.',
-        agenda: const [
-          ProgramAgendaItem(
-            time: '06:30',
-            title: 'Morning group ride flag-off',
-          ),
-          ProgramAgendaItem(
-            time: '08:30',
-            title: 'Community health booths & bike safety clinic',
-          ),
-          ProgramAgendaItem(
-            time: '10:00',
-            title: 'Youth cycling skills workshop',
-          ),
-        ],
-        contactInfo: const ProgramContactInfo(
-          contactPerson: 'Somchai Prasert',
-          phone: '+66 2 345 6789',
-          email: 'wp@idf.org',
-        ),
-        isRegistered: true,
-        gradientColors: [0xFF059669, 0xFF10B981],
-        imageUrl: 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800&auto=format&fit=crop&q=80',
-        category: 'Campaign',
-      ),
-      ProgramModel(
-        id: 'PRG-2025-004',
-        title: 'Diabetes Awareness Walk 2026',
-        tag: 'CAMPAIGN',
-        type: ProgramType.campaign,
-        status: ProgramStatus.upcoming,
-        organizer: 'IDF South-East Asia',
-        organizationType: 'Healthcare Organization',
-        venue: 'Necklace Road, Hussain Sagar Lake',
-        location: 'Hyderabad, India',
-        country: 'India',
-        city: 'Hyderabad',
-        startDate: '2026-09-18',
-        endDate: '2026-09-18',
-        description:
-            'Annual city-wide 10k walk bringing together over 5,000 citizens, doctors, and students to promote daily exercise and early diabetes risk assessment.',
-        agenda: const [
-          ProgramAgendaItem(
-            time: '06:00',
-            title: 'Assembly & Kit Distribution',
-          ),
-          ProgramAgendaItem(
-            time: '06:45',
-            title: 'Walk Kick-off',
-          ),
-          ProgramAgendaItem(
-            time: '08:30',
-            title: 'Breakfast & Free Blood Sugar Checks',
-          ),
-        ],
-        contactInfo: const ProgramContactInfo(
-          contactPerson: 'Dr. Rajesh Kumar',
-          phone: '+91 40 1234 5678',
-          email: 'sea@idf.org',
-        ),
-        isRegistered: true,
-        gradientColors: [0xFFEA580C, 0xFFF97316],
-        imageUrl: 'https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=800&auto=format&fit=crop&q=80',
-        category: 'Campaign',
-      ),
-    ];
-  }
+  /// Empty list by default — no static fallback or dummy data
+  static List<ProgramModel> samplePrograms() => const [];
 }

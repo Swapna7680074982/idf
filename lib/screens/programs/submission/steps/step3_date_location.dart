@@ -209,11 +209,34 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
   }
 
   Future<void> _pickDate(bool isStart) async {
-    final initialDate = isStart ? (_startDate ?? DateTime.now()) : (_endDate ?? DateTime.now());
+    if (!isStart && _startDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select start date first'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final DateTime initialDate;
+    final DateTime firstDate;
+
+    if (isStart) {
+      initialDate = _startDate ?? DateTime.now();
+      firstDate = DateTime.now().subtract(const Duration(days: 365));
+    } else {
+      // Disables all dates before selected start date
+      firstDate = _startDate!;
+      initialDate = (_endDate != null && !_endDate!.isBefore(_startDate!))
+          ? _endDate!
+          : _startDate!;
+    }
+
     final picked = await showDatePicker(
       context: context,
       initialDate: initialDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      firstDate: firstDate,
       lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
       builder: (context, child) {
         return Theme(
@@ -232,7 +255,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
         if (isStart) {
           _startDate = picked;
           _startDateController.text = _formatDate(picked);
-          if (_endDate == null || _endDate!.isBefore(_startDate!)) {
+          if (_endDate != null && _endDate!.isBefore(_startDate!)) {
             _endDate = picked;
             _endDateController.text = _formatDate(picked);
           }
@@ -247,7 +270,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
   void _handleContinue() {
     if (_formKey.currentState?.validate() ?? false) {
       widget.model.startDate = _startDate;
-      widget.model.endDate = _endDate ?? _startDate;
+      widget.model.endDate = _endDate;
       widget.model.country = _selectedCountry?.name ?? '';
       widget.model.countryId = _selectedCountry?.id;
       widget.model.regionState = _selectedRegion?.name ?? _regionController.text.trim();
@@ -283,17 +306,26 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
           ),
           const SizedBox(height: 16),
 
-          // End Date
-          _buildFieldLabel('End Date (Optional)'),
+          // End Date (Mandatory, dates before Start Date are disabled)
+          _buildFieldLabel('End Date *'),
           const SizedBox(height: 6),
           TextFormField(
             controller: _endDateController,
             readOnly: true,
             onTap: () => _pickDate(false),
             decoration: const InputDecoration(
-              hintText: 'YYYY-MM-DD (Defaults to start date)',
+              hintText: 'YYYY-MM-DD',
               suffixIcon: Icon(Icons.calendar_today_outlined, size: 18, color: Color(0xFF64748B)),
             ),
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) {
+                return 'Please select end date';
+              }
+              if (_startDate != null && _endDate != null && _endDate!.isBefore(_startDate!)) {
+                return 'End date cannot be before start date';
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 16),
 

@@ -16,11 +16,13 @@ class CertificationSubmittedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = application.submissionDate ?? DateTime.now();
     final dateStr = '${now.month}/${now.day}/${now.year}';
-    final appId = application.applicationId ?? 'APP-CERT-2025-0089';
-    final institution = application.institutionName.isNotEmpty
-        ? application.institutionName
-        : 'Lagos State University';
-    final status = application.status.isNotEmpty ? application.status : 'AI Audit';
+    final appId = (application.applicationId != null && application.applicationId!.trim().isNotEmpty)
+        ? application.applicationId!.trim()
+        : '—';
+    final institution = application.institutionName.trim().isNotEmpty
+        ? application.institutionName.trim()
+        : '—';
+    final status = application.status.trim().isNotEmpty ? application.status.trim() : 'Submitted';
 
     return Scaffold(
       backgroundColor: Colors.white,

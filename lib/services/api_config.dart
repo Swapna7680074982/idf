@@ -7,6 +7,12 @@ class ApiConfig {
     if (path == null) return '';
     final p = path.trim();
     if (p.isEmpty) return '';
+    if (p.startsWith('http://localhost:4000')) {
+      return p.replaceFirst('http://localhost:4000', baseUrl);
+    }
+    if (p.startsWith('http://127.0.0.1:4000')) {
+      return p.replaceFirst('http://127.0.0.1:4000', baseUrl);
+    }
     if (p.startsWith('http://') || p.startsWith('https://')) return p;
     if (p.startsWith('/')) return '$baseUrl$p';
     return '$baseUrl/$p';
@@ -56,6 +62,10 @@ class ApiConfig {
   static String get programsRegistered => '$baseUrl/api/programs/registered';
   static String programDetail(dynamic id) => '$baseUrl/api/programs/$id';
   static String programRegister(dynamic id) => '$baseUrl/api/programs/$id/register';
+  static String programAiValidation(dynamic id) => '$baseUrl/api/programs/$id/ai-validation';
+  static String programAiValidationV1(dynamic id) => '$baseUrl/api/v1/programs/$id/ai-validation';
+  static String programReview(dynamic id) => '$baseUrl/api/programs/$id/review';
+  static String programReviewV1(dynamic id) => '$baseUrl/api/v1/programs/$id/review';
 
   // 07. Program Applications
   static String get applicationsPrograms => '$baseUrl/api/applications/programs';

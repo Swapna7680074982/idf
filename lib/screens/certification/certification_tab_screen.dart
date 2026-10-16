@@ -6,12 +6,17 @@ import '../../models/certification_model.dart';
 import 'certification_wizard_screen.dart';
 
 class CertificationTabScreen extends StatelessWidget {
-  const CertificationTabScreen({super.key});
+  final Future<void> Function()? onRefresh;
+
+  const CertificationTabScreen({
+    super.key,
+    this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
+    final scrollChild = SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       padding: const EdgeInsets.fromLTRB(18.0, 16.0, 18.0, 80.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,6 +62,15 @@ class CertificationTabScreen extends StatelessWidget {
         ],
       ),
     );
+
+    if (onRefresh != null) {
+      return RefreshIndicator(
+        onRefresh: onRefresh!,
+        color: AppColors.primaryBlue,
+        child: scrollChild,
+      );
+    }
+    return scrollChild;
   }
 
   Widget _buildHeroCard(BuildContext context) {
@@ -179,7 +193,7 @@ class CertificationTabScreen extends StatelessWidget {
                   id: '2',
                   institutionName: 'Lagos State University',
                   institutionType: 'College / University',
-                  certificateId: 'APP-CERT-2025-0018',
+                  certificateId: '',
                   issuedDate: '01 Sep 2025',
                   expiresDate: '01 Sep 2027',
                   status: 'Changes Required',

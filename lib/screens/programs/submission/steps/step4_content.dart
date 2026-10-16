@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/date_time_utils.dart';
 import '../../../../core/theme.dart';
 import '../../../../models/program_submission_model.dart';
 import '../../../../widgets/custom_button.dart';
@@ -349,7 +350,7 @@ class _Step4ContentState extends State<Step4Content> {
                           ),
                           const SizedBox(width: 8),
                           Text(
-                            hasTime ? 'Start Time: ${session.time}' : 'Select Start Time (e.g. 09:00)',
+                            hasTime ? 'Start Time: ${DateTimeUtils.formatTime(session.time)}' : 'Select Start Time (e.g. 09:00 AM)',
                             style: GoogleFonts.inter(
                               fontSize: 13,
                               fontWeight: hasTime ? FontWeight.w700 : FontWeight.w500,

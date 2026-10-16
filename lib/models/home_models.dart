@@ -44,7 +44,21 @@ class HomeRegisteredProgram {
   factory HomeRegisteredProgram.fromJson(Map<String, dynamic> json) {
     final effectiveCover = json['cover_image_url'] ?? json['banner_image_url'] ?? json['banner'];
     final effectiveBanner = json['banner_image_url'] ?? json['banner'] ?? json['cover_image_url'];
-    final isOrg = json['is_organizer'] == 1 || json['is_organizer'] == true || json['is_organizer'] == '1';
+    final statusStr = (json['review_status'] ?? json['status'])?.toString().toLowerCase() ?? '';
+    final isSubmittedOrDraft = statusStr == 'submitted' || statusStr == 'draft' || statusStr == 'in_review';
+    final isOrg = json['is_organizer'] == 1 ||
+        json['is_organizer'] == true ||
+        json['is_organizer'] == '1' ||
+        json['is_creator'] == 1 ||
+        json['is_creator'] == true ||
+        json['role'] == 'organizer' ||
+        (json['organizer_name']?.toString().toLowerCase().contains('you') ?? false) ||
+        isSubmittedOrDraft;
+
+    final rawIsRegistered = json['is_registered'] == true ||
+        json['is_registered'] == 1 ||
+        json['is_registered'] == '1' ||
+        json['registered_at'] != null;
 
     return HomeRegisteredProgram(
       id: json['id'] is int ? json['id'] as int : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
@@ -60,10 +74,7 @@ class HomeRegisteredProgram {
       startDate: json['start_date']?.toString(),
       endDate: json['end_date']?.toString(),
       eventStatus: json['event_status']?.toString() ?? 'upcoming',
-      isRegistered: json['is_registered'] == true ||
-          json['is_registered'] == 1 ||
-          json['is_registered'] == '1' ||
-          json['registered_at'] != null,
+      isRegistered: rawIsRegistered && !isOrg,
       organizerName: (json['organizer_name'] ?? json['organization_entity_name'])?.toString(),
       registrationLink: json['registration_link']?.toString(),
       reviewStatus: (json['review_status'] ?? json['status'])?.toString(),

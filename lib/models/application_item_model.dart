@@ -100,7 +100,7 @@ class ProgramApplicationItem {
       programName: item.programName ?? item.title,
       programType: item.programType,
       category: item.programType,
-      referenceNumber: item.programNo ?? (item.id > 0 ? 'PRG-2026-0000${item.id}' : ''),
+      referenceNumber: item.programNo ?? (item.id > 0 ? item.id.toString() : ''),
       startDate: item.startDate ?? '',
       endDate: item.endDate ?? item.startDate,
       location: loc,
@@ -134,7 +134,7 @@ class ProgramApplicationItem {
       programName: model.title,
       programType: model.tag,
       category: model.category ?? model.tag,
-      referenceNumber: model.programNo ?? (model.id.isNotEmpty ? 'PRG-2026-0000${model.id}' : ''),
+      referenceNumber: model.programNo ?? model.id,
       startDate: model.startDate,
       endDate: model.endDate,
       location: model.location,
@@ -159,8 +159,9 @@ class ProgramApplicationItem {
     if (lower == 'submitted') return 'Submitted';
     if (lower == 'approved') return 'Approved';
     if (lower == 'draft') return 'Draft';
-    if (lower == 'in review' || lower == 'in_review' || lower == 'review') return 'In Review';
+    if (lower == 'in review' || lower == 'in_review' || lower == 'review' || lower == 'manual_review') return 'In Review';
     if (lower == 'completed') return 'Completed';
+    if (lower == 'changes_required' || lower == 'changes required') return 'Changes Required';
     if (lower == 'rejected') return 'Rejected';
     return raw;
   }

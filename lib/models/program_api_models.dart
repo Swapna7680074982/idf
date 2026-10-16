@@ -88,7 +88,17 @@ class ProgramApiItem {
   factory ProgramApiItem.fromJson(Map<String, dynamic> json) {
     final effectiveCover = json['cover_image_url'] ?? json['banner_image_url'] ?? json['banner'];
     final effectiveBanner = json['banner_image_url'] ?? json['banner'] ?? json['cover_image_url'];
-    final isOrg = json['is_organizer'] == 1 || json['is_organizer'] == true || json['is_organizer'] == '1';
+    final statusStr = (json['review_status'] ?? json['status'])?.toString().toLowerCase() ?? '';
+    final isSubmittedOrDraft = statusStr == 'submitted' || statusStr == 'draft' || statusStr == 'in_review';
+    final isOrg = json['is_organizer'] == 1 ||
+        json['is_organizer'] == true ||
+        json['is_organizer'] == '1' ||
+        isSubmittedOrDraft;
+
+    final rawIsRegistered = json['is_registered'] == true ||
+        json['is_registered'] == 1 ||
+        json['is_registered'] == '1' ||
+        json['registered_at'] != null;
 
     return ProgramApiItem(
       id: json['id'] is int ? json['id'] as int : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
@@ -109,10 +119,7 @@ class ProgramApiItem {
       startDate: json['start_date']?.toString(),
       endDate: json['end_date']?.toString(),
       eventStatus: json['event_status']?.toString() ?? 'upcoming',
-      isRegistered: json['is_registered'] == true ||
-          json['is_registered'] == 1 ||
-          json['is_registered'] == '1' ||
-          json['registered_at'] != null,
+      isRegistered: rawIsRegistered && !isOrg,
       registeredAt: json['registered_at']?.toString(),
       registrationLink: json['registration_link']?.toString(),
       reviewStatus: (json['review_status'] ?? json['status'])?.toString(),

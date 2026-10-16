@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../bloc/app_bloc.dart';
 import '../../../bloc/app_event.dart';
 import '../../../models/program_model.dart';
+import '../../../models/application_item_model.dart';
 import '../../../models/program_submission_model.dart';
 import '../widgets/step_progress_indicator.dart';
 import 'steps/step1_program_info.dart';
@@ -136,41 +137,27 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
 
     try {
       final res = await ProgramsService.submitProgramProposal(
-        title: _submissionModel.programName.isNotEmpty
-            ? _submissionModel.programName
-            : 'IDF Diabetes Screening Camp 2026',
+        title: _submissionModel.programName,
         programTypeId: _submissionModel.programTypeId ?? 1,
-        organizerName: _submissionModel.organizingEntityName.isNotEmpty
-            ? _submissionModel.organizingEntityName
-            : 'IDF National Chapter',
-        organizationType: _submissionModel.organizationType.isNotEmpty
-            ? _submissionModel.organizationType
-            : 'NGO / Non-Profit',
-        about: fullDesc.isNotEmpty ? fullDesc : 'A comprehensive diabetes screening and lifestyle education initiative designed to boost awareness.',
-        venue: _submissionModel.venueAddress.isNotEmpty
-            ? _submissionModel.venueAddress
-            : 'Hitex Exhibition Center, Hall 2',
+        organizerName: _submissionModel.organizingEntityName,
+        organizationType: _submissionModel.organizationType,
+        about: fullDesc,
+        venue: _submissionModel.venueAddress,
         countryId: _submissionModel.countryId ?? 1,
-        cityText: _submissionModel.city.isNotEmpty ? _submissionModel.city : 'Hyderabad',
-        countryText: _submissionModel.country.isNotEmpty ? _submissionModel.country : 'India',
-        regionText: _submissionModel.regionState.isNotEmpty ? _submissionModel.regionState : 'Telangana',
+        cityText: _submissionModel.city,
+        countryText: _submissionModel.country,
+        regionText: _submissionModel.regionState,
         startDate: startDateStr,
         endDate: endDateStr,
-        contactPerson: _submissionModel.contactPerson.isNotEmpty
-            ? _submissionModel.contactPerson
-            : 'Dr. Nikhil Yadav',
-        contactPhone: _submissionModel.phone.isNotEmpty
-            ? _submissionModel.phone
-            : '+91 9988776655',
-        contactEmail: _submissionModel.email.isNotEmpty
-            ? _submissionModel.email
-            : 'nikhil@idf.org',
+        contactPerson: _submissionModel.contactPerson,
+        contactPhone: _submissionModel.phone,
+        contactEmail: _submissionModel.email,
         registrationInstructions: _submissionModel.registrationInstructions.trim().isNotEmpty
             ? _submissionModel.registrationInstructions.trim()
-            : 'Fasting 8 hours prior to test recommended. Bring personal ID card.',
+            : null,
         registrationLink: _submissionModel.registrationLink.trim().isNotEmpty
             ? _submissionModel.registrationLink.trim()
-            : 'https://idf.org/register/screening2026',
+            : null,
         agenda: agendaPayload,
         supportingFileIds: fileIds,
         materials: materialsList,
@@ -182,11 +169,15 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
       );
 
       final programObj = res.program;
-      final programId = programObj?.id.toString() ??
-          (res['data']?['program']?['id']?.toString() ?? '14');
+      final programId = (programObj != null && programObj.id > 0)
+          ? programObj.id.toString()
+          : (res['data']?['program']?['id']?.toString() ??
+              res['data']?['id']?.toString() ??
+              '');
       _submissionModel.referenceNumber = (programObj?.programNo.isNotEmpty ?? false)
           ? programObj!.programNo
-          : (res['data']?['program']?['program_no']?.toString() ?? 'PRG-2026-0000$programId');
+          : (res['data']?['program']?['program_no']?.toString() ??
+              (programId.isNotEmpty ? programId : ''));
       _submissionModel.status = (programObj?.reviewStatus.isNotEmpty ?? false)
           ? programObj!.reviewStatus
           : (res['data']?['program']?['review_status']?.toString() ??
@@ -195,70 +186,64 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
 
       _submissionModel.submissionDate = DateTime.now();
 
+      // Automatically post AI Validation Result (Mobile -> Backend)
+      // Transitions program status to "In Review" (manual_review)
+      if (programId.isNotEmpty) {
+        try {
+          final aiRes = await ProgramsService.postAiValidationResult(
+            programId,
+            status: 'approved',
+          );
+          final displayStatus = aiRes['data']?['display_status']?.toString();
+          if (displayStatus != null && displayStatus.isNotEmpty) {
+            _submissionModel.status = displayStatus;
+          } else {
+            _submissionModel.status = 'In Review';
+          }
+        } catch (_) {
+          _submissionModel.status = 'In Review';
+        }
+      }
+
+      final loc = [_submissionModel.city, _submissionModel.country]
+          .where((s) => s.trim().isNotEmpty)
+          .join(', ');
+
       final newProgram = ProgramModel(
         id: programId,
         programNo: _submissionModel.referenceNumber,
-        title: _submissionModel.programName.isNotEmpty
-            ? _submissionModel.programName
-            : 'IDF Diabetes Screening Camp 2026',
+        title: _submissionModel.programName,
         tag: _submissionModel.programType.isNotEmpty
             ? _submissionModel.programType.toUpperCase()
-            : 'ACTIVITY DRIVE',
+            : 'PROGRAM',
         type: ProgramType.activityDrive,
         status: ProgramStatus.upcoming,
         organizer: _submissionModel.organizingEntityName.isNotEmpty
             ? _submissionModel.organizingEntityName
-            : 'IDF National Chapter',
-        organizationType: _submissionModel.organizationType.isNotEmpty
-            ? _submissionModel.organizationType
-            : 'NGO / Non-Profit',
-        venue: _submissionModel.venueAddress.isNotEmpty
-            ? _submissionModel.venueAddress
-            : 'Hitex Exhibition Center, Hall 2',
-        location: _submissionModel.city.isNotEmpty
-            ? '${_submissionModel.city}, ${_submissionModel.country}'
-            : 'Hyderabad, India',
-        country: _submissionModel.country.isNotEmpty
-            ? _submissionModel.country
-            : 'India',
-        city: _submissionModel.city.isNotEmpty ? _submissionModel.city : 'Hyderabad',
+            : 'You (Organizer)',
+        organizationType: _submissionModel.organizationType,
+        venue: _submissionModel.venueAddress,
+        location: loc,
+        country: _submissionModel.country,
+        city: _submissionModel.city,
         startDate: startDateStr,
         endDate: endDateStr,
-        description: fullDesc.isNotEmpty
-            ? fullDesc
-            : 'A comprehensive diabetes screening and lifestyle education initiative designed to boost awareness.',
+        description: fullDesc,
         agenda: _submissionModel.agendaItems.isNotEmpty
             ? _submissionModel.agendaItems.map((item) => ProgramAgendaItem(
-                time: item['start_time'] ?? '09:00',
+                time: item['start_time'] ?? '',
                 title: item['title'] ?? '',
               )).toList()
-            : const [
-                ProgramAgendaItem(
-                  time: '09:00',
-                  title: 'Registration & Blood Glucose Screening',
-                ),
-                ProgramAgendaItem(
-                  time: '11:30',
-                  title: 'Diet & Lifestyle Consultation Session',
-                ),
-              ],
+            : const [],
         materials: materialsList.map((m) => ProgramMaterialItem.fromJson(m)).toList(),
         contactInfo: ProgramContactInfo(
-          contactPerson: _submissionModel.contactPerson.isNotEmpty
-              ? _submissionModel.contactPerson
-              : 'Dr. Nikhil Yadav',
-          phone: _submissionModel.phone.isNotEmpty
-              ? _submissionModel.phone
-              : '+91 9988776655',
-          email: _submissionModel.email.isNotEmpty
-              ? _submissionModel.email
-              : 'nikhil@idf.org',
+          contactPerson: _submissionModel.contactPerson,
+          phone: _submissionModel.phone,
+          email: _submissionModel.email,
         ),
         gradientColors: const [0xFF006097, 0xFF017CC2],
         imageUrl: _submissionModel.bannerUrl ?? _submissionModel.bannerPath,
-        category: _submissionModel.programType.isNotEmpty
-            ? _submissionModel.programType
-            : 'Activity Drive',
+        category: _submissionModel.programType,
         registrationInstructions: _submissionModel.registrationInstructions.trim().isNotEmpty
             ? _submissionModel.registrationInstructions.trim()
             : null,
@@ -275,10 +260,13 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
           _isSubmitting = false;
         });
 
+        final appItem = ProgramApplicationItem.fromProgramModel(newProgram);
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(
             builder: (_) => ProgramSubmittedSuccessScreen(
               submission: _submissionModel,
+              applicationItem: appItem,
+              programModel: newProgram,
             ),
           ),
         );

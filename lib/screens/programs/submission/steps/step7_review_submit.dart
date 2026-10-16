@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/date_time_utils.dart';
 import '../../../../core/theme.dart';
 import '../../../../models/program_submission_model.dart';
 import '../../../../widgets/custom_button.dart';
@@ -345,7 +346,7 @@ class Step7ReviewSubmit extends StatelessWidget {
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          time.isNotEmpty ? time : '09:00',
+                          DateTimeUtils.formatTime(time.isNotEmpty ? time : '09:00'),
                           style: GoogleFonts.inter(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,

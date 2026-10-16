@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../bloc/app_bloc.dart';
 import '../../bloc/app_event.dart';
+import '../../core/date_time_utils.dart';
 import '../../core/theme.dart';
 import '../../models/program_model.dart';
 import '../../services/api_client.dart';
@@ -45,9 +46,32 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
     });
     try {
       final detail = await ProgramsService.getProgramDetail(widget.program.id);
+      bool isOrganizer = widget.program.isOrganizer || _currentProgram.isOrganizer || detail.isOrganizer;
+
+      if (!isOrganizer) {
+        try {
+          final myApps = await ProgramsService.getMyApplications();
+          final items = myApps['items'] is List ? myApps['items'] as List : [];
+          final idStr = widget.program.id.toString();
+          final pNo = detail.programNo ?? widget.program.programNo;
+          final match = items.where((it) {
+            if (it is! Map) return false;
+            final mId = (it['id'] ?? '').toString();
+            final mNo = it['program_no']?.toString();
+            return mId == idStr || (pNo != null && mNo == pNo);
+          }).firstOrNull;
+          if (match != null) {
+            isOrganizer = true;
+          }
+        } catch (_) {}
+      }
+
       if (mounted) {
         setState(() {
-          _currentProgram = detail;
+          _currentProgram = detail.copyWith(
+            isOrganizer: isOrganizer,
+            isRegistered: isOrganizer ? false : detail.isRegistered,
+          );
           _isLoadingDetail = false;
         });
       }
@@ -69,11 +93,13 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
       ),
     );
 
-    if (result != null && mounted) {
-      setState(() {
-        _currentProgram = result;
-      });
-      _fetchDetail();
+    if (mounted) {
+      if (result != null) {
+        setState(() {
+          _currentProgram = result.copyWith(isRegistered: true);
+        });
+      }
+      await _fetchDetail();
     }
   }
 
@@ -129,6 +155,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
             backgroundColor: AppColors.primaryBlue,
           ),
         );
+        await _fetchDetail();
       }
     } on ApiException catch (e) {
       if (mounted) {
@@ -239,8 +266,8 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                icon: const Icon(Icons.open_in_browser_rounded, size: 18),
-                label: Text('Open / Download', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
+                icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                label: Text('Open', style: GoogleFonts.inter(fontWeight: FontWeight.w600)),
                 onPressed: () async {
                   final uri = Uri.tryParse(resolvedUrl);
                   if (uri != null) {
@@ -277,47 +304,53 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
   @override
   Widget build(BuildContext context) {
     final blocProgram = context.watch<AppBloc>().state.programs.where((p) => p.id == widget.program.id).firstOrNull;
-    final isRegistered = blocProgram?.isRegistered ?? _currentProgram.isRegistered;
+    final isRegistered = _currentProgram.isRegistered || (blocProgram?.isRegistered ?? false);
     final activeProgram = _currentProgram.copyWith(isRegistered: isRegistered);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
-      body: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Hero Banner with Back Button
-              Stack(
-                children: [
-                  ProgramImageBanner(
-                    program: activeProgram,
-                    height: 220,
-                    borderRadius: const BorderRadius.vertical(
-                      bottom: Radius.circular(24),
-                    ),
-                    showFloatingStatus: true,
-                  ),
-                  if (_isLoadingDetail)
-                    const Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      child: LinearProgressIndicator(
-                        minHeight: 3,
-                        color: AppColors.primaryBlue,
-                        backgroundColor: Colors.transparent,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.of(context).pop(_currentProgram);
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8FAFC),
+        body: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Hero Banner with Back Button
+                Stack(
+                  children: [
+                    ProgramImageBanner(
+                      program: activeProgram,
+                      height: 220,
+                      borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(24),
                       ),
+                      showFloatingStatus: true,
                     ),
-                  SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-                      child: InkWell(
-                        onTap: () => Navigator.of(context).pop(),
-                        borderRadius: BorderRadius.circular(20),
-                        child: Container(
+                    if (_isLoadingDetail)
+                      const Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: LinearProgressIndicator(
+                          minHeight: 3,
+                          color: AppColors.primaryBlue,
+                          backgroundColor: Colors.transparent,
+                        ),
+                      ),
+                    SafeArea(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        child: InkWell(
+                          onTap: () => Navigator.of(context).pop(_currentProgram),
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
                           width: 38,
                           height: 38,
                           decoration: BoxDecoration(
@@ -360,58 +393,50 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Meta Tags Row
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      child: Row(
-                        children: [
-                          if (activeProgram.programNo != null && activeProgram.programNo!.isNotEmpty) ...[
-                            _buildMetaChip(
-                              emoji: '🏷️',
-                              label: activeProgram.programNo!,
-                              bgColor: const Color(0xFFEFF6FF),
-                              textColor: const Color(0xFF1D4ED8),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          if (activeProgram.reviewStatus != null && activeProgram.reviewStatus!.isNotEmpty) ...[
-                            _buildMetaChip(
-                              emoji: activeProgram.reviewStatus == 'submitted' ? '⏳' : '📝',
-                              label: activeProgram.reviewStatus!.toUpperCase(),
-                              bgColor: activeProgram.reviewStatus == 'submitted'
-                                  ? const Color(0xFFFEF3C7)
-                                  : const Color(0xFFF1F5F9),
-                              textColor: activeProgram.reviewStatus == 'submitted'
-                                  ? const Color(0xFFB45309)
-                                  : const Color(0xFF475569),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
+                    // Meta Tags Wrap (Not scrollable, wraps down onto next line)
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        if (activeProgram.programNo != null && activeProgram.programNo!.isNotEmpty)
                           _buildMetaChip(
-                            emoji: '📋',
-                            label: activeProgram.category ?? activeProgram.tag,
-                            bgColor: const Color(0xFFFEF3C7),
-                            textColor: const Color(0xFFB45309),
+                            emoji: '🏷️',
+                            label: activeProgram.programNo!,
+                            bgColor: const Color(0xFFEFF6FF),
+                            textColor: const Color(0xFF1D4ED8),
                           ),
-                          const SizedBox(width: 8),
+                        if (activeProgram.reviewStatus != null && activeProgram.reviewStatus!.isNotEmpty)
+                          _buildMetaChip(
+                            emoji: activeProgram.reviewStatus == 'submitted' ? '⏳' : '📝',
+                            label: activeProgram.reviewStatus!.toUpperCase(),
+                            bgColor: activeProgram.reviewStatus == 'submitted'
+                                ? const Color(0xFFFEF3C7)
+                                : const Color(0xFFF1F5F9),
+                            textColor: activeProgram.reviewStatus == 'submitted'
+                                ? const Color(0xFFB45309)
+                                : const Color(0xFF475569),
+                          ),
+                        _buildMetaChip(
+                          emoji: '📋',
+                          label: activeProgram.category ?? activeProgram.tag,
+                          bgColor: const Color(0xFFFEF3C7),
+                          textColor: const Color(0xFFB45309),
+                        ),
+                        if (activeProgram.location.isNotEmpty)
                           _buildMetaChip(
                             emoji: '📍',
                             label: activeProgram.location,
                             bgColor: const Color(0xFFFFE4E6),
                             textColor: const Color(0xFFE11D48),
                           ),
-                          const SizedBox(width: 8),
+                        if (activeProgram.startDate.isNotEmpty)
                           _buildMetaChip(
                             emoji: '📅',
-                            label: (activeProgram.endDate.isNotEmpty && activeProgram.endDate != activeProgram.startDate)
-                                ? '${activeProgram.startDate} - ${activeProgram.endDate}'
-                                : activeProgram.startDate,
+                            label: DateTimeUtils.formatCardDate(activeProgram.startDate, activeProgram.endDate),
                             bgColor: const Color(0xFFF1F5F9),
                             textColor: const Color(0xFF475569),
                           ),
-                        ],
-                      ),
+                      ],
                     ),
                     const SizedBox(height: 20),
 
@@ -453,14 +478,14 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                           _buildEventDetailRow(
                             emoji: '🗓️',
                             label: 'START DATE',
-                            value: activeProgram.startDate,
+                            value: DateTimeUtils.formatDateTime(activeProgram.startDate),
                           ),
                           if (activeProgram.endDate.isNotEmpty && activeProgram.endDate != activeProgram.startDate) ...[
                             const Divider(height: 18, color: AppColors.border),
                             _buildEventDetailRow(
                               emoji: '🏁',
                               label: 'END DATE',
-                              value: activeProgram.endDate,
+                              value: DateTimeUtils.formatDateTime(activeProgram.endDate),
                             ),
                           ],
                         ],
@@ -524,7 +549,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                                                 ),
                                               ),
                                               Text(
-                                                'Tap to view / download',
+                                                'Tap to open',
                                                 style: GoogleFonts.inter(
                                                   fontSize: 11,
                                                   color: const Color(0xFF94A3B8),
@@ -533,7 +558,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                                             ],
                                           ),
                                         ),
-                                        const Icon(Icons.download_rounded, color: AppColors.primaryBlue, size: 20),
+                                        const Icon(Icons.open_in_new_rounded, color: AppColors.primaryBlue, size: 20),
                                       ],
                                     ),
                                   ),
@@ -669,7 +694,64 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                           ],
                         ),
                       ),
-                    ] else if (isRegistered) ...[
+                    ] else if (activeProgram.isOrganizer) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEEF2FF),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFC7D2FE)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(
+                              Icons.workspace_premium_rounded,
+                              color: Color(0xFF4F46E5),
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'You are the Organizer',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF4338CA),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (activeProgram.reviewStatus == 'submitted') ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFFDE68A)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.info_outline_rounded, color: Color(0xFFB45309), size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Your program proposal has been submitted and is currently awaiting review.',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: const Color(0xFF92400E),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ] else if (isRegistered && !activeProgram.isOrganizer) ...[
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -690,7 +772,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                             Text(
                               activeProgram.status == ProgramStatus.ongoing
                                   ? 'Registered • Session is Live!'
-                                  : 'You are registered for this program',
+                                  : 'Registered',
                               style: GoogleFonts.inter(
                                 fontSize: 13.5,
                                 fontWeight: FontWeight.w600,
@@ -742,6 +824,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
           ),
         ),
       ),
+    ),
     );
   }
 

@@ -38,9 +38,7 @@ class _Step2OrganizerState extends State<Step2Organizer> {
     super.initState();
     _entityNameController = TextEditingController(text: widget.model.organizingEntityName);
     _contactPersonController = TextEditingController(text: widget.model.contactPerson);
-    final rawPhone = widget.model.phone.replaceAll(RegExp(r'\D'), '');
-    final cleanPhone = rawPhone.length > 10 ? rawPhone.substring(rawPhone.length - 10) : rawPhone;
-    _phoneController = TextEditingController(text: cleanPhone);
+    _phoneController = TextEditingController(text: widget.model.phone);
     _emailController = TextEditingController(text: widget.model.email);
     _loadOrgTypes();
   }
@@ -217,27 +215,30 @@ class _Step2OrganizerState extends State<Step2Organizer> {
           ),
           const SizedBox(height: 16),
 
-          // Phone (10 Digits)
-          _buildFieldLabel('Phone (10 Digits) *'),
+          // Phone Number (International / Foreign supported)
+          _buildFieldLabel('Contact Phone Number *'),
           const SizedBox(height: 6),
           TextFormField(
             controller: _phoneController,
             keyboardType: TextInputType.phone,
             inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(10),
+              FilteringTextInputFormatter.allow(RegExp(r'[\d\+\s\-\(\)]')),
+              LengthLimitingTextInputFormatter(22),
             ],
             decoration: const InputDecoration(
-              hintText: '9876543210',
-              prefixText: '+91 ',
+              hintText: 'e.g. +1 555 123 4567 or +91 9876543210',
+              prefixIcon: Icon(Icons.phone_outlined, size: 18, color: Color(0xFF64748B)),
             ),
             validator: (val) {
               if (val == null || val.trim().isEmpty) {
-                return 'Please enter 10-digit phone number';
+                return 'Please enter contact phone number';
               }
-              final clean = val.replaceAll(RegExp(r'\D'), '');
-              if (clean.length != 10) {
-                return 'Phone number must be exactly 10 digits';
+              final cleanDigits = val.replaceAll(RegExp(r'\D'), '');
+              if (cleanDigits.length < 7) {
+                return 'Please enter a valid phone number (at least 7 digits)';
+              }
+              if (cleanDigits.length > 17) {
+                return 'Phone number cannot exceed 17 digits';
               }
               return null;
             },

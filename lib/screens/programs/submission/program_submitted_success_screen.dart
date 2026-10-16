@@ -1,24 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme.dart';
+import '../../../core/date_time_utils.dart';
+import '../../../models/application_item_model.dart';
+import '../../../models/program_model.dart';
 import '../../../models/program_submission_model.dart';
 import '../../../widgets/custom_button.dart';
+import '../../applications/program_application_details_screen.dart';
 import '../../home_screen.dart';
 
 class ProgramSubmittedSuccessScreen extends StatelessWidget {
   final ProgramSubmissionModel submission;
+  final ProgramApplicationItem? applicationItem;
+  final ProgramModel? programModel;
 
   const ProgramSubmittedSuccessScreen({
     super.key,
     required this.submission,
+    this.applicationItem,
+    this.programModel,
   });
 
   @override
   Widget build(BuildContext context) {
-    final refNumber = submission.referenceNumber ??
-        'APP-PRG-${DateTime.now().year}-${DateTime.now().millisecondsSinceEpoch.toString().substring(7, 11)}';
+    final refNumber = (submission.referenceNumber != null && submission.referenceNumber!.trim().isNotEmpty)
+        ? submission.referenceNumber!.trim()
+        : '—';
     final now = submission.submissionDate ?? DateTime.now();
-    final dateStr = '${now.month}/${now.day}/${now.year}';
+    final dateStr = DateTimeUtils.formatDateTime(now.toIso8601String());
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -61,7 +70,7 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
 
               // Subtitle
               Text(
-                'Your program has been submitted and is under review.',
+                'Your proposal has been received and evaluated by the AI auditing engine.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 13.5,
@@ -69,7 +78,7 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
                   height: 1.4,
                 ),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
 
               // Summary Card
               Container(
@@ -95,13 +104,13 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
                       value: refNumber,
                       isBoldValue: true,
                     ),
-                    const Divider(height: 22, color: AppColors.border),
+                    const Divider(height: 20, color: AppColors.border),
                     _buildDetailRow(
                       iconEmoji: '📅',
                       label: 'SUBMISSION DATE',
                       value: dateStr,
                     ),
-                    const Divider(height: 22, color: AppColors.border),
+                    const Divider(height: 20, color: AppColors.border),
                     _buildDetailRow(
                       iconEmoji: '📊',
                       label: 'CURRENT STATUS',
@@ -109,11 +118,13 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
                       valueColor: AppColors.primaryBlue,
                       isBoldValue: true,
                     ),
-                    const Divider(height: 22, color: AppColors.border),
+                    const Divider(height: 20, color: AppColors.border),
                     _buildDetailRow(
-                      iconEmoji: 'ℹ️',
-                      label: 'NEXT STEP',
-                      value: 'AI validation will complete within 24 hours',
+                      iconEmoji: '🤖',
+                      label: 'AI VALIDATION',
+                      value: 'Automated parameter audit ready',
+                      valueColor: const Color(0xFF10B981),
+                      isBoldValue: true,
                     ),
                   ],
                 ),
@@ -123,16 +134,47 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
 
               // Action Buttons
               CustomButton(
-                text: 'View Applications',
+                text: 'View AI Validation & Score',
                 onPressed: () {
-                  Navigator.of(context).pushAndRemoveUntil(
+                  final item = applicationItem ??
+                      ProgramApplicationItem(
+                        id: submission.referenceNumber ?? '',
+                        programName: submission.programName,
+                        programType: submission.programType,
+                        category: submission.programType,
+                        referenceNumber: refNumber,
+                        startDate: submission.startDate != null
+                            ? '${submission.startDate!.year}-${submission.startDate!.month.toString().padLeft(2, '0')}-${submission.startDate!.day.toString().padLeft(2, '0')}'
+                            : '',
+                        endDate: submission.endDate != null
+                            ? '${submission.endDate!.year}-${submission.endDate!.month.toString().padLeft(2, '0')}-${submission.endDate!.day.toString().padLeft(2, '0')}'
+                            : '',
+                        location: [submission.city, submission.country]
+                            .where((s) => s.isNotEmpty)
+                            .join(', '),
+                        venue: submission.venueAddress,
+                        organizer: submission.organizingEntityName.isNotEmpty
+                            ? submission.organizingEntityName
+                            : 'You (Organizer)',
+                        submittedDate: dateStr,
+                        lastUpdatedDate: dateStr,
+                        status: submission.status,
+                        description: submission.description.isNotEmpty
+                            ? submission.description
+                            : submission.programDescription,
+                        banner: submission.bannerUrl ?? submission.bannerPath,
+                        contactPerson: submission.contactPerson,
+                        contactPhone: submission.phone,
+                        contactEmail: submission.email,
+                        supportingMaterials: submission.uploadedFileNames,
+                        materials: submission.materials,
+                        agenda: submission.agendaItems,
+                      );
+
+                  Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => const HomeScreen(
-                        initialTabIndex: 3,
-                        initialAppTabIndex: 0,
-                      ),
+                      builder: (_) => ProgramApplicationDetailsScreen(item: item),
                     ),
-                    (route) => false,
                   );
                 },
               ),
@@ -141,7 +183,10 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
                 onPressed: () {
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(
-                      builder: (_) => const HomeScreen(),
+                      builder: (_) => const HomeScreen(
+                        initialTabIndex: 3,
+                        initialAppTabIndex: 0,
+                      ),
                     ),
                     (route) => false,
                   );
@@ -154,11 +199,29 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  'Back to Home',
+                  'My Applications',
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppColors.primaryBlue,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (_) => const HomeScreen(),
+                    ),
+                    (route) => false,
+                  );
+                },
+                child: Text(
+                  'Back to Home',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    color: const Color(0xFF64748B),
                   ),
                 ),
               ),

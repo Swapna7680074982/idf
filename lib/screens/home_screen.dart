@@ -4,12 +4,14 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../bloc/app_bloc.dart';
 import '../bloc/app_state.dart';
+import '../core/date_time_utils.dart';
 import '../core/theme.dart';
 import '../models/program_model.dart';
 import 'notifications/notifications_screen.dart';
 import 'programs/program_details_screen.dart';
 import 'programs/programs_screen.dart';
 import 'programs/submission/submit_program_wizard_screen.dart';
+import 'programs/widgets/program_status_pill.dart';
 import 'certification/certification_tab_screen.dart';
 import 'certification/certification_wizard_screen.dart';
 import '../models/certification_model.dart';
@@ -17,6 +19,7 @@ import '../models/application_item_model.dart';
 import '../models/home_models.dart';
 import '../services/api_config.dart';
 import '../services/home_service.dart';
+import '../services/programs_service.dart';
 import 'applications/my_applications_screen.dart';
 import 'account/account_screen.dart';
 
@@ -39,6 +42,13 @@ class _HomeScreenState extends State<HomeScreen> {
   late int _appTabIndex;
   DateTime? _lastBackPressTime;
   HomeSummaryResponse? _homeSummary;
+  List<ProgramModel> _allPublicPrograms = [];
+
+  // Refresh keys to force re-fetch when switching tabs from bottom navigation
+  int _programsRefreshKey = 0;
+  int _applicationsRefreshKey = 0;
+  int _accountRefreshKey = 0;
+  int _idfActiveRefreshKey = 0;
 
   @override
   void initState() {
@@ -46,6 +56,28 @@ class _HomeScreenState extends State<HomeScreen> {
     _currentTabIndex = widget.initialTabIndex;
     _appTabIndex = widget.initialAppTabIndex;
     _fetchHomeData();
+  }
+
+  void _switchTab(int index, {int? appTabIndex}) {
+    setState(() {
+      _currentTabIndex = index;
+      if (appTabIndex != null) {
+        _appTabIndex = appTabIndex;
+      }
+      // Trigger instant data re-fetch for the targeted screen
+      if (index == 0) {
+        _fetchHomeData();
+      } else if (index == 1) {
+        _programsRefreshKey++;
+      } else if (index == 2) {
+        _idfActiveRefreshKey++;
+        _fetchHomeData();
+      } else if (index == 3) {
+        _applicationsRefreshKey++;
+      } else if (index == 4) {
+        _accountRefreshKey++;
+      }
+    });
   }
 
   Future<void> _fetchHomeData() async {
@@ -57,6 +89,58 @@ class _HomeScreenState extends State<HomeScreen> {
         });
       }
     } catch (_) {}
+
+    try {
+      final progRes = await ProgramsService.getPrograms(status: 'all', limit: 10);
+
+      // Fetch user's applications to reliably know which programs the user organized (exact same logic as details screen)
+      final myOrganizedIds = <String>{};
+      final myOrganizedNos = <String>{};
+      final myOrganizedTitles = <String>{};
+      try {
+        final myApps = await ProgramsService.getMyApplications();
+        final items = myApps['items'] is List ? myApps['items'] as List : [];
+        for (final it in items) {
+          if (it is Map) {
+            final idStr = (it['id'] ?? '').toString();
+            final pNo = (it['program_no'] ?? it['application_id'] ?? '').toString().trim();
+            final titleStr = (it['title'] ?? it['program_name'] ?? '').toString().trim().toLowerCase();
+            if (idStr.isNotEmpty) myOrganizedIds.add(idStr);
+            if (pNo.isNotEmpty) myOrganizedNos.add(pNo);
+            if (titleStr.isNotEmpty) myOrganizedTitles.add(titleStr);
+          }
+        }
+      } catch (_) {}
+
+      if (mounted) {
+        setState(() {
+          // Home screen "Programs" section shows ALL community programs across platform
+          // Filter to approved / published public programs only (exclude unapproved user proposals)
+          _allPublicPrograms = progRes.items
+              .where((p) {
+                final rev = (p.reviewStatus ?? '').toLowerCase();
+                return rev.isEmpty || rev == 'approved' || rev == 'completed';
+              })
+              .map((apiItem) {
+                final prog = ProgramModel.fromApiItem(apiItem);
+                final pId = prog.id.toString();
+                final pNo = (prog.programNo ?? '').trim();
+                final pTitle = prog.title.trim().toLowerCase();
+
+                final isOrg = prog.isOrganizer ||
+                    myOrganizedIds.contains(pId) ||
+                    (pNo.isNotEmpty && myOrganizedNos.contains(pNo)) ||
+                    (pTitle.isNotEmpty && myOrganizedTitles.contains(pTitle));
+
+                return prog.copyWith(
+                  isOrganizer: isOrg,
+                  isRegistered: isOrg ? false : prog.isRegistered,
+                );
+              })
+              .toList();
+        });
+      }
+    } catch (_) {}
   }
 
   void _handlePopScope(bool didPop) {
@@ -64,9 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // If not on Home tab, navigate back to Home tab (WhatsApp behavior)
     if (_currentTabIndex != 0) {
-      setState(() {
-        _currentTabIndex = 0;
-      });
+      _switchTab(0);
       return;
     }
 
@@ -115,22 +197,35 @@ class _HomeScreenState extends State<HomeScreen> {
             backgroundColor: const Color(0xFFF8FAFC),
             body: SafeArea(
               bottom: false,
-              child: IndexedStack(
-                index: _currentTabIndex,
-                children: [
-                  _buildHomeDashboardTab(state),
-                  const ProgramsScreen(isTabMode: true),
-                  _buildIDFActiveTab(state),
-                  _buildApplicationsTab(state),
-                  const AccountScreen(),
-                ],
-              ),
+              child: _buildActiveTab(state),
             ),
             bottomNavigationBar: _buildWhatsAppStyleNavigationBar(),
           );
         },
       ),
     );
+  }
+
+  Widget _buildActiveTab(AppState state) {
+    switch (_currentTabIndex) {
+      case 0:
+        return _buildHomeDashboardTab(state);
+      case 1:
+        return ProgramsScreen(
+          key: ValueKey('programs_tab_$_programsRefreshKey'),
+          isTabMode: true,
+        );
+      case 2:
+        return _buildIDFActiveTab(state);
+      case 3:
+        return _buildApplicationsTab(state);
+      case 4:
+        return AccountScreen(
+          key: ValueKey('account_tab_$_accountRefreshKey'),
+        );
+      default:
+        return _buildHomeDashboardTab(state);
+    }
   }
 
   // -------------------------------------------------------------
@@ -209,11 +304,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Expanded(
       child: InkWell(
-        onTap: () {
-          setState(() {
-            _currentTabIndex = index;
-          });
-        },
+        onTap: () => _switchTab(index),
         borderRadius: BorderRadius.circular(20),
         splashColor: AppColors.primaryBlue.withAlpha(20),
         highlightColor: AppColors.primaryBlue.withAlpha(10),
@@ -398,9 +489,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   title: 'Apply for IDF Active',
                   subtitle: 'Get certified today',
                   onTap: () {
-                    setState(() {
-                      _currentTabIndex = 2;
-                    });
+                    _switchTab(2);
                   },
                 ),
               ),
@@ -422,9 +511,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               GestureDetector(
                 onTap: () {
-                  setState(() {
-                    _currentTabIndex = 3;
-                  });
+                  _switchTab(3, appTabIndex: 0);
                 },
                 child: Text(
                   'View All',
@@ -455,9 +542,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               GestureDetector(
                 onTap: () {
-                  setState(() {
-                    _currentTabIndex = 1;
-                  });
+                  _switchTab(1);
                 },
                 child: Text(
                   'See All',
@@ -488,9 +573,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               GestureDetector(
                 onTap: () {
-                  setState(() {
-                    _currentTabIndex = 2;
-                  });
+                  _switchTab(2);
                 },
                 child: Text(
                   'View',
@@ -600,9 +683,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 14),
                 InkWell(
                   onTap: () {
-                    setState(() {
-                      _currentTabIndex = 2;
-                    });
+                    _switchTab(2);
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
@@ -726,10 +807,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           InkWell(
             onTap: () {
-              setState(() {
-                _appTabIndex = 0;
-                _currentTabIndex = 3;
-              });
+              _switchTab(3, appTabIndex: 0);
             },
             borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
             child: Padding(
@@ -776,10 +854,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const Divider(height: 1, color: AppColors.border),
           InkWell(
             onTap: () {
-              setState(() {
-                _appTabIndex = 1;
-                _currentTabIndex = 3;
-              });
+              _switchTab(3, appTabIndex: 1);
             },
             borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
             child: Padding(
@@ -829,14 +904,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // -------------------------------------------------------------
-  // Programs Carousel (Safe Height & Shared State)
+  // Programs Carousel (Shows All Community Programs, Not My Programs)
   // -------------------------------------------------------------
   Widget _buildProgramsCarousel(AppState state) {
-    final List<ProgramModel> programsToDisplay = _homeSummary != null
-        ? _homeSummary!.registeredPrograms
-            .map((reg) => ProgramModel.fromApiItem(reg))
-            .toList()
-        : [];
+    // Show ALL approved community programs across the IDF platform (strictly public programs, not user's proposals)
+    final List<ProgramModel> programsToDisplay = _allPublicPrograms;
 
     if (programsToDisplay.isEmpty) {
       return Container(
@@ -852,7 +924,7 @@ class _HomeScreenState extends State<HomeScreen> {
             const Icon(Icons.event_available_outlined, size: 30, color: Color(0xFF94A3B8)),
             const SizedBox(height: 8),
             Text(
-              'No registered programs yet',
+              'No programs available',
               style: GoogleFonts.inter(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w600,
@@ -861,7 +933,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Explore and join upcoming diabetes prevention programs',
+              'Explore community initiatives across IDF',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 12,
@@ -909,7 +981,7 @@ class _HomeScreenState extends State<HomeScreen> {
               MaterialPageRoute(
                 builder: (_) => ProgramDetailsScreen(program: program),
               ),
-            );
+            ).then((_) => _fetchHomeData());
           },
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -960,45 +1032,80 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: Colors.white.withAlpha(160),
                         ),
                       ),
-                    // Top-right Registered status pill (only shown for registered programs)
-                    if (program.isRegistered)
-                      Positioned(
-                        top: 10,
-                        right: 10,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF22C55E),
-                            borderRadius: BorderRadius.circular(12),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withAlpha(40),
-                                blurRadius: 4,
-                                offset: const Offset(0, 1),
+                    // Top-right status pill (Organizer / Registered if joined / Event timeline status)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: program.isOrganizer
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4F46E5),
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withAlpha(40),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.check_circle_rounded,
-                                size: 12,
-                                color: Colors.white,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.workspace_premium_rounded,
+                                    size: 12,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Organizer',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'Registered',
-                                style: GoogleFonts.inter(
-                                  fontSize: 10.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                            )
+                          : ((program.isRegistered && !program.isOrganizer)
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF16A34A),
+                                    borderRadius: BorderRadius.circular(12),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withAlpha(40),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.check_circle_rounded,
+                                        size: 12,
+                                        color: Colors.white,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        'Registered',
+                                        style: GoogleFonts.inter(
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w700,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : ProgramStatusPill(status: program.status)),
+                    ),
                   ],
                 ),
               ),
@@ -1034,7 +1141,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 5),
                         Expanded(
                           child: Text(
-                            program.startDate,
+                            DateTimeUtils.formatDateRange(program.startDate, program.endDate),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.inter(
@@ -1082,9 +1189,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (cert == null) {
       return InkWell(
         onTap: () {
-          setState(() {
-            _currentTabIndex = 2;
-          });
+          _switchTab(2);
         },
         borderRadius: BorderRadius.circular(16),
         child: Container(
@@ -1288,7 +1393,10 @@ class _HomeScreenState extends State<HomeScreen> {
   // IDF Active Tab
   // -------------------------------------------------------------
   Widget _buildIDFActiveTab(AppState state) {
-    return const CertificationTabScreen();
+    return CertificationTabScreen(
+      key: ValueKey('idf_active_$_idfActiveRefreshKey'),
+      onRefresh: _fetchHomeData,
+    );
   }
 
   // -------------------------------------------------------------
@@ -1296,7 +1404,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // -------------------------------------------------------------
   Widget _buildApplicationsTab(AppState state) {
     return MyApplicationsScreen(
-      key: ValueKey('my_apps_$_appTabIndex'),
+      key: ValueKey('my_apps_${_appTabIndex}_$_applicationsRefreshKey'),
       initialTabIndex: _appTabIndex,
     );
   }

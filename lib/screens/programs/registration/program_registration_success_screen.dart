@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme.dart';
+import '../../../core/date_time_utils.dart';
 import '../../../models/program_model.dart';
 import '../../../widgets/custom_button.dart';
 import '../../home_screen.dart';
@@ -15,12 +16,20 @@ class ProgramRegistrationSuccessScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
-          child: Column(
+    final updatedProgram = program.copyWith(isRegistered: true);
+
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        Navigator.of(context).pop(updatedProgram);
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 20.0),
+            child: Column(
             children: [
               const Spacer(flex: 1),
 
@@ -110,7 +119,7 @@ class ProgramRegistrationSuccessScreen extends StatelessWidget {
                     _buildDetailRow(
                       emoji: '📅',
                       label: 'DATE',
-                      value: program.startDate,
+                      value: DateTimeUtils.formatDateRange(program.startDate, program.endDate),
                     ),
                     const Divider(height: 22, color: AppColors.border),
                     _buildDetailRow(
@@ -136,7 +145,7 @@ class ProgramRegistrationSuccessScreen extends StatelessWidget {
               CustomButton(
                 text: 'View Program',
                 onPressed: () {
-                  Navigator.of(context).pop();
+                  Navigator.of(context).pop(updatedProgram);
                 },
               ),
               const SizedBox(height: 12),
@@ -170,6 +179,7 @@ class ProgramRegistrationSuccessScreen extends StatelessWidget {
           ),
         ),
       ),
+    ),
     );
   }
 

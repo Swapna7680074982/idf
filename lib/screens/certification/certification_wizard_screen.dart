@@ -69,7 +69,6 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
 
     await Future.delayed(const Duration(milliseconds: 700));
 
-    _model.applicationId = 'APP-CERT-2025-0089';
     _model.submissionDate = DateTime.now();
     _model.status = 'AI Audit';
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/date_time_utils.dart';
 import '../../core/theme.dart';
 import '../../models/application_item_model.dart';
 import '../../models/certification_model.dart';
@@ -34,6 +35,8 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     'Submitted',
     'In Review',
     'Approved',
+    'Changes Required',
+    'Rejected',
     'Completed',
   ];
 
@@ -67,28 +70,13 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     try {
       final List<ProgramApplicationItem> fetchedList = [];
 
-      // 1. Fetch from /api/applications/programs
+      // Fetch exclusively from /api/applications/programs?status=all&page=1&limit=20
       try {
-        final res = await ProgramsService.getMyApplications();
+        final res = await ProgramsService.getMyApplications(status: 'all', page: 1, limit: 20);
         final items = res['items'] is List ? res['items'] as List : [];
         for (final item in items) {
           if (item is Map<String, dynamic>) {
             fetchedList.add(ProgramApplicationItem.fromJson(item));
-          }
-        }
-      } catch (_) {}
-
-      // 2. Also fetch real submitted programs from /api/programs
-      try {
-        final progRes = await ProgramsService.getPrograms();
-        for (final p in progRes.items) {
-          final alreadyExists = fetchedList.any(
-            (existing) =>
-                existing.id == p.id.toString() ||
-                (existing.referenceNumber.isNotEmpty && existing.referenceNumber == p.programNo),
-          );
-          if (!alreadyExists) {
-            fetchedList.add(ProgramApplicationItem.fromProgramApiItem(p));
           }
         }
       } catch (_) {}
@@ -450,12 +438,13 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   }
 
   Widget _buildProgramCard(ProgramApplicationItem item) {
-    void openDetails() {
-      Navigator.of(context).push(
+    void openDetails() async {
+      await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ProgramApplicationDetailsScreen(item: item),
         ),
       );
+      _fetchMyProgramApplications();
     }
 
     return Container(
@@ -525,7 +514,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            'Submitted: ${item.submittedDate}',
+                            'Submitted: ${DateTimeUtils.formatDateTime(item.submittedDate)}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.inter(
@@ -536,7 +525,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                           if (item.lastUpdatedDate.isNotEmpty) ...[
                             const SizedBox(height: 2),
                             Text(
-                              'Last Updated: ${item.lastUpdatedDate}',
+                              'Last Updated: ${DateTimeUtils.formatDateTime(item.lastUpdatedDate)}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.inter(
@@ -545,6 +534,34 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                               ),
                             ),
                           ],
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFDCFCE7),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFF86EFAC)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.check_circle_rounded, size: 11, color: Color(0xFF16A34A)),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'AI Validation Done',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: const Color(0xFF16A34A),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                           const SizedBox(height: 10),
                           Row(
                             mainAxisSize: MainAxisSize.min,
@@ -595,29 +612,44 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   Widget _buildProgramBadge(String status) {
     Color bg = const Color(0xFFF1F5F9);
     Color text = const Color(0xFF475569);
+    Color border = const Color(0xFFE2E8F0);
 
-    if (status == 'In Review') {
-      bg = const Color(0xFFFEF3C7);
-      text = const Color(0xFFB45309);
-    } else if (status == 'Submitted') {
-      bg = const Color(0xFFDBEAFE);
-      text = const Color(0xFF2563EB);
-    } else if (status == 'Approved') {
+    final s = status.trim().toLowerCase();
+    if (s == 'approved' || s == 'complete' || s == 'completed') {
       bg = const Color(0xFFDCFCE7);
       text = const Color(0xFF16A34A);
-    } else if (status == 'Completed') {
-      bg = const Color(0xFFF1F5F9);
-      text = const Color(0xFF475569);
+      border = const Color(0xFF86EFAC);
+    } else if (s == 'in review' || s == 'under review' || s == 'manual_review' || s == 'pending') {
+      bg = const Color(0xFFFEF3C7);
+      text = const Color(0xFFB45309);
+      border = const Color(0xFFFDE68A);
+    } else if (s == 'submitted') {
+      bg = const Color(0xFFE0F2FE);
+      text = const Color(0xFF0284C7);
+      border = const Color(0xFFBAE6FD);
+    } else if (s.contains('changes') || s == 'changes_required' || s == 'changes required') {
+      bg = const Color(0xFFFFEDD5);
+      text = const Color(0xFFC2410C);
+      border = const Color(0xFFFDBA74);
+    } else if (s == 'rejected' || s == 'cancelled' || s == 'canceled') {
+      bg = const Color(0xFFFEE2E2);
+      text = const Color(0xFFDC2626);
+      border = const Color(0xFFFCA5A5);
     }
+
+    final displayLabel = (s == 'manual_review' || s == 'in_review')
+        ? 'In Review'
+        : (s == 'changes_required' ? 'Changes Required' : status);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border, width: 1.0),
       ),
       child: Text(
-        status,
+        displayLabel,
         style: GoogleFonts.inter(
           fontSize: 11,
           fontWeight: FontWeight.w700,
@@ -810,7 +842,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                               if (item.issuedDate.isNotEmpty) ...[
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Issued: ${item.issuedDate}',
+                                  'Issued: ${DateTimeUtils.formatDateTime(item.issuedDate)}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.inter(
@@ -822,7 +854,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                               if (item.expiresDate.isNotEmpty) ...[
                                 const SizedBox(height: 2),
                                 Text(
-                                  'Expires: ${item.expiresDate}',
+                                  'Expires: ${DateTimeUtils.formatDateTime(item.expiresDate)}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: GoogleFonts.inter(
@@ -894,18 +926,31 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   }
 
   Widget _buildCertBadge(String status) {
-    Color bg = const Color(0xFFDCFCE7);
-    Color text = const Color(0xFF16A34A);
+    Color bg = const Color(0xFFF1F5F9);
+    Color text = const Color(0xFF475569);
+    Color border = const Color(0xFFE2E8F0);
 
-    if (status == 'Expired') {
-      bg = const Color(0xFFF1F5F9);
-      text = const Color(0xFF64748B);
-    } else if (status == 'Changes Required') {
-      bg = const Color(0xFFFEE2E2);
-      text = const Color(0xFFDC2626);
-    } else if (status == 'Submitted') {
+    final s = status.trim().toLowerCase();
+    if (s == 'active' || s == 'approved' || s == 'completed') {
+      bg = const Color(0xFFDCFCE7);
+      text = const Color(0xFF16A34A);
+      border = const Color(0xFF86EFAC);
+    } else if (s == 'in review' || s == 'pending' || s == 'under review') {
+      bg = const Color(0xFFFEF3C7);
+      text = const Color(0xFFB45309);
+      border = const Color(0xFFFDE68A);
+    } else if (s == 'submitted') {
       bg = const Color(0xFFE0F2FE);
       text = const Color(0xFF0284C7);
+      border = const Color(0xFFBAE6FD);
+    } else if (s.contains('changes') || s == 'changes required') {
+      bg = const Color(0xFFFFEDD5);
+      text = const Color(0xFFC2410C);
+      border = const Color(0xFFFDBA74);
+    } else if (s == 'expired' || s == 'rejected' || s == 'cancelled') {
+      bg = const Color(0xFFFEE2E2);
+      text = const Color(0xFFDC2626);
+      border = const Color(0xFFFCA5A5);
     }
 
     return Container(
@@ -913,6 +958,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: border, width: 1.0),
       ),
       child: Text(
         status,

@@ -479,7 +479,7 @@ class ApiClient {
 
     if (statusCode >= 200 && statusCode < 300) {
       if (decoded is Map<String, dynamic>) {
-        if (decoded.containsKey('data')) {
+        if (decoded.containsKey('data') && decoded['data'] != null) {
           return decoded['data'];
         }
         return decoded;

@@ -18,7 +18,7 @@ class CertificationDetailsScreen extends StatelessWidget {
             id: '2',
             institutionName: 'Lagos State University',
             institutionType: 'College / University',
-            certificateId: 'APP-CERT-2025-0018',
+            certificateId: '',
             issuedDate: '01 Sep 2025',
             expiresDate: '01 Sep 2027',
             status: 'Changes Required',
@@ -89,7 +89,7 @@ class CertificationDetailsScreen extends StatelessWidget {
                       const SizedBox(width: 14),
                       Expanded(
                         child: Text(
-                          '${app.institutionTypeTitle} · APP-CERT-2025-0018',
+                          '${app.institutionTypeTitle}${(app.applicationId != null && app.applicationId!.isNotEmpty) ? ' · ${app.applicationId}' : ''}',
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w500,
