@@ -120,6 +120,41 @@ class HomeCertificationSummary {
   }
 }
 
+class IdfActivateCard {
+  final String tag;
+  final String badge;
+  final String title;
+  final String description;
+  final String subtitle;
+  final String buttonText;
+  final String actionText;
+  final String actionUrl;
+
+  const IdfActivateCard({
+    this.tag = '',
+    this.badge = '',
+    this.title = '',
+    this.description = '',
+    this.subtitle = '',
+    this.buttonText = 'Learn More',
+    this.actionText = 'Learn More',
+    this.actionUrl = '',
+  });
+
+  factory IdfActivateCard.fromJson(Map<String, dynamic> json) {
+    return IdfActivateCard(
+      tag: (json['tag'] ?? json['badge'] ?? '').toString(),
+      badge: (json['badge'] ?? json['tag'] ?? '').toString(),
+      title: (json['title'] ?? '').toString(),
+      description: (json['description'] ?? json['subtitle'] ?? '').toString(),
+      subtitle: (json['subtitle'] ?? json['description'] ?? '').toString(),
+      buttonText: (json['button_text'] ?? json['action_text'] ?? 'Learn More').toString(),
+      actionText: (json['action_text'] ?? json['button_text'] ?? 'Learn More').toString(),
+      actionUrl: (json['action_url'] ?? '').toString(),
+    );
+  }
+}
+
 class HomeSummaryResponse {
   final String userFullName;
   final int unreadNotifications;
@@ -127,6 +162,7 @@ class HomeSummaryResponse {
   final int certificationApplicationsCount;
   final List<HomeRegisteredProgram> registeredPrograms;
   final HomeCertificationSummary? certification;
+  final IdfActivateCard? idfActivateCard;
 
   const HomeSummaryResponse({
     required this.userFullName,
@@ -135,6 +171,7 @@ class HomeSummaryResponse {
     required this.certificationApplicationsCount,
     required this.registeredPrograms,
     this.certification,
+    this.idfActivateCard,
   });
 
   factory HomeSummaryResponse.fromJson(Map<String, dynamic> json) {
@@ -142,6 +179,7 @@ class HomeSummaryResponse {
     final appsObj = json['applications'] is Map<String, dynamic> ? json['applications'] as Map<String, dynamic> : null;
     final progList = json['registered_programs'] is List ? json['registered_programs'] as List : [];
     final certObj = json['certification'] is Map<String, dynamic> ? json['certification'] as Map<String, dynamic> : null;
+    final cardObj = json['idf_activate_card'] is Map<String, dynamic> ? json['idf_activate_card'] as Map<String, dynamic> : null;
 
     return HomeSummaryResponse(
       userFullName: userObj?['full_name']?.toString() ?? '',
@@ -159,6 +197,7 @@ class HomeSummaryResponse {
           .map((item) => HomeRegisteredProgram.fromJson(item))
           .toList(),
       certification: certObj != null ? HomeCertificationSummary.fromJson(certObj) : null,
+      idfActivateCard: cardObj != null ? IdfActivateCard.fromJson(cardObj) : null,
     );
   }
 }

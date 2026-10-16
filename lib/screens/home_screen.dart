@@ -599,6 +599,20 @@ class _HomeScreenState extends State<HomeScreen> {
   // Hero Banner Widget (Responsive)
   // -------------------------------------------------------------
   Widget _buildHeroBanner() {
+    final card = _homeSummary?.idfActivateCard;
+    final tag = card != null && card.tag.isNotEmpty
+        ? card.tag
+        : (card != null && card.badge.isNotEmpty ? card.badge : 'IDF ACTIVATE INITIATIVE');
+    final title = card != null && card.title.isNotEmpty
+        ? card.title
+        : 'Promoting Physical Activity for a Healthier World';
+    final desc = card != null && card.description.isNotEmpty
+        ? card.description
+        : (card != null && card.subtitle.isNotEmpty ? card.subtitle : 'Join the global movement to reduce diabetes through active living.');
+    final btnText = card != null && card.buttonText.isNotEmpty
+        ? card.buttonText
+        : (card != null && card.actionText.isNotEmpty ? card.actionText : 'Learn More');
+
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -651,18 +665,20 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'IDF ACTIVATE INITIATIVE',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white.withAlpha(210),
-                    letterSpacing: 1.1,
+                if (tag.isNotEmpty) ...[
+                  Text(
+                    tag,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withAlpha(210),
+                      letterSpacing: 1.1,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
+                  const SizedBox(height: 8),
+                ],
                 Text(
-                  'Promoting Physical Activity for a Healthier World',
+                  title,
                   style: GoogleFonts.inter(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
@@ -670,20 +686,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     height: 1.25,
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  'Join the global movement to reduce diabetes through active living.',
-                  style: GoogleFonts.inter(
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w400,
-                    color: Colors.white.withAlpha(225),
-                    height: 1.35,
+                if (desc.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    desc,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w400,
+                      color: Colors.white.withAlpha(225),
+                      height: 1.35,
+                    ),
                   ),
-                ),
+                ],
                 const SizedBox(height: 14),
                 InkWell(
                   onTap: () {
-                    _switchTab(2);
+                    final url = card?.actionUrl ?? '';
+                    if (url == '/programs' || url.contains('program')) {
+                      _switchTab(1);
+                    } else {
+                      _switchTab(2);
+                    }
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
@@ -700,7 +723,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Learn More',
+                          btnText,
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w600,
