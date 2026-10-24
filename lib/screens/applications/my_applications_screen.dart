@@ -766,6 +766,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => CertificationWizardScreen(
+              applicationId: item.id.isNotEmpty ? item.id : item.applicationNo,
               initialModel:
                   CertificationApplicationModel.prefilledForCertificate(item),
             ),
@@ -791,13 +792,8 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
             builder: (_) => ExpiredCertificateDetailsScreen(certificate: item),
           ),
         );
-      } else if (isApproved) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => CertificateViewScreen(certificate: item),
-          ),
-        );
       } else {
+        // For Approved (Auditor Notes), Changes Required (Auditor Notes), or Under Review
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => CertificationDetailsScreen(
@@ -873,51 +869,19 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                   _buildCertBadge(item.displayReviewStatus),
                                 ],
                               ),
-                              const SizedBox(height: 3),
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: isApproved
-                                          ? const Color(0xFFE0F2FE)
-                                          : (item.displayReviewStatus.toLowerCase().contains('review')
-                                              ? const Color(0xFFFEF3C7)
-                                              : const Color(0xFFF1F5F9)),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      isApproved ? 'IDF ACTIVE' : item.displayReviewStatus.toUpperCase(),
-                                      style: GoogleFonts.inter(
-                                        fontSize: 9.5,
-                                        fontWeight: FontWeight.w700,
-                                        color: isApproved
-                                            ? AppColors.primaryBlue
-                                            : (item.displayReviewStatus.toLowerCase().contains('review')
-                                                ? const Color(0xFFB45309)
-                                                : const Color(0xFF64748B)),
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Flexible(
-                                    child: Text(
-                                      item.institutionType,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: GoogleFonts.inter(
-                                        fontSize: 11,
-                                        color: const Color(0xFF64748B),
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              Text(
+                                item.institutionType,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: const Color(0xFF64748B),
+                                ),
                               ),
                               const SizedBox(height: 3),
                               Text(
                                 isApproved
-                                    ? 'Certificate ID: ${item.certificateId}'
+                                    ? 'Certificate No: ${item.certificateId}'
                                     : 'Application No: ${item.applicationNo.isNotEmpty ? item.applicationNo : item.id}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -983,7 +947,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                       ),
                                     ],
                                   ),
-                                  if (isExpired || isChangesRequired)
+                                  if (isExpired || isChangesRequired || isApproved)
                                     InkWell(
                                       onTap: openDetailsRedirect,
                                       child: Padding(

@@ -109,11 +109,19 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
       widget.model.passScore = config.category.passScore;
       widget.model.institutionTypeTitle = config.category.name;
 
-      // Populate evidence requirements dynamically from API
+      // Populate evidence requirements dynamically from API, preserving already attached/uploaded evidence
       if (config.evidenceRequirements.isNotEmpty) {
-        widget.model.evidenceItems = config.evidenceRequirements
-            .map((req) => EvidenceItem.fromRequirement(req))
-            .toList();
+        final existingEvidence = List<EvidenceItem>.from(widget.model.evidenceItems);
+        widget.model.evidenceItems = config.evidenceRequirements.map((req) {
+          final match = existingEvidence.firstWhere(
+            (e) =>
+                e.requirementId == req.id.toString() ||
+                e.id == req.id.toString() ||
+                e.title.trim().toLowerCase() == req.title.trim().toLowerCase(),
+            orElse: () => EvidenceItem.fromRequirement(req),
+          );
+          return match.copyWithRequirement(req);
+        }).toList();
       } else {
         widget.model.evidenceItems = [];
       }

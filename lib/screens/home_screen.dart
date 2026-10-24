@@ -1353,6 +1353,7 @@ class _HomeScreenState extends State<HomeScreen> {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => CertificationWizardScreen(
+              applicationId: item.id.isNotEmpty ? item.id : item.applicationNo,
               initialModel:
                   CertificationApplicationModel.prefilledForCertificate(item),
             ),
@@ -1430,51 +1431,19 @@ class _HomeScreenState extends State<HomeScreen> {
                           _buildCertBadge(item.displayReviewStatus),
                         ],
                       ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isApproved
-                                  ? const Color(0xFFE0F2FE)
-                                  : (item.displayReviewStatus.toLowerCase().contains('review')
-                                      ? const Color(0xFFFEF3C7)
-                                      : const Color(0xFFF1F5F9)),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              isApproved ? 'IDF ACTIVE' : item.displayReviewStatus.toUpperCase(),
-                              style: GoogleFonts.inter(
-                                fontSize: 9.5,
-                                fontWeight: FontWeight.w700,
-                                color: isApproved
-                                    ? AppColors.primaryBlue
-                                    : (item.displayReviewStatus.toLowerCase().contains('review')
-                                        ? const Color(0xFFB45309)
-                                        : const Color(0xFF64748B)),
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              item.institutionType,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: const Color(0xFF64748B),
-                              ),
-                            ),
-                          ),
-                        ],
+                      Text(
+                        item.institutionType,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: const Color(0xFF64748B),
+                        ),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         isApproved
-                            ? 'Certificate ID: ${item.certificateId}'
+                            ? 'Certificate No: ${item.certificateId}'
                             : 'Application No: ${item.applicationNo.isNotEmpty ? item.applicationNo : (item.id.isNotEmpty ? item.id : 'APP-CERT-2026-0001')}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -1485,22 +1454,70 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 10),
                       Row(
-                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(
-                            isApproved ? 'View Certificate' : 'View Details',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primaryBlue,
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                isExpired
+                                    ? 'Renew Certificate'
+                                    : isChangesRequired
+                                        ? 'Edit Application'
+                                        : isApproved
+                                            ? 'View Certificate'
+                                            : 'View Details',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: isChangesRequired
+                                      ? const Color(0xFFDC2626)
+                                      : AppColors.primaryBlue,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 13,
+                                color: isChangesRequired
+                                    ? const Color(0xFFDC2626)
+                                    : AppColors.primaryBlue,
+                              ),
+                            ],
+                          ),
+                          if (isExpired || isChangesRequired || isApproved)
+                            InkWell(
+                              onTap: () {
+                                if (isExpired) {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => ExpiredCertificateDetailsScreen(certificate: item),
+                                    ),
+                                  );
+                                } else {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => CertificationDetailsScreen(
+                                        applicationId: item.id.isNotEmpty ? item.id : item.applicationNo,
+                                        certificateItem: item,
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                child: Text(
+                                  isExpired ? 'View Details' : 'Auditor Notes',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF64748B),
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
                             ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 13,
-                            color: AppColors.primaryBlue,
-                          ),
                         ],
                       ),
                     ],

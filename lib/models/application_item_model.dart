@@ -242,7 +242,7 @@ class CertificateApplicationItem {
   }
 
   factory CertificateApplicationItem.fromJson(Map<String, dynamic> json) {
-    final rawCertId = json['certificate_id'] ?? json['certificate_no'] ?? json['certificate_code'];
+    final rawCertId = json['certificate_no'] ?? json['certificate_code'] ?? json['certificate_number'] ?? json['certificate_id'];
     final certIdStr = (rawCertId != null && rawCertId.toString() != 'null') ? rawCertId.toString().trim() : '';
     final appNoStr = (json['application_no'] ?? json['application_id'] ?? json['id'] ?? '').toString().trim();
     final revStatus = (json['review_status'] ?? json['reviewStatus'] ?? '').toString().trim();

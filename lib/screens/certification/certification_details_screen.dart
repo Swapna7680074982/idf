@@ -551,8 +551,11 @@ class _CertificationDetailsScreenState
               const SizedBox(height: 14),
             ],
 
-            // 7. Actions (Edit Application if editable)
-            if (detail.editable) ...[
+            // 7. Actions (Edit Application if editable or changes required)
+            if (detail.editable ||
+                detail.status.toLowerCase().contains('change') ||
+                detail.displayStatus.toLowerCase().contains('change') ||
+                detail.reviewStatus.toLowerCase().contains('change')) ...[
               _buildActionButtons(detail),
               const SizedBox(height: 20),
             ],
@@ -742,7 +745,88 @@ class _CertificationDetailsScreenState
     );
   }
 
-  Widget _buildTimelineCard(List<CertificationTimelineStage> stages) {
+  List<CertificationTimelineStage> _resolveTimelineStages(
+      List<CertificationTimelineStage> stages) {
+    final status = _detail?.status.toLowerCase() ?? '';
+    final dispStatus = _detail?.displayStatus.toLowerCase() ?? '';
+    final revStatus = _detail?.reviewStatus.toLowerCase() ?? '';
+    final decision = _detail?.decision.toLowerCase() ?? '';
+
+    final isApproved = status == 'approved' ||
+        status == 'active' ||
+        status == 'certified' ||
+        dispStatus == 'approved' ||
+        dispStatus == 'active' ||
+        dispStatus == 'certified' ||
+        revStatus == 'approved' ||
+        decision == 'approved';
+
+    final isChangesRequired = status.contains('change') ||
+        dispStatus.contains('change') ||
+        revStatus.contains('change') ||
+        decision.contains('change') ||
+        (_detail?.editable == true && !isApproved);
+
+    final Map<String, CertificationTimelineStage> stageMap = {};
+    for (final s in stages) {
+      stageMap[s.stage.toLowerCase()] = s;
+    }
+
+    final submittedStage = stageMap['submitted'] ?? stageMap['submission'];
+    final aiStage = stageMap['ai_validation'] ?? stageMap['ai_audit'] ?? stageMap['ai'];
+    final manualStage = stageMap['manual_review'] ?? stageMap['review'] ?? stageMap['audit'];
+    final certStage = stageMap['certificate'] ?? stageMap['cert'];
+
+    final comment = _detail?.effectiveComment ?? manualStage?.comment;
+
+    return [
+      CertificationTimelineStage(
+        stage: 'submitted',
+        label: 'Submitted',
+        state: 'completed',
+        note: submittedStage?.note ?? 'Application submitted successfully',
+        occurredAt: submittedStage?.occurredAt ?? _detail?.submittedAt,
+      ),
+      CertificationTimelineStage(
+        stage: 'ai_validation',
+        label: 'AI Audit',
+        state: 'completed',
+        note: aiStage?.note ?? 'AI automated checks completed',
+        occurredAt: aiStage?.occurredAt,
+      ),
+      CertificationTimelineStage(
+        stage: 'manual_review',
+        label: 'Manual Review',
+        state: isApproved
+            ? 'completed'
+            : (isChangesRequired ? 'changes_required' : (manualStage?.state ?? 'in_progress')),
+        note: isApproved
+            ? 'Manual review completed • Approved'
+            : (isChangesRequired
+                ? 'Auditor requested modifications'
+                : (manualStage?.note ?? 'Manual review in progress')),
+        comment: isChangesRequired ? comment : manualStage?.comment,
+        occurredAt: manualStage?.occurredAt ?? _detail?.decisionAt,
+      ),
+      CertificationTimelineStage(
+        stage: 'certificate',
+        label: 'Certificate',
+        state: isApproved
+            ? 'completed'
+            : (isChangesRequired ? 'blocked' : 'pending'),
+        note: isApproved
+            ? 'Certificate issued'
+            : (isChangesRequired
+                ? 'Certificate not issued due to changes required'
+                : 'Certificate issuance pending completion of review'),
+        occurredAt: isApproved ? (_detail?.decisionAt ?? certStage?.occurredAt) : null,
+      ),
+    ];
+  }
+
+  Widget _buildTimelineCard(List<CertificationTimelineStage> rawStages) {
+    final effectiveStages = _resolveTimelineStages(rawStages);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -768,10 +852,10 @@ class _CertificationDetailsScreenState
             ],
           ),
           const SizedBox(height: 14),
-          ...stages.asMap().entries.map((entry) {
+          ...effectiveStages.asMap().entries.map((entry) {
             final idx = entry.key;
             final stage = entry.value;
-            final isLast = idx == stages.length - 1;
+            final isLast = idx == effectiveStages.length - 1;
             return _buildTimelineStepItem(stage, isLast);
           }),
         ],
@@ -783,6 +867,8 @@ class _CertificationDetailsScreenState
     final state = stage.state.toLowerCase();
     final isCompleted = state == 'completed';
     final isInProgress = state == 'in_progress';
+    final isStageChangesRequired = state == 'changes_required';
+    final isStageBlocked = state == 'blocked';
 
     Color nodeColor = const Color(0xFFCBD5E1);
     Widget iconChild = Container(
@@ -797,6 +883,12 @@ class _CertificationDetailsScreenState
     if (isCompleted) {
       nodeColor = const Color(0xFF16A34A);
       iconChild = const Icon(Icons.check_rounded, size: 14, color: Colors.white);
+    } else if (isStageChangesRequired) {
+      nodeColor = const Color(0xFFEA580C);
+      iconChild = const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.white);
+    } else if (isStageBlocked) {
+      nodeColor = const Color(0xFFDC2626);
+      iconChild = const Icon(Icons.close_rounded, size: 13, color: Colors.white);
     } else if (isInProgress) {
       nodeColor = AppColors.primaryBlue;
       iconChild = Container(
@@ -807,6 +899,13 @@ class _CertificationDetailsScreenState
           shape: BoxShape.circle,
         ),
       );
+    }
+
+    Color lineColor = const Color(0xFFE2E8F0);
+    if (isCompleted) {
+      lineColor = const Color(0xFF86EFAC);
+    } else if (isStageChangesRequired) {
+      lineColor = const Color(0xFFFED7AA);
     }
 
     return IntrinsicHeight(
@@ -828,7 +927,7 @@ class _CertificationDetailsScreenState
                 Expanded(
                   child: Container(
                     width: 2,
-                    color: isCompleted ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                    color: lineColor,
                     margin: const EdgeInsets.symmetric(vertical: 3),
                   ),
                 ),
@@ -844,15 +943,45 @@ class _CertificationDetailsScreenState
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        stage.label,
-                        style: GoogleFonts.inter(
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w700,
-                          color: isInProgress
-                              ? AppColors.primaryBlue
-                              : (isCompleted ? const Color(0xFF0F172A) : const Color(0xFF64748B)),
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            stage.label,
+                            style: GoogleFonts.inter(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: isStageChangesRequired
+                                  ? const Color(0xFFC2410C)
+                                  : (isStageBlocked
+                                      ? const Color(0xFFDC2626)
+                                      : (isInProgress
+                                          ? AppColors.primaryBlue
+                                          : (isCompleted
+                                              ? const Color(0xFF0F172A)
+                                              : const Color(0xFF64748B)))),
+                            ),
+                          ),
+                          if (isStageChangesRequired) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFEDD5),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: const Color(0xFFFDBA74)),
+                              ),
+                              child: Text(
+                                'Changes Required',
+                                style: GoogleFonts.inter(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFFC2410C),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       if (stage.occurredAt != null)
                         Text(
@@ -870,7 +999,111 @@ class _CertificationDetailsScreenState
                       stage.note!,
                       style: GoogleFonts.inter(
                         fontSize: 12,
-                        color: const Color(0xFF64748B),
+                        color: isStageBlocked
+                            ? const Color(0xFFDC2626)
+                            : (isStageChangesRequired
+                                ? const Color(0xFFC2410C)
+                                : const Color(0xFF64748B)),
+                        fontWeight: (isStageBlocked || isStageChangesRequired)
+                            ? FontWeight.w600
+                            : FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                  if (isStageChangesRequired && stage.comment != null && stage.comment!.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF7ED),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFFDBA74), width: 1),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.rate_review_outlined, size: 13, color: Color(0xFFC2410C)),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Auditor Notes / Action Required:',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFFC2410C),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            stage.comment!,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              height: 1.35,
+                              color: const Color(0xFF9A3412),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (isStageBlocked) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFFECACA)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.info_outline_rounded, size: 13, color: Color(0xFFDC2626)),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              'Certificate not issued due to changes required',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFFDC2626),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  if (isCompleted && stage.stage == 'certificate') ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: const Color(0xFFBBF7D0)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.verified_rounded, size: 13, color: Color(0xFF16A34A)),
+                          const SizedBox(width: 5),
+                          Flexible(
+                            child: Text(
+                              'Certificate issued successfully',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF16A34A),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -1175,9 +1408,13 @@ class _CertificationDetailsScreenState
       height: 48,
       child: ElevatedButton.icon(
         onPressed: () {
+          final appId = detail.applicationId.isNotEmpty
+              ? detail.applicationId
+              : (detail.id > 0 ? detail.id.toString() : detail.applicationNo);
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => CertificationWizardScreen(
+                applicationId: appId,
                 initialModel: CertificationApplicationModel(
                   id: detail.id,
                   applicationId: detail.applicationId,
@@ -1195,7 +1432,7 @@ class _CertificationDetailsScreenState
                 ),
               ),
             ),
-          );
+          ).then((_) => _fetchApplicationDetail());
         },
         icon: const Icon(Icons.edit_note_rounded, size: 20),
         label: Text(

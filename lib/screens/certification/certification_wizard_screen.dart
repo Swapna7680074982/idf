@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../models/certification_model.dart';
 import '../../services/certification_service.dart';
 import 'certification_submitted_screen.dart';
@@ -14,11 +15,13 @@ import 'steps/step9_confirmation.dart';
 
 class CertificationWizardScreen extends StatefulWidget {
   final CertificationApplicationModel? initialModel;
+  final dynamic applicationId;
   final int initialStep;
 
   const CertificationWizardScreen({
     super.key,
     this.initialModel,
+    this.applicationId,
     this.initialStep = 1,
   });
 
@@ -31,12 +34,43 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
   int _currentStep = 1;
   late final CertificationApplicationModel _model;
   bool _isSubmitting = false;
+  bool _isLoadingData = false;
 
   @override
   void initState() {
     super.initState();
     _currentStep = widget.initialStep;
     _model = widget.initialModel ?? CertificationApplicationModel();
+
+    final targetId = widget.applicationId ?? _model.id ?? _model.applicationId;
+    if (targetId != null && targetId.toString().isNotEmpty) {
+      if (widget.applicationId != null || _model.questionAnswers.isEmpty || _model.address.isEmpty) {
+        _loadApplicationData(targetId);
+      }
+    }
+  }
+
+  Future<void> _loadApplicationData(dynamic id) async {
+    setState(() {
+      _isLoadingData = true;
+    });
+
+    try {
+      final fullModel = await CertificationService.getApplicationModelForEdit(id);
+      if (mounted) {
+        setState(() {
+          _model.copyFrom(fullModel);
+          _isLoadingData = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error prefilling application data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoadingData = false;
+        });
+      }
+    }
   }
 
   void _nextStep() {
@@ -180,6 +214,36 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingData) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 38,
+                height: 38,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: Color(0xFF00529B),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Loading application data...',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF475569),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     switch (_currentStep) {
       case 1:
         return Step1InstitutionType(

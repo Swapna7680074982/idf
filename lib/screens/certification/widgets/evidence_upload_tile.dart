@@ -106,7 +106,14 @@ class EvidenceUploadTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasAttachment = item.fileName != null && item.fileName!.isNotEmpty;
+    final hasAttachment = (item.fileName != null && item.fileName!.isNotEmpty) ||
+        (item.fileUrl != null && item.fileUrl!.isNotEmpty) ||
+        (item.filePath != null && item.filePath!.isNotEmpty);
+    final displayFileName = (item.fileName != null && item.fileName!.isNotEmpty)
+        ? item.fileName!
+        : (item.fileUrl != null && item.fileUrl!.isNotEmpty
+            ? item.fileUrl!.split('/').last
+            : 'Uploaded Document');
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -178,27 +185,27 @@ class EvidenceUploadTile extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: _getAttachmentBgColor(item.fileName!),
+                color: _getAttachmentBgColor(displayFileName),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _getAttachmentBorderColor(item.fileName!)),
+                border: Border.all(color: _getAttachmentBorderColor(displayFileName)),
               ),
               child: Row(
                 children: [
                   Icon(
-                    _getAttachmentIcon(item.fileName!),
+                    _getAttachmentIcon(displayFileName),
                     size: 18,
-                    color: _getAttachmentTextColor(item.fileName!),
+                    color: _getAttachmentTextColor(displayFileName),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      item.fileName!,
+                      displayFileName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: _getAttachmentTextColor(item.fileName!),
+                        color: _getAttachmentTextColor(displayFileName),
                       ),
                     ),
                   ),
@@ -206,6 +213,7 @@ class EvidenceUploadTile extends StatelessWidget {
                     onTap: () {
                       item.filePath = null;
                       item.fileName = null;
+                      item.fileUrl = null;
                       onUpdated();
                     },
                     child: const Icon(

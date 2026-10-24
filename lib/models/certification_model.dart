@@ -377,6 +377,7 @@ class InstitutionTypeInfo {
 
 class EvidenceItem {
   final String id;
+  final String? requirementId;
   final String title;
   final String description;
   final bool isRequired;
@@ -389,6 +390,7 @@ class EvidenceItem {
 
   EvidenceItem({
     required this.id,
+    this.requirementId,
     required this.title,
     required this.description,
     this.isRequired = false,
@@ -403,12 +405,29 @@ class EvidenceItem {
   factory EvidenceItem.fromRequirement(CertificationEvidenceRequirement req) {
     return EvidenceItem(
       id: req.id.toString(),
+      requirementId: req.id.toString(),
       title: req.title,
       description: req.description,
       isRequired: req.isRequired,
       evidenceKind: req.evidenceKind,
       requiresGps: req.requiresGps,
       sectionId: req.sectionId,
+    );
+  }
+
+  EvidenceItem copyWithRequirement(CertificationEvidenceRequirement req) {
+    return EvidenceItem(
+      id: req.id.toString(),
+      requirementId: req.id.toString(),
+      title: req.title,
+      description: req.description,
+      isRequired: req.isRequired,
+      evidenceKind: req.evidenceKind,
+      requiresGps: req.requiresGps,
+      sectionId: req.sectionId,
+      filePath: filePath,
+      fileName: (fileName != null && fileName!.isNotEmpty) ? fileName : (fileUrl?.split('/').last),
+      fileUrl: fileUrl,
     );
   }
 }
@@ -545,6 +564,29 @@ class CertificationApplicationModel {
         questionAnswers = questionAnswers ?? {},
         evidenceItems = evidenceItems ?? [];
 
+  /// Safely gets a boolean answer by int or string question id
+  bool? getQuestionBool(dynamic questionId) {
+    if (questionId == null) return null;
+    final intId = int.tryParse(questionId.toString());
+    if (intId == null || !questionAnswers.containsKey(intId)) return null;
+    final val = questionAnswers[intId];
+    if (val == null) return null;
+    if (val is bool) return val;
+    if (val is num) return val == 1;
+    final s = val.toString().trim().toLowerCase();
+    if (s == 'true' || s == '1' || s == 'yes') return true;
+    if (s == 'false' || s == '0' || s == 'no') return false;
+    return null;
+  }
+
+  /// Sets a question answer
+  void setQuestionAnswer(dynamic questionId, dynamic answer) {
+    final intId = int.tryParse(questionId.toString());
+    if (intId != null) {
+      questionAnswers[intId] = answer;
+    }
+  }
+
   static CertificationApplicationModel prefilledForCertificate(
       CertificateApplicationItem item) {
     int maxScore = 0;
@@ -555,18 +597,206 @@ class CertificationApplicationModel {
       maxScore = int.tryParse(parts.length > 1 ? parts[1].trim() : '0') ?? 0;
     }
 
+    final parsedId = int.tryParse(item.id) ?? int.tryParse(item.certificateId);
+
     return CertificationApplicationModel(
-      id: int.tryParse(item.id),
+      id: parsedId,
       institutionTypeId: item.institutionType,
       institutionTypeTitle: item.institutionType,
       categoryMaxScore: maxScore,
       passScore: pass,
       institutionName: item.institutionName,
-      applicationId: item.certificateId.isNotEmpty ? item.certificateId : item.id,
-      applicationNo: item.certificateId.isNotEmpty ? item.certificateId : item.id,
+      applicationId: item.applicationNo.isNotEmpty ? item.applicationNo : (item.id.isNotEmpty ? item.id : item.certificateId),
+      applicationNo: item.applicationNo.isNotEmpty ? item.applicationNo : (item.id.isNotEmpty ? item.id : item.certificateId),
       submissionDate: DateTime.tryParse(item.issuedDate),
       status: item.status,
     );
+  }
+
+  factory CertificationApplicationModel.fromApplicationJson(Map<String, dynamic> rawJson) {
+    // Merge nested 'data' and 'application' maps if present so all fields are accessible
+    final Map<String, dynamic> appMap = Map<String, dynamic>.from(rawJson);
+    if (rawJson['data'] is Map<String, dynamic>) {
+      final dataMap = rawJson['data'] as Map<String, dynamic>;
+      appMap.addAll(dataMap);
+      if (dataMap['application'] is Map<String, dynamic>) {
+        appMap.addAll(dataMap['application'] as Map<String, dynamic>);
+      }
+    } else if (rawJson['application'] is Map<String, dynamic>) {
+      appMap.addAll(rawJson['application'] as Map<String, dynamic>);
+    }
+
+    final inst = appMap['institution'] is Map<String, dynamic>
+        ? appMap['institution'] as Map<String, dynamic>
+        : (appMap['organization'] is Map<String, dynamic> ? appMap['organization'] as Map<String, dynamic> : null);
+
+    final rawDetails = appMap['institution_details'] is Map
+        ? Map<String, dynamic>.from(appMap['institution_details'] as Map)
+        : (inst != null && inst['details'] is Map ? Map<String, dynamic>.from(inst['details'] as Map) : <String, dynamic>{});
+
+    final Map<int, dynamic> qAnswers = {};
+    final rawAnswers = appMap['answers'] ??
+        (appMap['application'] is Map ? (appMap['application'] as Map)['answers'] : null) ??
+        (appMap['data'] is Map ? (appMap['data'] as Map)['answers'] : null);
+
+    if (rawAnswers is List) {
+      for (final a in rawAnswers) {
+        if (a is Map) {
+          final qId = int.tryParse(a['question_id']?.toString() ?? a['id']?.toString() ?? '');
+          if (qId != null) {
+            final dynamic val = a['answer_bool'] ??
+                a['answer_number'] ??
+                a['answer_text'] ??
+                a['answer_option_id'] ??
+                a['answer'] ??
+                a['value'];
+            if (val != null) {
+              if (val is bool) {
+                qAnswers[qId] = val;
+              } else if (val is num) {
+                qAnswers[qId] = val == 1;
+              } else {
+                final s = val.toString().trim().toLowerCase();
+                if (s == 'true' || s == '1' || s == 'yes') {
+                  qAnswers[qId] = true;
+                } else if (s == 'false' || s == '0' || s == 'no') {
+                  qAnswers[qId] = false;
+                } else {
+                  qAnswers[qId] = val;
+                }
+              }
+            }
+          }
+        }
+      }
+    } else if (rawAnswers is Map) {
+      rawAnswers.forEach((key, val) {
+        final qId = int.tryParse(key.toString());
+        if (qId != null) {
+          if (val is bool) {
+            qAnswers[qId] = val;
+          } else if (val is num) {
+            qAnswers[qId] = val == 1;
+          } else {
+            final s = val.toString().trim().toLowerCase();
+            if (s == 'true' || s == '1' || s == 'yes') {
+              qAnswers[qId] = true;
+            } else if (s == 'false' || s == '0' || s == 'no') {
+              qAnswers[qId] = false;
+            } else {
+              qAnswers[qId] = val;
+            }
+          }
+        }
+      });
+    }
+
+    final List<EvidenceItem> evItems = [];
+    final rawEv = appMap['evidence'] ?? appMap['materials'] ?? appMap['supporting_material'];
+    if (rawEv is List) {
+      for (final ev in rawEv) {
+        if (ev is Map) {
+          final reqId = ev['requirement_id']?.toString() ?? ev['id']?.toString() ?? '1';
+          final title = ev['title']?.toString() ?? '';
+          final fileUrl = ev['url']?.toString() ?? (ev['file'] is Map ? ev['file']['url']?.toString() : null);
+          final fileName = ev['name']?.toString() ?? (ev['file'] is Map ? ev['file']['name']?.toString() : null);
+          final kind = ev['kind']?.toString() ?? 'photo';
+          evItems.add(EvidenceItem(
+            id: reqId,
+            requirementId: reqId,
+            title: title,
+            description: '',
+            fileUrl: fileUrl,
+            fileName: (fileName != null && fileName.isNotEmpty) ? fileName : (fileUrl?.split('/').last),
+            evidenceKind: kind,
+          ));
+        }
+      }
+    }
+
+    final catId = int.tryParse(inst?['category_id']?.toString() ?? appMap['category_id']?.toString() ?? '') ?? 1;
+    final catName = inst?['category']?.toString() ?? appMap['category']?.toString() ?? 'Workplace / Worksite / Office / Hospital';
+
+    final parsedId = appMap['id'] is int ? appMap['id'] as int : int.tryParse(appMap['id']?.toString() ?? '');
+
+    final model = CertificationApplicationModel(
+      id: parsedId,
+      applicationId: appMap['application_id']?.toString() ?? appMap['application_no']?.toString(),
+      applicationNo: appMap['application_no']?.toString() ?? appMap['application_id']?.toString(),
+      categoryId: catId,
+      institutionTypeId: catName,
+      institutionTypeTitle: catName,
+      institutionName: inst?['name']?.toString() ?? appMap['institution_name']?.toString() ?? '',
+      address: inst?['address']?.toString() ?? appMap['address']?.toString() ?? '',
+      country: inst?['country']?.toString() ?? appMap['country']?.toString() ?? '',
+      countryId: inst?['country_id'] is int ? inst!['country_id'] as int : int.tryParse(inst?['country_id']?.toString() ?? appMap['country_id']?.toString() ?? ''),
+      regionState: inst?['region']?.toString() ?? appMap['region']?.toString() ?? '',
+      regionId: inst?['region_id'] is int ? inst!['region_id'] as int : int.tryParse(inst?['region_id']?.toString() ?? appMap['region_id']?.toString() ?? ''),
+      city: inst?['city']?.toString() ?? appMap['city']?.toString() ?? '',
+      cityId: inst?['city_id'] is int ? inst!['city_id'] as int : int.tryParse(inst?['city_id']?.toString() ?? appMap['city_id']?.toString() ?? ''),
+      contactPerson: inst?['contact_person']?.toString() ?? appMap['contact_person']?.toString() ?? '',
+      contactPhone: inst?['contact_phone']?.toString() ?? appMap['contact_phone']?.toString() ?? '',
+      contactEmail: inst?['contact_email']?.toString() ?? appMap['contact_email']?.toString() ?? '',
+      numberOfRooms: rawDetails['number_of_rooms']?.toString() ?? '',
+      distanceFromMainRoad: rawDetails['distance_from_main_road_km']?.toString() ?? '',
+      parkingAvailability: rawDetails['parking_availability']?.toString() ?? '',
+      detailFieldValues: rawDetails,
+      questionAnswers: qAnswers,
+      evidenceItems: evItems,
+      status: appMap['status']?.toString() ?? 'changes_required',
+      reviewStatus: appMap['review_status']?.toString() ?? 'changes_required',
+      displayStatus: appMap['display_status']?.toString() ?? 'Changes Required',
+      decision: appMap['decision']?.toString() ?? 'Pending',
+      decisionText: appMap['decision_text']?.toString(),
+      declarationAccepted: true,
+    );
+
+    return model;
+  }
+
+  void copyFrom(CertificationApplicationModel other) {
+    if (other.categoryId != null) categoryId = other.categoryId;
+    if (other.categoryConfig != null) categoryConfig = other.categoryConfig;
+    if (other.institutionTypeId.isNotEmpty) institutionTypeId = other.institutionTypeId;
+    if (other.institutionTypeTitle.isNotEmpty) institutionTypeTitle = other.institutionTypeTitle;
+    if (other.categoryMaxScore > 0) categoryMaxScore = other.categoryMaxScore;
+    if (other.passScore > 0) passScore = other.passScore;
+    if (other.institutionName.isNotEmpty) institutionName = other.institutionName;
+    if (other.address.isNotEmpty) address = other.address;
+    if (other.country.isNotEmpty) country = other.country;
+    if (other.countryId != null) countryId = other.countryId;
+    if (other.regionState.isNotEmpty) regionState = other.regionState;
+    if (other.regionId != null) regionId = other.regionId;
+    if (other.city.isNotEmpty) city = other.city;
+    if (other.cityId != null) cityId = other.cityId;
+    if (other.contactPerson.isNotEmpty) contactPerson = other.contactPerson;
+    if (other.contactPhone.isNotEmpty) contactPhone = other.contactPhone;
+    if (other.contactEmail.isNotEmpty) contactEmail = other.contactEmail;
+    if (other.numberOfRooms.isNotEmpty) numberOfRooms = other.numberOfRooms;
+    if (other.distanceFromMainRoad.isNotEmpty) distanceFromMainRoad = other.distanceFromMainRoad;
+    if (other.parkingAvailability.isNotEmpty) parkingAvailability = other.parkingAvailability;
+    if (other.detailFieldValues.isNotEmpty) {
+      detailFieldValues = Map<String, dynamic>.from(other.detailFieldValues);
+    }
+    if (other.questionAnswers.isNotEmpty) {
+      questionAnswers = Map<int, dynamic>.from(other.questionAnswers);
+    }
+    if (other.evidenceItems.isNotEmpty) {
+      evidenceItems = List<EvidenceItem>.from(other.evidenceItems);
+    }
+    declarationAccepted = other.declarationAccepted;
+    if (other.id != null) id = other.id;
+    if (other.applicationId != null && other.applicationId!.isNotEmpty) applicationId = other.applicationId;
+    if (other.applicationNo != null && other.applicationNo!.isNotEmpty) applicationNo = other.applicationNo;
+    if (other.submissionDate != null) submissionDate = other.submissionDate;
+    if (other.status.isNotEmpty) status = other.status;
+    if (other.reviewStatus.isNotEmpty) reviewStatus = other.reviewStatus;
+    if (other.displayStatus.isNotEmpty) displayStatus = other.displayStatus;
+    if (other.decision.isNotEmpty) decision = other.decision;
+    if (other.decisionText != null) decisionText = other.decisionText;
+    if (other.timeline != null) timeline = other.timeline;
+    if (other.aiValidation != null) aiValidation = other.aiValidation;
+    if (other.materials != null) materials = other.materials;
   }
 
   Map<String, dynamic> toSubmissionJson() {
@@ -599,6 +829,9 @@ class CertificationApplicationModel {
     }).toList();
 
     return {
+      if (id != null) 'id': id,
+      if (applicationId != null && applicationId!.isNotEmpty) 'application_id': applicationId,
+      if (applicationNo != null && applicationNo!.isNotEmpty) 'application_no': applicationNo,
       'category_id': categoryId ?? 1,
       'institution_name': institutionName,
       'institution_type': institutionTypeTitle.isNotEmpty ? institutionTypeTitle : 'Workplace / Worksite / Office / Hospital',
@@ -665,6 +898,89 @@ class CertificationApplicationModel {
       }
     }
 
+    // Extract Institution & Detail info if provided
+    final inst = appMap['institution'] is Map<String, dynamic>
+        ? appMap['institution'] as Map<String, dynamic>
+        : (appMap['organization'] is Map<String, dynamic> ? appMap['organization'] as Map<String, dynamic> : null);
+    if (inst != null) {
+      if (inst['name'] != null && inst['name'].toString().isNotEmpty) {
+        institutionName = inst['name'].toString();
+      }
+      if (inst['address'] != null && inst['address'].toString().isNotEmpty) {
+        address = inst['address'].toString();
+      }
+      if (inst['country'] != null && inst['country'].toString().isNotEmpty) {
+        country = inst['country'].toString();
+      }
+      if (inst['country_id'] != null) {
+        countryId = int.tryParse(inst['country_id'].toString()) ?? countryId;
+      }
+      if (inst['region'] != null && inst['region'].toString().isNotEmpty) {
+        regionState = inst['region'].toString();
+      }
+      if (inst['region_id'] != null) {
+        regionId = int.tryParse(inst['region_id'].toString()) ?? regionId;
+      }
+      if (inst['city'] != null && inst['city'].toString().isNotEmpty) {
+        city = inst['city'].toString();
+      }
+      if (inst['city_id'] != null) {
+        cityId = int.tryParse(inst['city_id'].toString()) ?? cityId;
+      }
+      if (inst['contact_person'] != null && inst['contact_person'].toString().isNotEmpty) {
+        contactPerson = inst['contact_person'].toString();
+      }
+      if (inst['contact_phone'] != null && inst['contact_phone'].toString().isNotEmpty) {
+        contactPhone = inst['contact_phone'].toString();
+      }
+      if (inst['contact_email'] != null && inst['contact_email'].toString().isNotEmpty) {
+        contactEmail = inst['contact_email'].toString();
+      }
+      if (inst['details'] is Map) {
+        final dMap = Map<String, dynamic>.from(inst['details'] as Map);
+        detailFieldValues.addAll(dMap);
+        numberOfRooms = dMap['number_of_rooms']?.toString() ?? numberOfRooms;
+        distanceFromMainRoad = dMap['distance_from_main_road_km']?.toString() ?? distanceFromMainRoad;
+        parkingAvailability = dMap['parking_availability']?.toString() ?? parkingAvailability;
+      }
+    }
+
+    if (appMap['institution_details'] is Map) {
+      final dMap = Map<String, dynamic>.from(appMap['institution_details'] as Map);
+      detailFieldValues.addAll(dMap);
+      numberOfRooms = dMap['number_of_rooms']?.toString() ?? numberOfRooms;
+      distanceFromMainRoad = dMap['distance_from_main_road_km']?.toString() ?? distanceFromMainRoad;
+      parkingAvailability = dMap['parking_availability']?.toString() ?? parkingAvailability;
+    }
+
+    // Extract questionnaire answers
+    if (appMap['answers'] is List) {
+      for (final a in appMap['answers']) {
+        if (a is Map) {
+          final qId = int.tryParse(a['question_id']?.toString() ?? '');
+          if (qId != null) {
+            final dynamic val = a['answer_bool'] ?? a['answer_number'] ?? a['answer_text'] ?? a['answer_option_id'];
+            if (val != null) {
+              if (val is bool) {
+                questionAnswers[qId] = val;
+              } else if (val is num) {
+                questionAnswers[qId] = val == 1;
+              } else {
+                final s = val.toString().trim().toLowerCase();
+                if (s == 'true' || s == '1' || s == 'yes') {
+                  questionAnswers[qId] = true;
+                } else if (s == 'false' || s == '0' || s == 'no') {
+                  questionAnswers[qId] = false;
+                } else {
+                  questionAnswers[qId] = val;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
     if (appMap['status'] != null) {
       status = appMap['status'].toString();
     }
@@ -711,12 +1027,38 @@ class CertificationApplicationModel {
           .map((e) => CertificationAiValidationCheck.fromJson(e))
           .toList();
     }
-    final rawMaterials = appMap['evidence'] ?? appMap['materials'];
+    final rawMaterials = appMap['evidence'] ?? appMap['materials'] ?? appMap['supporting_material'];
     if (rawMaterials is List) {
       materials = rawMaterials
           .whereType<Map<String, dynamic>>()
           .map((e) => CertificationMaterialItem.fromJson(e))
           .toList();
+
+      for (final ev in rawMaterials) {
+        if (ev is Map) {
+          final reqId = ev['requirement_id']?.toString() ?? ev['id']?.toString() ?? '1';
+          final title = ev['title']?.toString() ?? '';
+          final fileUrl = ev['url']?.toString() ?? (ev['file'] is Map ? ev['file']['url']?.toString() : null);
+          final fileName = ev['name']?.toString() ?? (ev['file'] is Map ? ev['file']['name']?.toString() : null);
+          final kind = ev['kind']?.toString() ?? 'photo';
+          
+          final existingIdx = evidenceItems.indexWhere((item) => item.id == reqId || item.requirementId == reqId);
+          if (existingIdx >= 0) {
+            evidenceItems[existingIdx].fileUrl = fileUrl;
+            evidenceItems[existingIdx].fileName = (fileName != null && fileName.isNotEmpty) ? fileName : (fileUrl?.split('/').last);
+          } else {
+            evidenceItems.add(EvidenceItem(
+              id: reqId,
+              requirementId: reqId,
+              title: title,
+              description: '',
+              fileUrl: fileUrl,
+              fileName: (fileName != null && fileName.isNotEmpty) ? fileName : (fileUrl?.split('/').last),
+              evidenceKind: kind,
+            ));
+          }
+        }
+      }
     }
   }
 }
@@ -727,6 +1069,7 @@ class CertificationTimelineStage {
   final String label;
   final String state; // 'completed', 'in_progress', 'pending'
   final String? note;
+  final String? comment;
   final String? occurredAt;
 
   const CertificationTimelineStage({
@@ -734,6 +1077,7 @@ class CertificationTimelineStage {
     required this.label,
     required this.state,
     this.note,
+    this.comment,
     this.occurredAt,
   });
 
@@ -743,6 +1087,7 @@ class CertificationTimelineStage {
       label: json['label']?.toString() ?? '',
       state: json['state']?.toString() ?? 'pending',
       note: json['note']?.toString(),
+      comment: json['comment']?.toString() ?? json['comments']?.toString() ?? json['reviewer_comment']?.toString() ?? json['admin_comment']?.toString(),
       occurredAt: json['occurred_at']?.toString(),
     );
   }
@@ -752,6 +1097,7 @@ class CertificationTimelineStage {
     'label': label,
     'state': state,
     if (note != null) 'note': note,
+    if (comment != null) 'comment': comment,
     if (occurredAt != null) 'occurred_at': occurredAt,
   };
 }
@@ -1035,6 +1381,13 @@ class CertificationApplicationDetail {
     this.materials = const [],
   });
 
+  String? get effectiveComment {
+    if (reviewerComment != null && reviewerComment!.isNotEmpty) return reviewerComment;
+    if (adminComment != null && adminComment!.isNotEmpty) return adminComment;
+    if (aiValidationComment != null && aiValidationComment!.isNotEmpty) return aiValidationComment;
+    return null;
+  }
+
   factory CertificationApplicationDetail.fromJson(Map<String, dynamic> json) {
     final tRaw = json['timeline'];
     List<CertificationTimelineStage> stages = [];
@@ -1063,6 +1416,39 @@ class CertificationApplicationDetail {
           .toList();
     }
 
+    String? foundComment = json['reviewer_comment']?.toString() ??
+        json['changes_required_reason']?.toString() ??
+        json['comment']?.toString() ??
+        json['comments']?.toString() ??
+        json['reason']?.toString() ??
+        json['admin_comment']?.toString() ??
+        json['notes']?.toString();
+
+    if (foundComment == null && json['reviews'] is List && (json['reviews'] as List).isNotEmpty) {
+      final lastReview = (json['reviews'] as List).last;
+      if (lastReview is Map) {
+        foundComment = lastReview['comment']?.toString() ??
+            lastReview['comments']?.toString() ??
+            lastReview['notes']?.toString() ??
+            lastReview['reviewer_comment']?.toString();
+      }
+    } else if (foundComment == null && json['review'] is Map) {
+      final r = json['review'] as Map;
+      foundComment = r['comment']?.toString() ??
+          r['comments']?.toString() ??
+          r['notes']?.toString() ??
+          r['reviewer_comment']?.toString();
+    }
+
+    if (foundComment == null) {
+      for (final s in stages) {
+        if (s.comment != null && s.comment!.isNotEmpty) {
+          foundComment = s.comment;
+          break;
+        }
+      }
+    }
+
     return CertificationApplicationDetail(
       id: json['id'] is int ? json['id'] as int : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       applicationId: json['application_id']?.toString() ?? '',
@@ -1078,8 +1464,8 @@ class CertificationApplicationDetail {
       totalSteps: json['total_steps'] is int ? json['total_steps'] as int : 4,
       submittedAt: json['submitted_at']?.toString(),
       decisionAt: json['decision_at']?.toString(),
-      reviewerComment: json['reviewer_comment']?.toString(),
-      adminComment: json['admin_comment']?.toString(),
+      reviewerComment: foundComment,
+      adminComment: foundComment,
       aiValidationComment: json['ai_validation_comment']?.toString(),
       institution: json['institution'] is Map<String, dynamic>
           ? CertificationInstitution.fromJson(json['institution'] as Map<String, dynamic>)

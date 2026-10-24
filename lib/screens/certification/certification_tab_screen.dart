@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme.dart';
 import '../../models/application_item_model.dart';
+import '../../models/certification_model.dart';
 import '../../services/certification_service.dart';
 import '../applications/certificate_view_screen.dart';
 import 'certification_details_screen.dart';
@@ -259,6 +260,15 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
               builder: (_) => CertificateViewScreen(certificate: app),
             ),
           );
+        } else if (isChangesRequired) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => CertificationWizardScreen(
+                applicationId: app.id.isNotEmpty ? app.id : app.applicationNo,
+                initialModel: CertificationApplicationModel.prefilledForCertificate(app),
+              ),
+            ),
+          );
         } else {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -368,13 +378,64 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
                       ],
                     ],
                   ),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            isChangesRequired
+                                ? 'Edit Application'
+                                : (isApproved ? 'View Certificate' : 'View Details'),
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: isChangesRequired
+                                  ? const Color(0xFFDC2626)
+                                  : AppColors.primaryBlue,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 13,
+                            color: isChangesRequired
+                                ? const Color(0xFFDC2626)
+                                : AppColors.primaryBlue,
+                          ),
+                        ],
+                      ),
+                      if (isApproved || isChangesRequired)
+                        InkWell(
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => CertificationDetailsScreen(
+                                  applicationId: app.id.isNotEmpty ? app.id : app.applicationNo,
+                                  certificateItem: app,
+                                ),
+                              ),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            child: Text(
+                              'Auditor Notes',
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF64748B),
+                                decoration: TextDecoration.underline,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
-            ),
-            const Icon(
-              Icons.chevron_right_rounded,
-              color: Color(0xFF94A3B8),
-              size: 22,
             ),
           ],
         ),

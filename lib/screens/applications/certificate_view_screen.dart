@@ -1,7 +1,12 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/theme.dart';
 import '../../models/application_item_model.dart';
+import '../../services/api_config.dart';
+import '../../services/token_storage.dart';
 
 class CertificateViewScreen extends StatelessWidget {
   final CertificateApplicationItem certificate;
@@ -10,6 +15,129 @@ class CertificateViewScreen extends StatelessWidget {
     super.key,
     required this.certificate,
   });
+
+  String _formatScore(String raw) {
+    final s = raw.trim();
+    if (s.isEmpty) return 'N/A';
+    if (s.endsWith('.00')) {
+      return s.substring(0, s.length - 3);
+    }
+    return s;
+  }
+
+  Future<void> _handleDownload(BuildContext context) async {
+    try {
+      final certId = certificate.id.isNotEmpty ? certificate.id : '1';
+      final token = TokenStorage.accessToken;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Downloading certificate for ${certificate.institutionName}...'),
+          backgroundColor: AppColors.primaryBlue,
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+
+      final uri = Uri.parse('${ApiConfig.baseUrl}/api/applications/certificates/$certId/download');
+      http.Response res = await http.get(uri, headers: {
+        'Accept': 'application/pdf',
+        if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      });
+
+      if (res.statusCode != 200 || res.bodyBytes.isEmpty) {
+        // Fallback to alt certification endpoint
+        final altUri = Uri.parse('${ApiConfig.baseUrl}/api/certification/certificates/$certId/download');
+        res = await http.get(altUri, headers: {
+          'Accept': 'application/pdf',
+          if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+        });
+      }
+
+      if (res.statusCode == 200 && res.bodyBytes.isNotEmpty) {
+        final safeCertNo = certificate.certificateId.replaceAll('/', '-').replaceAll('\\', '-');
+        final fileName = '${safeCertNo.isNotEmpty ? safeCertNo : "Certificate_$certId"}.pdf';
+
+        final savedUri = await FilePicker.saveFile(
+          dialogTitle: 'Save Certificate PDF',
+          fileName: fileName,
+          mimeType: 'application/pdf',
+          type: FileType.custom,
+          allowedExtensions: ['pdf'],
+          bytes: res.bodyBytes,
+        );
+
+        if (context.mounted && savedUri != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Certificate downloaded successfully!'),
+              backgroundColor: Color(0xFF16A34A),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } else {
+        throw Exception('Server returned ${res.statusCode}');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Download failed: $e'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleShareWhatsApp(BuildContext context) async {
+    final certNo = certificate.certificateId;
+    final instName = certificate.institutionName;
+    final issued = certificate.issuedDate;
+    final expires = certificate.expiresDate;
+    final score = _formatScore(certificate.score);
+
+    final certId = certificate.id.isNotEmpty ? certificate.id : '1';
+    final verifyUrl =
+        '${ApiConfig.baseUrl}/api/applications/certificates/$certId/download';
+
+    final shareText = '''🏆 *IDF ACTIVE CERTIFICATION*
+🏛 *Institution:* $instName
+📜 *Certificate No:* $certNo
+⭐ *Score:* $score
+📅 *Issued On:* $issued
+⏳ *Expires On:* $expires
+
+Verified by International Diabetes Federation (IDF) Active Accreditation Program.
+Download / Verify: $verifyUrl''';
+
+    final encoded = Uri.encodeComponent(shareText);
+    final waDeepLink = Uri.parse('whatsapp://send?text=$encoded');
+    final waUniversalLink = Uri.parse('https://api.whatsapp.com/send?text=$encoded');
+
+    try {
+      final launched = await launchUrl(waDeepLink, mode: LaunchMode.externalNonBrowserApplication);
+      if (!launched) {
+        await launchUrl(waUniversalLink, mode: LaunchMode.externalApplication);
+      }
+    } catch (_) {
+      try {
+        await launchUrl(waUniversalLink, mode: LaunchMode.externalApplication);
+      } catch (err) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not open WhatsApp: $err'),
+              backgroundColor: Colors.red.shade700,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -124,7 +252,7 @@ class CertificateViewScreen extends StatelessWidget {
                         Expanded(
                           child: _buildCertStatTile(
                             label: 'SCORE',
-                            value: certificate.score,
+                            value: _formatScore(certificate.score),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -156,9 +284,9 @@ class CertificateViewScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
 
-                    // Certificate ID
+                    // Certificate No
                     Text(
-                      'CERTIFICATE ID',
+                      'CERTIFICATE NO',
                       style: GoogleFonts.inter(
                         fontSize: 9.5,
                         fontWeight: FontWeight.w700,
@@ -187,15 +315,7 @@ class CertificateViewScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Downloading certificate for ${certificate.institutionName}...'),
-                        backgroundColor: AppColors.primaryBlue,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
+                  onPressed: () => _handleDownload(context),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryBlue,
                     foregroundColor: Colors.white,
@@ -215,20 +335,12 @@ class CertificateViewScreen extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              // Share Certificate Button
+              // Share Certificate Button (WhatsApp)
               SizedBox(
                 width: double.infinity,
                 height: 48,
                 child: OutlinedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Sharing certificate: ${certificate.certificateId}'),
-                        backgroundColor: const Color(0xFF0F172A),
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  },
+                  onPressed: () => _handleShareWhatsApp(context),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: AppColors.primaryBlue, width: 1.3),
                     shape: RoundedRectangleBorder(

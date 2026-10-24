@@ -138,13 +138,13 @@ class _Step5IndividualState extends State<Step5Individual> {
                 children: [
                   if (dynamicQuestions.isNotEmpty)
                     ...dynamicQuestions.map((q) {
-                      final val = widget.model.questionAnswers[q.id] as bool?;
+                      final val = widget.model.getQuestionBool(q.id);
                       return YesNoSelector(
                         question: q.text,
                         value: val,
                         onChanged: (newVal) {
                           setState(() {
-                            widget.model.questionAnswers[q.id] = newVal;
+                            widget.model.setQuestionAnswer(q.id, newVal);
                           });
                         },
                       );

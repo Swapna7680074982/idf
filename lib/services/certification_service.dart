@@ -191,53 +191,98 @@ class CertificationService {
   /// including stage timeline, AI validation checks, and uploaded evidence.
   /// GET /api/applications/certificates/{id}
   /// (Also accessible via GET /api/certification/applications/{id})
-  static Future<CertificationApplicationDetail> getApplicationDetail(dynamic id) async {
-    Map<String, dynamic>? appData;
-
+  /// Fetches the raw application Map from the server for complete data prefilling
+  static Future<Map<String, dynamic>> getApplicationRawMap(dynamic id) async {
     try {
       final response = await ApiClient.get(ApiConfig.certificationApplicationDetail(id));
       if (response is Map<String, dynamic>) {
+        final Map<String, dynamic> merged = {};
         if (response['data'] is Map<String, dynamic>) {
           final data = response['data'] as Map<String, dynamic>;
-          appData = data['application'] is Map<String, dynamic>
-              ? data['application'] as Map<String, dynamic>
-              : data;
+          merged.addAll(data);
+          if (data['application'] is Map<String, dynamic>) {
+            merged.addAll(data['application'] as Map<String, dynamic>);
+          }
         } else if (response['application'] is Map<String, dynamic>) {
-          appData = response['application'] as Map<String, dynamic>;
+          merged.addAll(response);
+          merged.addAll(response['application'] as Map<String, dynamic>);
         } else {
-          appData = response;
+          merged.addAll(response);
         }
+        if (merged.isNotEmpty) return merged;
       }
     } catch (e) {
       debugPrint('⚠️ [CERTIFICATION SERVICE] Detail primary URL failed: $e. Trying alternative URL...');
       try {
         final altRes = await ApiClient.get(ApiConfig.certificationApplicationDetailAlt(id));
         if (altRes is Map<String, dynamic>) {
+          final Map<String, dynamic> merged = {};
           if (altRes['data'] is Map<String, dynamic>) {
             final data = altRes['data'] as Map<String, dynamic>;
-            appData = data['application'] is Map<String, dynamic>
-                ? data['application'] as Map<String, dynamic>
-                : data;
+            merged.addAll(data);
+            if (data['application'] is Map<String, dynamic>) {
+              merged.addAll(data['application'] as Map<String, dynamic>);
+            }
           } else if (altRes['application'] is Map<String, dynamic>) {
-            appData = altRes['application'] as Map<String, dynamic>;
+            merged.addAll(altRes);
+            merged.addAll(altRes['application'] as Map<String, dynamic>);
           } else {
-            appData = altRes;
+            merged.addAll(altRes);
           }
+          if (merged.isNotEmpty) return merged;
         }
       } catch (_) {
         rethrow;
       }
     }
 
-    if (appData != null) {
-      return CertificationApplicationDetail.fromJson(appData);
-    }
-
     throw const ApiException(
       code: 'INVALID_RESPONSE',
-      message: 'Failed to load certification application details.',
+      message: 'Failed to load certification application data.',
       statusCode: 404,
     );
+  }
+
+  /// Builds a fully prefilled CertificationApplicationModel ready for wizard edit
+  static Future<CertificationApplicationModel> getApplicationModelForEdit(dynamic id) async {
+    final appMap = await getApplicationRawMap(id);
+    final model = CertificationApplicationModel.fromApplicationJson(appMap);
+
+    // Fetch and sync category configuration for dynamic sections and evidence requirements
+    try {
+      final config = await getCategoryConfig(model.categoryId ?? 1);
+      model.categoryConfig = config;
+      model.categoryMaxScore = config.category.maxScore;
+      model.passScore = config.category.passScore;
+      model.institutionTypeTitle = config.category.name;
+
+      if (config.evidenceRequirements.isNotEmpty) {
+        final existingEvidence = List<EvidenceItem>.from(model.evidenceItems);
+        model.evidenceItems = config.evidenceRequirements.map((req) {
+          final match = existingEvidence.firstWhere(
+            (e) =>
+                e.requirementId == req.id.toString() ||
+                e.id == req.id.toString() ||
+                e.title.trim().toLowerCase() == req.title.trim().toLowerCase(),
+            orElse: () => EvidenceItem.fromRequirement(req),
+          );
+          return match.copyWithRequirement(req);
+        }).toList();
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error attaching category config to edit model: $e');
+    }
+
+    return model;
+  }
+
+  /// Fetches the complete status dossier matching the Programs format,
+  /// including stage timeline, AI validation checks, and uploaded evidence.
+  /// GET /api/applications/certificates/{id}
+  /// (Also accessible via GET /api/certification/applications/{id})
+  static Future<CertificationApplicationDetail> getApplicationDetail(dynamic id) async {
+    final appData = await getApplicationRawMap(id);
+    return CertificationApplicationDetail.fromJson(appData);
   }
 
   /// 3. Update Certification AI Validation Status
