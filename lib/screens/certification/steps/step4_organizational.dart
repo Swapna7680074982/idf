@@ -42,6 +42,12 @@ class _Step4OrganizationalState extends State<Step4Organizational> {
   }
 
   Widget _buildHeader() {
+    final sections = widget.model.categoryConfig?.sections;
+    final totalSections = (sections != null && sections.isNotEmpty) ? sections.length : 4;
+    final section = (sections != null && sections.length > 1) ? sections[1] : null;
+    final sectionName = section?.name ?? 'Organizational / Policy';
+    final sectionEmoji = section?.emoji ?? '📋';
+
     return Container(
       width: double.infinity,
       color: Colors.white,
@@ -69,7 +75,7 @@ class _Step4OrganizationalState extends State<Step4Organizational> {
           ),
           const SizedBox(height: 10),
           Text(
-            'QUESTIONNAIRE · SECTION 2 OF 4',
+            'QUESTIONNAIRE · SECTION 2 OF $totalSections',
             style: GoogleFonts.inter(
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
@@ -79,7 +85,7 @@ class _Step4OrganizationalState extends State<Step4Organizational> {
           ),
           const SizedBox(height: 4),
           Text(
-            '📋 Organizational / Policy',
+            '$sectionEmoji $sectionName',
             style: GoogleFonts.inter(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -88,14 +94,14 @@ class _Step4OrganizationalState extends State<Step4Organizational> {
             ),
           ),
           const SizedBox(height: 10),
-          // 4-Bar Segmented Progress Indicator (Bars 1 & 2 filled)
+          // Segmented Progress Indicator
           Row(
-            children: List.generate(4, (index) {
+            children: List.generate(totalSections, (index) {
               final isCompleted = index <= 1;
               return Expanded(
                 child: Container(
                   height: 4.0,
-                  margin: EdgeInsets.only(right: index == 3 ? 0 : 6),
+                  margin: EdgeInsets.only(right: index == totalSections - 1 ? 0 : 6),
                   decoration: BoxDecoration(
                     color: isCompleted
                         ? AppColors.primaryBlue
@@ -113,6 +119,10 @@ class _Step4OrganizationalState extends State<Step4Organizational> {
 
   @override
   Widget build(BuildContext context) {
+    final sections = widget.model.categoryConfig?.sections;
+    final section = (sections != null && sections.length > 1) ? sections[1] : null;
+    final dynamicQuestions = section?.questions ?? [];
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -125,69 +135,32 @@ class _Step4OrganizationalState extends State<Step4Organizational> {
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 16.0),
                 children: [
-                  YesNoSelector(
-                    question:
-                        'Does the institution conduct annual health checks for members?',
-                    value: widget.model.hasAnnualHealthChecks,
-                    onChanged: (val) =>
-                        setState(() => widget.model.hasAnnualHealthChecks = val),
-                  ),
-
-                  // Numeric Question Card
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border:
-                          Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(4),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'How many sports / PA events are organized per year?',
+                  if (dynamicQuestions.isNotEmpty)
+                    ...dynamicQuestions.map((q) {
+                      final val = widget.model.questionAnswers[q.id] as bool?;
+                      return YesNoSelector(
+                        question: q.text,
+                        value: val,
+                        onChanged: (newVal) {
+                          setState(() {
+                            widget.model.questionAnswers[q.id] = newVal;
+                          });
+                        },
+                      );
+                    })
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32.0),
+                      child: Center(
+                        child: Text(
+                          'No questions available in this section.',
                           style: GoogleFonts.inter(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                            height: 1.35,
+                            fontSize: 13,
+                            color: const Color(0xFF64748B),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _eventsCountController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            hintText: 'Enter number',
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-
-                  YesNoSelector(
-                    question:
-                        'Is there a formal physical activity promotion policy in place?',
-                    value: widget.model.hasFormalPaPolicy,
-                    onChanged: (val) =>
-                        setState(() => widget.model.hasFormalPaPolicy = val),
-                  ),
-                  YesNoSelector(
-                    question:
-                        'Are structured ergonomic or fitness breaks organized?',
-                    value: widget.model.hasStructuredErgonomicBreaks,
-                    onChanged: (val) => setState(
-                        () => widget.model.hasStructuredErgonomicBreaks = val),
-                  ),
                   const SizedBox(height: 20),
                 ],
               ),

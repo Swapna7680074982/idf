@@ -43,6 +43,12 @@ class _Step5IndividualState extends State<Step5Individual> {
   }
 
   Widget _buildHeader() {
+    final sections = widget.model.categoryConfig?.sections;
+    final totalSections = (sections != null && sections.isNotEmpty) ? sections.length : 4;
+    final section = (sections != null && sections.length > 2) ? sections[2] : null;
+    final sectionName = section?.name ?? 'Individual Level';
+    final sectionEmoji = section?.emoji ?? '👤';
+
     return Container(
       width: double.infinity,
       color: Colors.white,
@@ -70,7 +76,7 @@ class _Step5IndividualState extends State<Step5Individual> {
           ),
           const SizedBox(height: 10),
           Text(
-            'QUESTIONNAIRE · SECTION 3 OF 4',
+            'QUESTIONNAIRE · SECTION 3 OF $totalSections',
             style: GoogleFonts.inter(
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
@@ -80,7 +86,7 @@ class _Step5IndividualState extends State<Step5Individual> {
           ),
           const SizedBox(height: 4),
           Text(
-            '👤 Individual Level',
+            '$sectionEmoji $sectionName',
             style: GoogleFonts.inter(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -89,14 +95,14 @@ class _Step5IndividualState extends State<Step5Individual> {
             ),
           ),
           const SizedBox(height: 10),
-          // 4-Bar Segmented Progress Indicator (Bars 1, 2, 3 filled)
+          // Segmented Progress Indicator
           Row(
-            children: List.generate(4, (index) {
+            children: List.generate(totalSections, (index) {
               final isCompleted = index <= 2;
               return Expanded(
                 child: Container(
                   height: 4.0,
-                  margin: EdgeInsets.only(right: index == 3 ? 0 : 6),
+                  margin: EdgeInsets.only(right: index == totalSections - 1 ? 0 : 6),
                   decoration: BoxDecoration(
                     color: isCompleted
                         ? AppColors.primaryBlue
@@ -114,6 +120,10 @@ class _Step5IndividualState extends State<Step5Individual> {
 
   @override
   Widget build(BuildContext context) {
+    final sections = widget.model.categoryConfig?.sections;
+    final section = (sections != null && sections.length > 2) ? sections[2] : null;
+    final dynamicQuestions = section?.questions ?? [];
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -126,63 +136,32 @@ class _Step5IndividualState extends State<Step5Individual> {
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 16.0),
                 children: [
-                  YesNoSelector(
-                    question:
-                        'Are there designated PA champions or advocates in the institution?',
-                    value: widget.model.hasPaChampions,
-                    onChanged: (val) =>
-                        setState(() => widget.model.hasPaChampions = val),
-                  ),
-
-                  // Percentage Question Card
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 14),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      border:
-                          Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withAlpha(4),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Approximate % of members participating in PA programs:',
+                  if (dynamicQuestions.isNotEmpty)
+                    ...dynamicQuestions.map((q) {
+                      final val = widget.model.questionAnswers[q.id] as bool?;
+                      return YesNoSelector(
+                        question: q.text,
+                        value: val,
+                        onChanged: (newVal) {
+                          setState(() {
+                            widget.model.questionAnswers[q.id] = newVal;
+                          });
+                        },
+                      );
+                    })
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32.0),
+                      child: Center(
+                        child: Text(
+                          'No questions available in this section.',
                           style: GoogleFonts.inter(
-                            fontSize: 13.5,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                            height: 1.35,
+                            fontSize: 13,
+                            color: const Color(0xFF64748B),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        TextFormField(
-                          controller: _percentageController,
-                          keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
-                            hintText: 'Enter number',
-                            suffixText: '%',
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-
-                  YesNoSelector(
-                    question:
-                        'Are active play / fitness activities formally integrated?',
-                    value: widget.model.hasActivePlayIntegrated,
-                    onChanged: (val) =>
-                        setState(() => widget.model.hasActivePlayIntegrated = val),
-                  ),
                   const SizedBox(height: 20),
                 ],
               ),

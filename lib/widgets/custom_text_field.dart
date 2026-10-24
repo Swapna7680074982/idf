@@ -149,6 +149,7 @@ class PhoneInputField extends StatefulWidget {
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
   final String initialCountryCode;
+  final bool showCountryCode;
 
   const PhoneInputField({
     super.key,
@@ -157,6 +158,7 @@ class PhoneInputField extends StatefulWidget {
     this.controller,
     this.onChanged,
     this.initialCountryCode = '+91',
+    this.showCountryCode = false,
   });
 
   @override
@@ -187,74 +189,96 @@ class _PhoneInputFieldState extends State<PhoneInputField> {
           ),
         ),
         const SizedBox(height: 7),
-        Row(
-          children: [
-            // Country code selector container
-            Container(
-              height: 48,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border, width: 1.2),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: _selectedCode,
-                  icon: const Icon(
-                    Icons.keyboard_arrow_down_rounded,
-                    color: Color(0xFF64748B),
-                    size: 20,
-                  ),
-                  items: _countryCodes.map((code) {
-                    return DropdownMenuItem<String>(
-                      value: code,
-                      child: Text(
-                        code,
-                        style: GoogleFonts.inter(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+        if (widget.showCountryCode)
+          Row(
+            children: [
+              // Country code selector container
+              Container(
+                height: 48,
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.border, width: 1.2),
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedCode,
+                    icon: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: Color(0xFF64748B),
+                      size: 20,
+                    ),
+                    items: _countryCodes.map((code) {
+                      return DropdownMenuItem<String>(
+                        value: code,
+                        child: Text(
+                          code,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setState(() {
-                        _selectedCode = val;
-                      });
-                    }
-                  },
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setState(() {
+                          _selectedCode = val;
+                        });
+                      }
+                    },
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            // Phone number text field
-            Expanded(
-              child: SizedBox(
-                height: 48,
-                child: TextFormField(
-                  controller: widget.controller,
-                  keyboardType: TextInputType.phone,
-                  onChanged: widget.onChanged,
-                  style: GoogleFonts.inter(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                    color: AppColors.textPrimary,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: widget.hintText,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 14,
+              const SizedBox(width: 8),
+              // Phone number text field
+              Expanded(
+                child: SizedBox(
+                  height: 48,
+                  child: TextFormField(
+                    controller: widget.controller,
+                    keyboardType: TextInputType.phone,
+                    onChanged: widget.onChanged,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textPrimary,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: widget.hintText,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                     ),
                   ),
                 ),
               ),
+            ],
+          )
+        else
+          SizedBox(
+            height: 48,
+            child: TextFormField(
+              controller: widget.controller,
+              keyboardType: TextInputType.phone,
+              onChanged: widget.onChanged,
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
+              decoration: InputDecoration(
+                hintText: widget.hintText,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 14,
+                ),
+              ),
             ),
-          ],
-        ),
+          ),
       ],
     );
   }

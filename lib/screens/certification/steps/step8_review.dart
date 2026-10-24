@@ -113,13 +113,19 @@ class Step8Review extends StatelessWidget {
                         const SizedBox(height: 12),
                         _buildStatusRow('Institution Type', isDone: true, onEdit: () => onJumpToStep?.call(1)),
                         _buildStatusRow('Institution Details', isDone: true, onEdit: () => onJumpToStep?.call(2)),
-                        _buildStatusRow('Infrastructure / Amenities', isDone: true, onEdit: () => onJumpToStep?.call(3)),
-                        _buildStatusRow('Organizational / Policy', isDone: true, onEdit: () => onJumpToStep?.call(4)),
-                        _buildStatusRow('Individual Level', isDone: true, onEdit: () => onJumpToStep?.call(5)),
-                        _buildStatusRow('Scalability / Advocacy', isDone: true, onEdit: () => onJumpToStep?.call(6)),
+                        if (model.categoryConfig?.sections != null && model.categoryConfig!.sections.isNotEmpty)
+                          ...model.categoryConfig!.sections.asMap().entries.map((entry) {
+                            final idx = entry.key;
+                            final sect = entry.value;
+                            return _buildStatusRow(sect.name, isDone: true, onEdit: () => onJumpToStep?.call(3 + idx));
+                          })
+                        else ...[
+                          _buildStatusRow('Infrastructure / Amenities', isDone: true, onEdit: () => onJumpToStep?.call(3)),
+                          _buildStatusRow('Organizational / Policy', isDone: true, onEdit: () => onJumpToStep?.call(4)),
+                          _buildStatusRow('Individual Level', isDone: true, onEdit: () => onJumpToStep?.call(5)),
+                          _buildStatusRow('Scalability / Advocacy', isDone: true, onEdit: () => onJumpToStep?.call(6)),
+                        ],
                         _buildStatusRow('Evidence', isDone: true, onEdit: () => onJumpToStep?.call(7)),
-                        _buildStatusRow('Documents',
-                            isDone: false, isBadgeIncomplete: true, onEdit: () => onJumpToStep?.call(7)),
                       ],
                     ),
                   ),

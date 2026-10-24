@@ -384,9 +384,10 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
                   ),
                   const SizedBox(height: 16),
 
-                  PhoneInputField(
+                  CustomTextField(
                     label: 'Contact Phone',
-                    hintText: '0987654321',
+                    hintText: 'Enter contact phone',
+                    keyboardType: TextInputType.phone,
                     controller: _contactPhoneController,
                   ),
                   const SizedBox(height: 28),

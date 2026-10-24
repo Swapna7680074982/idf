@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme.dart';
 import '../../../models/certification_model.dart';
+import '../../../models/meta_models.dart';
+import '../../../services/metadata_service.dart';
 
 class Step2InstitutionDetails extends StatefulWidget {
   final CertificationApplicationModel model;
@@ -28,52 +30,24 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
   late TextEditingController _contactPersonController;
   late TextEditingController _phoneController;
   late TextEditingController _emailController;
-  late TextEditingController _roomsController;
-  late TextEditingController _distanceController;
+  late TextEditingController _regionTextController;
+  late TextEditingController _cityTextController;
 
-  String? _selectedCountry;
-  String? _selectedRegion;
-  String? _selectedCity;
-  String? _selectedParking;
+  Country? _selectedCountry;
+  Region? _selectedRegion;
+  City? _selectedCity;
 
-  final List<String> _countries = [
-    'Nigeria',
-    'India',
-    'Kenya',
-    'Ghana',
-    'South Africa',
-    'United Kingdom',
-    'United States',
-  ];
+  List<Country> _countries = [];
+  List<Region> _regions = [];
+  List<City> _cities = [];
 
-  final List<String> _regions = [
-    'Lagos',
-    'Abuja (FCT)',
-    'Oyo',
-    'Rivers',
-    'Kano',
-    'Telangana',
-    'Maharashtra',
-    'Delhi',
-  ];
+  bool _isLoadingCountries = false;
+  bool _isLoadingRegions = false;
+  bool _isLoadingCities = false;
+  String? _countriesError;
 
-  final List<String> _cities = [
-    'Ojo',
-    'Ikeja',
-    'Lekki',
-    'Yaba',
-    'Hyderabad',
-    'Mumbai',
-    'Nairobi',
-  ];
-
-  final List<String> _parkingOptions = [
-    'Ample Parking Available',
-    'Limited Designated Parking',
-    'Street Parking Only',
-    'Bicycle & Pedestrian Only',
-    'None',
-  ];
+  final Map<String, TextEditingController> _dynamicControllers = {};
+  final Map<String, String?> _dynamicSelects = {};
 
   @override
   void initState() {
@@ -87,23 +61,147 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
         TextEditingController(text: widget.model.contactPhone);
     _emailController =
         TextEditingController(text: widget.model.contactEmail);
-    _roomsController =
-        TextEditingController(text: widget.model.numberOfRooms);
-    _distanceController =
-        TextEditingController(text: widget.model.distanceFromMainRoad);
+    _regionTextController =
+        TextEditingController(text: widget.model.regionState);
+    _cityTextController =
+        TextEditingController(text: widget.model.city);
 
-    _selectedCountry = widget.model.country.isNotEmpty
-        ? widget.model.country
-        : null;
-    _selectedRegion = widget.model.regionState.isNotEmpty
-        ? widget.model.regionState
-        : null;
-    _selectedCity = widget.model.city.isNotEmpty
-        ? widget.model.city
-        : null;
-    _selectedParking = widget.model.parkingAvailability.isNotEmpty
-        ? widget.model.parkingAvailability
-        : null;
+    _loadCountries();
+
+    // Initialize dynamic fields from category config
+    final dynamicFields = widget.model.categoryConfig?.detailFields ?? [];
+    for (final field in dynamicFields) {
+      final existingVal = widget.model.detailFieldValues[field.fieldKey]?.toString();
+      if (field.inputType == 'select') {
+        _dynamicSelects[field.fieldKey] = existingVal != null && field.options.contains(existingVal)
+            ? existingVal
+            : null;
+      } else {
+        _dynamicControllers[field.fieldKey] = TextEditingController(
+          text: existingVal ?? '',
+        );
+      }
+    }
+  }
+
+  Future<void> _loadCountries() async {
+    setState(() {
+      _isLoadingCountries = true;
+      _countriesError = null;
+    });
+
+    try {
+      final countries = await MetadataService.getCountries();
+      if (mounted) {
+        setState(() {
+          _countries = countries;
+          _isLoadingCountries = false;
+
+          if (widget.model.countryId != null) {
+            final matches = _countries.where((c) => c.id == widget.model.countryId);
+            if (matches.isNotEmpty) {
+              _selectedCountry = matches.first;
+            }
+          } else if (widget.model.country.isNotEmpty) {
+            final matches = _countries.where(
+              (c) => c.name.toLowerCase() == widget.model.country.toLowerCase(),
+            );
+            if (matches.isNotEmpty) {
+              _selectedCountry = matches.first;
+            }
+          }
+
+          if (_selectedCountry != null) {
+            _loadRegions(_selectedCountry!.id);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingCountries = false;
+          _countriesError = 'Failed to load countries: ${e.toString()}';
+        });
+      }
+    }
+  }
+
+  Future<void> _loadRegions(int countryId) async {
+    setState(() {
+      _isLoadingRegions = true;
+      _regions = [];
+      _selectedRegion = null;
+      _cities = [];
+      _selectedCity = null;
+    });
+
+    try {
+      final regions = await MetadataService.getRegions(countryId);
+      if (mounted) {
+        setState(() {
+          _regions = regions;
+          _isLoadingRegions = false;
+          if (_regions.isNotEmpty) {
+            if (widget.model.regionId != null) {
+              final matches = _regions.where((r) => r.id == widget.model.regionId);
+              if (matches.isNotEmpty) {
+                _selectedRegion = matches.first;
+              }
+            }
+            if (_selectedRegion == null && widget.model.regionState.isNotEmpty) {
+              final matches = _regions.where(
+                (r) => r.name.toLowerCase() == widget.model.regionState.toLowerCase(),
+              );
+              if (matches.isNotEmpty) {
+                _selectedRegion = matches.first;
+              }
+            }
+
+            if (_selectedRegion != null) {
+              _loadCities(_selectedRegion!.id);
+            }
+          }
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingRegions = false);
+    }
+  }
+
+  Future<void> _loadCities(int regionId) async {
+    setState(() {
+      _isLoadingCities = true;
+      _cities = [];
+      _selectedCity = null;
+    });
+
+    try {
+      final cities = await MetadataService.getCities(regionId);
+      if (mounted) {
+        setState(() {
+          _cities = cities;
+          _isLoadingCities = false;
+          if (_cities.isNotEmpty) {
+            if (widget.model.cityId != null) {
+              final matches = _cities.where((c) => c.id == widget.model.cityId);
+              if (matches.isNotEmpty) {
+                _selectedCity = matches.first;
+              }
+            }
+            if (_selectedCity == null && widget.model.city.isNotEmpty) {
+              final matches = _cities.where(
+                (c) => c.name.toLowerCase() == widget.model.city.toLowerCase(),
+              );
+              if (matches.isNotEmpty) {
+                _selectedCity = matches.first;
+              }
+            }
+          }
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingCities = false);
+    }
   }
 
   @override
@@ -113,24 +211,71 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
     _contactPersonController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
-    _roomsController.dispose();
-    _distanceController.dispose();
+    _regionTextController.dispose();
+    _cityTextController.dispose();
+    for (final ctrl in _dynamicControllers.values) {
+      ctrl.dispose();
+    }
     super.dispose();
   }
 
   void _submit() {
+    if (_selectedCountry == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a country'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final regionName = _selectedRegion?.name ?? _regionTextController.text.trim();
+    if (regionName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select or enter region / state'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
+    final cityName = _selectedCity?.name ?? _cityTextController.text.trim();
+    if (cityName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select or enter city'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     if (_formKey.currentState?.validate() ?? true) {
       widget.model.institutionName = _nameController.text.trim();
       widget.model.address = _addressController.text.trim();
-      widget.model.country = _selectedCountry ?? '';
-      widget.model.regionState = _selectedRegion ?? '';
-      widget.model.city = _selectedCity ?? '';
+      widget.model.country = _selectedCountry?.name ?? '';
+      widget.model.countryId = _selectedCountry?.id;
+      widget.model.regionState = regionName;
+      widget.model.regionId = _selectedRegion?.id;
+      widget.model.city = cityName;
+      widget.model.cityId = _selectedCity?.id;
       widget.model.contactPerson = _contactPersonController.text.trim();
       widget.model.contactPhone = _phoneController.text.trim();
       widget.model.contactEmail = _emailController.text.trim();
-      widget.model.numberOfRooms = _roomsController.text.trim();
-      widget.model.distanceFromMainRoad = _distanceController.text.trim();
-      widget.model.parkingAvailability = _selectedParking ?? '';
+
+      // Save dynamic fields
+      final dynamicFields = widget.model.categoryConfig?.detailFields ?? [];
+      for (final field in dynamicFields) {
+        if (field.inputType == 'select') {
+          widget.model.detailFieldValues[field.fieldKey] = _dynamicSelects[field.fieldKey];
+        } else {
+          final val = _dynamicControllers[field.fieldKey]?.text.trim();
+          widget.model.detailFieldValues[field.fieldKey] = val;
+        }
+      }
+
       widget.onContinue();
     }
   }
@@ -241,32 +386,242 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
                       const SizedBox(height: 16),
 
                       _buildFieldLabel('Country *'),
-                      _buildDropdown(
-                        value: _selectedCountry,
-                        hint: 'Select country...',
-                        items: _countries,
-                        onChanged: (val) =>
-                            setState(() => _selectedCountry = val),
-                      ),
+                      if (_isLoadingCountries)
+                        _buildLoadingBox('Loading countries...')
+                      else if (_countriesError != null)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                _countriesError!,
+                                style: GoogleFonts.inter(fontSize: 12, color: Colors.redAccent),
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: _loadCountries,
+                              child: const Text('Retry'),
+                            ),
+                          ],
+                        )
+                      else
+                        DropdownButtonFormField<Country>(
+                          initialValue: _selectedCountry,
+                          hint: Text(
+                            'Select country...',
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFFB0BAC9),
+                              fontSize: 13.0,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.1),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.4),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: Colors.redAccent, width: 1.1),
+                            ),
+                            focusedErrorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: Colors.redAccent, width: 1.4),
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: Color(0xFF64748B),
+                          ),
+                          items: _countries.map((c) {
+                            return DropdownMenuItem<Country>(
+                              value: c,
+                              child: Text(
+                                c.name,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14.0,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedCountry = val;
+                              _selectedRegion = null;
+                              _selectedCity = null;
+                              _regionTextController.clear();
+                              _cityTextController.clear();
+                              if (val != null) {
+                                _loadRegions(val.id);
+                              }
+                            });
+                          },
+                          validator: (val) =>
+                              val == null ? 'Please select a country' : null,
+                        ),
                       const SizedBox(height: 16),
 
                       _buildFieldLabel('Region / State *'),
-                      _buildDropdown(
-                        value: _selectedRegion,
-                        hint: 'Select Region / State',
-                        items: _regions,
-                        onChanged: (val) =>
-                            setState(() => _selectedRegion = val),
-                      ),
+                      if (_isLoadingRegions)
+                        _buildLoadingBox('Loading regions...')
+                      else if (_regions.isNotEmpty)
+                        DropdownButtonFormField<Region>(
+                          key: ValueKey('region_${_selectedCountry?.id}_${_selectedRegion?.id}'),
+                          initialValue: _selectedRegion,
+                          hint: Text(
+                            'Select Region / State',
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFFB0BAC9),
+                              fontSize: 13.0,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.1),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.4),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: Colors.redAccent, width: 1.1),
+                            ),
+                            focusedErrorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: Colors.redAccent, width: 1.4),
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: Color(0xFF64748B),
+                          ),
+                          items: _regions.map((r) {
+                            return DropdownMenuItem<Region>(
+                              value: r,
+                              child: Text(
+                                r.name,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14.0,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedRegion = val;
+                              _selectedCity = null;
+                              _cityTextController.clear();
+                              if (val != null) {
+                                _regionTextController.text = val.name;
+                                _loadCities(val.id);
+                              }
+                            });
+                          },
+                          validator: (val) =>
+                              val == null && _regionTextController.text.trim().isEmpty
+                                  ? 'Please select region / state'
+                                  : null,
+                        )
+                      else
+                        _buildTextField(
+                          controller: _regionTextController,
+                          hintText: 'Enter Region / State',
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Please enter region / state'
+                              : null,
+                        ),
                       const SizedBox(height: 16),
 
                       _buildFieldLabel('City *'),
-                      _buildDropdown(
-                        value: _selectedCity,
-                        hint: 'Select City',
-                        items: _cities,
-                        onChanged: (val) => setState(() => _selectedCity = val),
-                      ),
+                      if (_isLoadingCities)
+                        _buildLoadingBox('Loading cities...')
+                      else if (_cities.isNotEmpty)
+                        DropdownButtonFormField<City>(
+                          key: ValueKey('city_${_selectedRegion?.id}_${_selectedCity?.id}'),
+                          initialValue: _selectedCity,
+                          hint: Text(
+                            'Select City',
+                            style: GoogleFonts.inter(
+                              color: const Color(0xFFB0BAC9),
+                              fontSize: 13.0,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                          decoration: InputDecoration(
+                            filled: true,
+                            fillColor: Colors.white,
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.1),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.4),
+                            ),
+                            errorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: Colors.redAccent, width: 1.1),
+                            ),
+                            focusedErrorBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: const BorderSide(color: Colors.redAccent, width: 1.4),
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.keyboard_arrow_down_rounded,
+                            color: Color(0xFF64748B),
+                          ),
+                          items: _cities.map((city) {
+                            return DropdownMenuItem<City>(
+                              value: city,
+                              child: Text(
+                                city.name,
+                                style: GoogleFonts.inter(
+                                  fontSize: 14.0,
+                                  color: const Color(0xFF0F172A),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                          onChanged: (val) {
+                            setState(() {
+                              _selectedCity = val;
+                              if (val != null) {
+                                _cityTextController.text = val.name;
+                              }
+                            });
+                          },
+                          validator: (val) =>
+                              val == null && _cityTextController.text.trim().isEmpty
+                                  ? 'Please select city'
+                                  : null,
+                        )
+                      else
+                        _buildTextField(
+                          controller: _cityTextController,
+                          hintText: 'Enter City',
+                          validator: (v) => v == null || v.trim().isEmpty
+                              ? 'Please enter city'
+                              : null,
+                        ),
                       const SizedBox(height: 16),
 
                       _buildFieldLabel('Contact Person *'),
@@ -298,51 +653,8 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Workplace Details Section
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.business_rounded,
-                            size: 18,
-                            color: Color(0xFF64748B),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Workplace Details',
-                            style: GoogleFonts.inter(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF0F172A),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-
-                      _buildFieldLabel('Number of Rooms'),
-                      _buildTextField(
-                        controller: _roomsController,
-                        keyboardType: TextInputType.number,
-                        hintText: 'e.g. 50',
-                      ),
-                      const SizedBox(height: 16),
-
-                      _buildFieldLabel('Distance from Main Road (km)'),
-                      _buildTextField(
-                        controller: _distanceController,
-                        keyboardType: TextInputType.number,
-                        hintText: 'e.g. 0.5',
-                      ),
-                      const SizedBox(height: 16),
-
-                      _buildFieldLabel('Parking Availability'),
-                      _buildDropdown(
-                        value: _selectedParking,
-                        hint: 'Select...',
-                        items: _parkingOptions,
-                        onChanged: (val) =>
-                            setState(() => _selectedParking = val),
-                      ),
+                      // Category Specific Details Section
+                      _buildCategorySpecificFields(),
                       const SizedBox(height: 20),
                     ],
                   ),
@@ -458,6 +770,37 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
     );
   }
 
+  Widget _buildLoadingBox(String message) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+      ),
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.primaryBlue,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            message,
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              color: const Color(0xFF64748B),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDropdown({
     required String? value,
     required String hint,
@@ -518,5 +861,99 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
       }).toList(),
       onChanged: onChanged,
     );
+  }
+
+  Widget _buildCategorySpecificFields() {
+    final dynamicFields = widget.model.categoryConfig?.detailFields ?? [];
+
+    if (dynamicFields.isNotEmpty) {
+      final groupLabel = dynamicFields.first.groupLabel;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                Icons.tune_rounded,
+                size: 18,
+                color: Color(0xFF64748B),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                groupLabel,
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF0F172A),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...dynamicFields.map((field) {
+            final labelText = '${field.label}${field.isRequired ? ' *' : ''}';
+            final hintText = field.placeholder ??
+                (field.unit != null ? 'e.g. 100 (${field.unit})' : 'Enter ${field.label.toLowerCase()}');
+
+            Widget inputWidget;
+
+            if (field.inputType == 'select') {
+              inputWidget = _buildDropdown(
+                value: _dynamicSelects[field.fieldKey],
+                hint: field.placeholder ?? 'Select...',
+                items: field.options,
+                onChanged: (val) {
+                  setState(() {
+                    _dynamicSelects[field.fieldKey] = val;
+                  });
+                },
+              );
+            } else if (field.inputType == 'number') {
+              final ctrl = _dynamicControllers[field.fieldKey]!;
+              inputWidget = _buildTextField(
+                controller: ctrl,
+                keyboardType: TextInputType.number,
+                hintText: hintText,
+                validator: field.isRequired
+                    ? (v) => v == null || v.trim().isEmpty ? 'Please enter ${field.label.toLowerCase()}' : null
+                    : null,
+              );
+            } else if (field.inputType == 'decimal') {
+              final ctrl = _dynamicControllers[field.fieldKey]!;
+              inputWidget = _buildTextField(
+                controller: ctrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                hintText: hintText,
+                validator: field.isRequired
+                    ? (v) => v == null || v.trim().isEmpty ? 'Please enter ${field.label.toLowerCase()}' : null
+                    : null,
+              );
+            } else {
+              final ctrl = _dynamicControllers[field.fieldKey]!;
+              inputWidget = _buildTextField(
+                controller: ctrl,
+                hintText: hintText,
+                validator: field.isRequired
+                    ? (v) => v == null || v.trim().isEmpty ? 'Please enter ${field.label.toLowerCase()}' : null
+                    : null,
+              );
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildFieldLabel(labelText),
+                  inputWidget,
+                ],
+              ),
+            );
+          }),
+        ],
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 }

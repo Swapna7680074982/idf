@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme.dart';
 import '../../../models/certification_model.dart';
+import '../../../services/certification_service.dart';
 
 class Step1InstitutionType extends StatefulWidget {
   final CertificationApplicationModel model;
@@ -21,21 +22,122 @@ class Step1InstitutionType extends StatefulWidget {
 
 class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
   late String _selectedId;
+  List<InstitutionTypeInfo> _categories = [];
+  bool _isLoading = true;
+  bool _isFetchingConfig = false;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     _selectedId = widget.model.institutionTypeId;
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories({bool forceRefresh = false}) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final apiCats = await CertificationService.getCategories(forceRefresh: forceRefresh);
+      final mapped = apiCats.map((c) => InstitutionTypeInfo.fromCategory(c)).toList();
+
+      if (mounted) {
+        setState(() {
+          _categories = mapped;
+          _isLoading = false;
+
+          // If current selection is invalid or empty, pick the first
+          final exists = _categories.any((c) => c.id == _selectedId || (c.categoryId != null && c.categoryId == widget.model.categoryId));
+          if (!exists && _categories.isNotEmpty) {
+            _selectType(_categories.first);
+          } else {
+            // Re-apply current selection to sync scores/titles
+            final current = _categories.firstWhere(
+              (c) => c.id == _selectedId || (c.categoryId != null && c.categoryId == widget.model.categoryId),
+              orElse: () => _categories.first,
+            );
+            _selectType(current);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   void _selectType(InstitutionTypeInfo type) {
     setState(() {
       _selectedId = type.id;
       widget.model.institutionTypeId = type.id;
-      widget.model.institutionTypeTitle =
-          type.title.replaceAll('\n', ' ');
+      if (type.categoryId != null) {
+        widget.model.categoryId = type.categoryId;
+      }
+      widget.model.institutionTypeTitle = type.title.replaceAll('\n', ' ');
       widget.model.categoryMaxScore = type.maxPoints;
+      widget.model.passScore = type.passScore ?? (type.maxPoints ~/ 2);
     });
+  }
+
+  Future<void> _handleContinue() async {
+    if (_isFetchingConfig) return;
+    if (_categories.isEmpty) return;
+
+    final currentType = _categories.firstWhere(
+      (c) => c.id == _selectedId,
+      orElse: () => _categories.first,
+    );
+
+    final catId = currentType.categoryId ?? widget.model.categoryId ?? 1;
+
+    setState(() {
+      _isFetchingConfig = true;
+    });
+
+    try {
+      final config = await CertificationService.getCategoryConfig(catId);
+      widget.model.categoryConfig = config;
+      widget.model.categoryId = config.category.id;
+      widget.model.categoryMaxScore = config.category.maxScore;
+      widget.model.passScore = config.category.passScore;
+      widget.model.institutionTypeTitle = config.category.name;
+
+      // Populate evidence requirements dynamically from API
+      if (config.evidenceRequirements.isNotEmpty) {
+        widget.model.evidenceItems = config.evidenceRequirements
+            .map((req) => EvidenceItem.fromRequirement(req))
+            .toList();
+      } else {
+        widget.model.evidenceItems = [];
+      }
+
+      if (mounted) {
+        setState(() {
+          _isFetchingConfig = false;
+        });
+        widget.onContinue();
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error fetching category config: $e');
+      if (mounted) {
+        setState(() {
+          _isFetchingConfig = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load category configuration: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildHeader() {
@@ -98,17 +200,56 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
           children: [
             _buildHeader(),
             Expanded(
-              child: ListView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 16.0),
-                children: [
-                  ...InstitutionTypeInfo.defaultTypes.map((type) {
-                    final isSelected = _selectedId == type.id;
-                    return _buildTypeCard(type, isSelected);
-                  }),
-                  const SizedBox(height: 20),
-                ],
-              ),
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaryBlue,
+                        strokeWidth: 2.5,
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: () => _loadCategories(forceRefresh: true),
+                      color: AppColors.primaryBlue,
+                      child: ListView(
+                        physics: const AlwaysScrollableScrollPhysics(
+                          parent: BouncingScrollPhysics(),
+                        ),
+                        padding: const EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 16.0),
+                        children: [
+                          if (_errorMessage != null)
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 14),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFEF2F2),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: const Color(0xFFFECACA)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.info_outline, color: Color(0xFFDC2626), size: 18),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _errorMessage!,
+                                      style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF991B1B)),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () => _loadCategories(forceRefresh: true),
+                                    child: const Text('Retry'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ..._categories.map((type) {
+                            final isSelected = _selectedId == type.id;
+                            return _buildTypeCard(type, isSelected);
+                          }),
+                          const SizedBox(height: 20),
+                        ],
+                      ),
+                    ),
             ),
           ],
         ),
@@ -149,7 +290,7 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: widget.onContinue,
+                    onPressed: _isFetchingConfig ? null : _handleContinue,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryBlue,
                       foregroundColor: Colors.white,
@@ -158,13 +299,22 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
                         borderRadius: BorderRadius.circular(24),
                       ),
                     ),
-                    child: Text(
-                      'Continue',
-                      style: GoogleFonts.inter(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                    child: _isFetchingConfig
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.2,
+                            ),
+                          )
+                        : Text(
+                            'Continue',
+                            style: GoogleFonts.inter(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                   ),
                 ),
               ],
@@ -243,6 +393,7 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
                               ),
                             ),
                           ),
+                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 8,
@@ -250,12 +401,12 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
                             ),
                             decoration: BoxDecoration(
                               color: const Color(0xFFE0F2FE),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              'Max ${type.maxPoints}',
+                              'Max Score: ${type.maxPoints}',
                               style: GoogleFonts.inter(
-                                fontSize: 11,
+                                fontSize: 10.5,
                                 fontWeight: FontWeight.w700,
                                 color: const Color(0xFF0284C7),
                               ),
@@ -271,6 +422,38 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
                           color: const Color(0xFF64748B),
                           height: 1.35,
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          if (type.passScore != null) ...[
+                            Text(
+                              'Pass score: ${type.passScore} pts',
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFF16A34A),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              '•',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: Color(0xFF94A3B8),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          Text(
+                            '${type.validityMonths ?? 24} months validity',
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w500,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

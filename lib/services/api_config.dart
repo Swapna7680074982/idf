@@ -1,21 +1,10 @@
 class ApiConfig {
   /// Base API URL set to user's server IP
-  static String baseUrl = 'http://192.168.215.232:4000';
+  static String baseUrl = 'https://apps.hhclservices.com/idf';
 
   /// Helper to safely resolve media & file URLs whether relative or absolute
   static String resolveMediaUrl(String? path) {
-    if (path == null) return '';
-    final p = path.trim();
-    if (p.isEmpty) return '';
-    if (p.startsWith('http://localhost:4000')) {
-      return p.replaceFirst('http://localhost:4000', baseUrl);
-    }
-    if (p.startsWith('http://127.0.0.1:4000')) {
-      return p.replaceFirst('http://127.0.0.1:4000', baseUrl);
-    }
-    if (p.startsWith('http://') || p.startsWith('https://')) return p;
-    if (p.startsWith('/')) return '$baseUrl$p';
-    return '$baseUrl/$p';
+    return resolveImageUrl(path) ?? '';
   }
 
   // System & Health
@@ -71,6 +60,10 @@ class ApiConfig {
   static String get applicationsPrograms => '$baseUrl/api/applications/programs';
   static String applicationProgramDetail(dynamic id) => '$baseUrl/api/applications/programs/$id';
 
+  // 08. Certification
+  static String get certificationCategories => '$baseUrl/api/certification/categories';
+  static String get certificationCategoryConfig => '$baseUrl/api/certification/categories/config';
+
   // 10. Support & Tickets
   static String get supportIssueTypes => '$baseUrl/api/support/issue-types';
   static String get supportTickets => '$baseUrl/api/support/tickets';
@@ -84,25 +77,55 @@ class ApiConfig {
   // 12. File Uploads
   static String get files => '$baseUrl/api/files';
 
-  /// Resolves relative image/file URLs (e.g., /uploads/xyz.jpg) to full absolute URLs
+  /// Resolves relative or localhost image/file URLs to full absolute URLs using [baseUrl].
+  /// Converts any localhost/127.0.0.1/10.0.2.2/private IP paths to the live [baseUrl].
   static String? resolveImageUrl(String? url) {
-    if (url == null || url.trim().isEmpty) return null;
+    if (url == null) return null;
     final trimmed = url.trim();
+    if (trimmed.isEmpty) return null;
+
     if (trimmed.contains('{{') || trimmed.contains('}}')) {
       return null;
     }
-    if (trimmed.startsWith('http://localhost:4000')) {
-      return trimmed.replaceFirst('http://localhost:4000', baseUrl);
+
+    final cleanBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+
+    // Pattern matching any localhost, 127.0.0.1, 0.0.0.0, 10.0.2.2, or 192.168.x.x with optional port
+    final localHostRegex = RegExp(
+      r'^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|10\.0\.2\.2|192\.168\.\d+\.\d+)(:\d+)?',
+      caseSensitive: false,
+    );
+
+    String normalized = trimmed;
+
+    if (localHostRegex.hasMatch(normalized)) {
+      normalized = normalized.replaceFirst(localHostRegex, '');
     }
-    if (trimmed.startsWith('http://127.0.0.1:4000')) {
-      return trimmed.replaceFirst('http://127.0.0.1:4000', baseUrl);
+
+    // If it's still a full external URL (e.g. AWS S3, Cloudinary, Unsplash), keep it
+    if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+      if (normalized.contains('localhost') || normalized.contains('127.0.0.1')) {
+        final uri = Uri.tryParse(normalized);
+        if (uri != null) {
+          normalized = uri.path + (uri.hasQuery ? '?${uri.query}' : '');
+        }
+      } else {
+        return normalized;
+      }
     }
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return trimmed;
+
+    // Ensure normalized starts with '/'
+    if (!normalized.startsWith('/')) {
+      normalized = '/$normalized';
     }
-    if (trimmed.startsWith('/')) {
-      return '$baseUrl$trimmed';
+
+    // Avoid duplicate /idf/ prefix if cleanBase already ends with /idf and normalized starts with /idf/
+    if (cleanBase.endsWith('/idf') && normalized.startsWith('/idf/')) {
+      normalized = normalized.substring(4);
     }
-    return '$baseUrl/$trimmed';
+
+    return '$cleanBase$normalized';
   }
 }

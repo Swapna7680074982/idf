@@ -115,12 +115,32 @@ class _Step7EvidenceState extends State<Step7Evidence> {
                   ),
 
                   // Evidence items
-                  ...widget.model.evidenceItems.map(
-                    (item) => EvidenceUploadTile(
-                      item: item,
-                      onUpdated: () => setState(() {}),
+                  if (widget.model.evidenceItems.isEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(top: 20, bottom: 20),
+                      padding: const EdgeInsets.all(24),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Text(
+                        'No specific evidence upload required for this certification category.',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          color: const Color(0xFF64748B),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    )
+                  else
+                    ...widget.model.evidenceItems.map(
+                      (item) => EvidenceUploadTile(
+                        item: item,
+                        onUpdated: () => setState(() {}),
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 20),
                 ],
               ),

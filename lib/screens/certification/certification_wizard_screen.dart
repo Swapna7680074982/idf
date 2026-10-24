@@ -39,6 +39,16 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
   }
 
   void _nextStep() {
+    final sections = _model.categoryConfig?.sections;
+    final totalSections = (sections != null && sections.isNotEmpty) ? sections.length : 4;
+
+    if (_currentStep == 5 && totalSections <= 3) {
+      setState(() {
+        _currentStep = 7; // Skip section 4 if category has only 3 sections (e.g. School)
+      });
+      return;
+    }
+
     if (_currentStep < 9) {
       setState(() {
         _currentStep++;
@@ -47,6 +57,16 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
   }
 
   void _previousStep() {
+    final sections = _model.categoryConfig?.sections;
+    final totalSections = (sections != null && sections.isNotEmpty) ? sections.length : 4;
+
+    if (_currentStep == 7 && totalSections <= 3) {
+      setState(() {
+        _currentStep = 5; // Go back to section 3 from Evidence
+      });
+      return;
+    }
+
     if (_currentStep > 1) {
       setState(() {
         _currentStep--;

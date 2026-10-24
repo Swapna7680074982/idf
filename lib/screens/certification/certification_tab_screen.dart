@@ -5,7 +5,7 @@ import '../../models/application_item_model.dart';
 import '../../models/certification_model.dart';
 import 'certification_wizard_screen.dart';
 
-class CertificationTabScreen extends StatelessWidget {
+class CertificationTabScreen extends StatefulWidget {
   final Future<void> Function()? onRefresh;
 
   const CertificationTabScreen({
@@ -14,63 +14,70 @@ class CertificationTabScreen extends StatelessWidget {
   });
 
   @override
+  State<CertificationTabScreen> createState() => _CertificationTabScreenState();
+}
+
+class _CertificationTabScreenState extends State<CertificationTabScreen> {
+  Future<void> _handleRefresh() async {
+    if (widget.onRefresh != null) {
+      await widget.onRefresh!();
+    }
+  }
+
+
+  @override
   Widget build(BuildContext context) {
-    final scrollChild = SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-      padding: const EdgeInsets.fromLTRB(18.0, 16.0, 18.0, 80.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header
-          Text(
-            'IDF Active',
-            style: GoogleFonts.inter(
-              fontSize: 24,
-              fontWeight: FontWeight.w800,
-              color: const Color(0xFF0F172A),
-              letterSpacing: -0.4,
+    return RefreshIndicator(
+      onRefresh: _handleRefresh,
+      color: AppColors.primaryBlue,
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+        padding: const EdgeInsets.fromLTRB(18.0, 16.0, 18.0, 80.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Text(
+              'IDF Active',
+              style: GoogleFonts.inter(
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0F172A),
+                letterSpacing: -0.4,
+              ),
             ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            'Accreditation & Certification',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w400,
-              color: const Color(0xFF64748B),
+            const SizedBox(height: 3),
+            Text(
+              'Accreditation & Certification',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: const Color(0xFF64748B),
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
+            const SizedBox(height: 20),
 
-          // Teal Hero Banner Card
-          _buildHeroCard(context),
-          const SizedBox(height: 26),
+            // Teal Hero Banner Card
+            _buildHeroCard(context),
+            const SizedBox(height: 24),
 
-          // Current Application Section
-          Text(
-            'Current Application',
-            style: GoogleFonts.inter(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: const Color(0xFF0F172A),
+            // Current Application Section
+            Text(
+              'Current Application',
+              style: GoogleFonts.inter(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFF0F172A),
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
 
-          _buildCurrentApplicationCard(context),
-          const SizedBox(height: 24),
-        ],
+            _buildCurrentApplicationCard(context),
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
-
-    if (onRefresh != null) {
-      return RefreshIndicator(
-        onRefresh: onRefresh!,
-        color: AppColors.primaryBlue,
-        child: scrollChild,
-      );
-    }
-    return scrollChild;
   }
 
   Widget _buildHeroCard(BuildContext context) {
@@ -89,7 +96,6 @@ class CertificationTabScreen extends StatelessWidget {
       ),
       child: Stack(
         children: [
-          // Subtle top-right watermark circle
           Positioned(
             right: -20,
             top: -20,
@@ -107,7 +113,6 @@ class CertificationTabScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Medal Emoji Badge with soft ring
                 Container(
                   width: 44,
                   height: 44,
@@ -120,8 +125,6 @@ class CertificationTabScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 14),
-
-                // Title
                 Text(
                   'IDF Active Certification',
                   style: GoogleFonts.inter(
@@ -132,8 +135,6 @@ class CertificationTabScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 8),
-
-                // Subtitle
                 Text(
                   'Certify your institution / workplace for promoting physical activity, lifelong movement & healthier lifestyle.',
                   style: GoogleFonts.inter(
@@ -143,8 +144,6 @@ class CertificationTabScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 18),
-
-                // Apply Button (White Pill)
                 ElevatedButton(
                   onPressed: () {
                     Navigator.of(context).push(
@@ -180,6 +179,7 @@ class CertificationTabScreen extends StatelessWidget {
       ),
     );
   }
+
 
   Widget _buildCurrentApplicationCard(BuildContext context) {
     return InkWell(

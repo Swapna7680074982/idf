@@ -22,6 +22,12 @@ class Step3Infrastructure extends StatefulWidget {
 
 class _Step3InfrastructureState extends State<Step3Infrastructure> {
   Widget _buildHeader() {
+    final sections = widget.model.categoryConfig?.sections;
+    final totalSections = (sections != null && sections.isNotEmpty) ? sections.length : 4;
+    final section = (sections != null && sections.isNotEmpty) ? sections.first : null;
+    final sectionName = section?.name ?? 'Infrastructure / Amenities';
+    final sectionEmoji = section?.emoji ?? '🏗️';
+
     return Container(
       width: double.infinity,
       color: Colors.white,
@@ -49,7 +55,7 @@ class _Step3InfrastructureState extends State<Step3Infrastructure> {
           ),
           const SizedBox(height: 10),
           Text(
-            'QUESTIONNAIRE · SECTION 1 OF 4',
+            'QUESTIONNAIRE · SECTION 1 OF $totalSections',
             style: GoogleFonts.inter(
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
@@ -59,7 +65,7 @@ class _Step3InfrastructureState extends State<Step3Infrastructure> {
           ),
           const SizedBox(height: 4),
           Text(
-            '🏗️ Infrastructure / Amenities',
+            '$sectionEmoji $sectionName',
             style: GoogleFonts.inter(
               fontSize: 20,
               fontWeight: FontWeight.w700,
@@ -68,14 +74,14 @@ class _Step3InfrastructureState extends State<Step3Infrastructure> {
             ),
           ),
           const SizedBox(height: 10),
-          // 4-Bar Segmented Progress Indicator
+          // Segmented Progress Indicator
           Row(
-            children: List.generate(4, (index) {
+            children: List.generate(totalSections, (index) {
               final isCompleted = index == 0;
               return Expanded(
                 child: Container(
                   height: 4.0,
-                  margin: EdgeInsets.only(right: index == 3 ? 0 : 6),
+                  margin: EdgeInsets.only(right: index == totalSections - 1 ? 0 : 6),
                   decoration: BoxDecoration(
                     color: isCompleted
                         ? AppColors.primaryBlue
@@ -93,6 +99,10 @@ class _Step3InfrastructureState extends State<Step3Infrastructure> {
 
   @override
   Widget build(BuildContext context) {
+    final sections = widget.model.categoryConfig?.sections;
+    final section = (sections != null && sections.isNotEmpty) ? sections.first : null;
+    final dynamicQuestions = section?.questions ?? [];
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -105,41 +115,32 @@ class _Step3InfrastructureState extends State<Step3Infrastructure> {
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 16.0),
                 children: [
-                  YesNoSelector(
-                    question:
-                        'Does the institution have a safe/equitable exercise area accessible to all?',
-                    value: widget.model.hasSafeExerciseArea,
-                    onChanged: (val) =>
-                        setState(() => widget.model.hasSafeExerciseArea = val),
-                  ),
-                  YesNoSelector(
-                    question:
-                        'Are standing desks or adjustable workstations available?',
-                    value: widget.model.hasStandingDesks,
-                    onChanged: (val) =>
-                        setState(() => widget.model.hasStandingDesks = val),
-                  ),
-                  YesNoSelector(
-                    question:
-                        'Is there a dedicated walking trail or path on premises?',
-                    value: widget.model.hasDedicatedWalkingTrail,
-                    onChanged: (val) => setState(
-                        () => widget.model.hasDedicatedWalkingTrail = val),
-                  ),
-                  YesNoSelector(
-                    question:
-                        'Are cycle stands / bicycle parking facilities available?',
-                    value: widget.model.hasCycleStands,
-                    onChanged: (val) =>
-                        setState(() => widget.model.hasCycleStands = val),
-                  ),
-                  YesNoSelector(
-                    question:
-                        'Is there PA promotion signage (e.g. stair use posters) displayed?',
-                    value: widget.model.hasPaPromotionSignage,
-                    onChanged: (val) => setState(
-                        () => widget.model.hasPaPromotionSignage = val),
-                  ),
+                  if (dynamicQuestions.isNotEmpty)
+                    ...dynamicQuestions.map((q) {
+                      final val = widget.model.questionAnswers[q.id] as bool?;
+                      return YesNoSelector(
+                        question: q.text,
+                        value: val,
+                        onChanged: (newVal) {
+                          setState(() {
+                            widget.model.questionAnswers[q.id] = newVal;
+                          });
+                        },
+                      );
+                    })
+                  else
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 32.0),
+                      child: Center(
+                        child: Text(
+                          'No questions available in this section.',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ),
                   const SizedBox(height: 20),
                 ],
               ),
