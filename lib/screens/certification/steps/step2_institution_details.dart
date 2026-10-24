@@ -219,7 +219,7 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
     super.dispose();
   }
 
-  void _submit() {
+  Future<void> _submit() async {
     if (_selectedCountry == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

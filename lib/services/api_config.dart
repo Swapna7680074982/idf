@@ -63,6 +63,15 @@ class ApiConfig {
   // 08. Certification
   static String get certificationCategories => '$baseUrl/api/certification/categories';
   static String get certificationCategoryConfig => '$baseUrl/api/certification/categories/config';
+  static String get certificationApplications => '$baseUrl/api/certification/applications';
+  static String get certificationApplicationsSubmit => '$baseUrl/api/certification/applications/submit';
+  static String get applicationsCertificates => '$baseUrl/api/applications/certificates';
+  static String certificationApplication(dynamic id) => '$baseUrl/api/certification/applications/$id';
+  static String certificationApplicationSubmit(dynamic id) => '$baseUrl/api/certification/applications/$id/submit';
+  static String certificationApplicationDetail(dynamic id) => '$baseUrl/api/applications/certificates/$id';
+  static String certificationApplicationDetailAlt(dynamic id) => '$baseUrl/api/certification/applications/$id';
+  static String certificationAiValidation(dynamic id) => '$baseUrl/api/certification/applications/$id/ai-validation';
+  static String certificationAiValidationAlt(dynamic id) => '$baseUrl/api/applications/certificates/$id/ai-validation';
 
   // 10. Support & Tickets
   static String get supportIssueTypes => '$baseUrl/api/support/issue-types';

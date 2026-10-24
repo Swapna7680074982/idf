@@ -175,9 +175,12 @@ class CertificateApplicationItem {
   final String institutionName;
   final String institutionType;
   final String certificateId;
+  final String applicationNo;
   final String issuedDate;
   final String expiresDate;
   final String status; // 'Active', 'Changes Required', 'Expired', 'Submitted'
+  final String reviewStatus;
+  final String displayStatus;
   final String score;
   final String emoji;
 
@@ -186,22 +189,77 @@ class CertificateApplicationItem {
     required this.institutionName,
     required this.institutionType,
     required this.certificateId,
+    this.applicationNo = '',
     required this.issuedDate,
     required this.expiresDate,
     required this.status,
+    this.reviewStatus = '',
+    this.displayStatus = '',
     required this.score,
     this.emoji = '🏅',
   });
 
+  bool get isApproved {
+    final s = status.trim().toLowerCase();
+    final d = displayStatus.trim().toLowerCase();
+    final r = reviewStatus.trim().toLowerCase();
+    return s == 'approved' || s == 'certified' || s == 'active' ||
+        d == 'approved' || d == 'certified' || d == 'active' ||
+        r == 'approved' || r == 'certified' || r == 'active';
+  }
+
+  bool get hasCertificate {
+    return certificateId.isNotEmpty && certificateId != 'null' && isApproved;
+  }
+
+  String get displayReviewStatus {
+    if (reviewStatus.isNotEmpty) {
+      return formatReviewStatus(reviewStatus);
+    }
+    return formatReviewStatus(status);
+  }
+
+  static String formatReviewStatus(String raw) {
+    final lower = raw.trim().toLowerCase();
+    if (lower == 'manual_review' ||
+        lower == 'manual review' ||
+        lower == 'under_review' ||
+        lower == 'in review' ||
+        lower == 'in_review' ||
+        lower == 'submitted' ||
+        lower == 'ai_audit') {
+      return 'Manual Review';
+    }
+    if (lower == 'approved' || lower == 'certified' || lower == 'active') return 'Approved';
+    if (lower == 'scoring') return 'Scoring';
+    if (lower == 'rejected') return 'Rejected';
+    if (lower == 'expired') return 'Expired';
+    if (lower == 'changes_required' || lower == 'changes required') return 'Changes Required';
+    return raw.replaceAll('_', ' ').split(' ').map((word) {
+      if (word.isEmpty) return '';
+      return word[0].toUpperCase() + word.substring(1).toLowerCase();
+    }).join(' ');
+  }
+
   factory CertificateApplicationItem.fromJson(Map<String, dynamic> json) {
+    final rawCertId = json['certificate_id'] ?? json['certificate_no'] ?? json['certificate_code'];
+    final certIdStr = (rawCertId != null && rawCertId.toString() != 'null') ? rawCertId.toString().trim() : '';
+    final appNoStr = (json['application_no'] ?? json['application_id'] ?? json['id'] ?? '').toString().trim();
+    final revStatus = (json['review_status'] ?? json['reviewStatus'] ?? '').toString().trim();
+    final dispStatus = (json['display_status'] ?? json['displayStatus'] ?? '').toString().trim();
+    final rawStatus = (json['status'] ?? 'Submitted').toString().trim();
+
     return CertificateApplicationItem(
       id: (json['id'] ?? json['application_id'] ?? '').toString(),
       institutionName: (json['institution_name'] ?? '').toString(),
       institutionType: (json['institution_type'] ?? json['category'] ?? '').toString(),
-      certificateId: (json['certificate_id'] ?? json['application_no'] ?? '').toString(),
-      issuedDate: (json['issued_date'] ?? json['applied_at'] ?? '').toString(),
-      expiresDate: (json['expires_date'] ?? json['expires_on'] ?? '').toString(),
-      status: (json['status'] ?? json['display_status'] ?? 'Submitted').toString(),
+      certificateId: certIdStr,
+      applicationNo: appNoStr,
+      issuedDate: (json['issued_on'] ?? json['issued_date'] ?? json['applied_at'] ?? '').toString(),
+      expiresDate: (json['expires_on'] ?? json['expires_date'] ?? '').toString(),
+      status: rawStatus,
+      reviewStatus: revStatus,
+      displayStatus: dispStatus,
       score: (json['score'] ?? '').toString(),
       emoji: (json['emoji'] ?? '🏅').toString(),
     );

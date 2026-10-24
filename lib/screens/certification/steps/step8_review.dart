@@ -7,7 +7,7 @@ class Step8Review extends StatelessWidget {
   final CertificationApplicationModel model;
   final VoidCallback onContinue;
   final VoidCallback onBack;
-  final VoidCallback onEditDetails;
+  final VoidCallback? onEditDetails;
   final void Function(int step)? onJumpToStep;
 
   const Step8Review({
@@ -15,7 +15,7 @@ class Step8Review extends StatelessWidget {
     required this.model,
     required this.onContinue,
     required this.onBack,
-    required this.onEditDetails,
+    this.onEditDetails,
     this.onJumpToStep,
   });
 
@@ -150,34 +150,13 @@ class Step8Review extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'Institution Details',
-                              style: GoogleFonts.inter(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            InkWell(
-                              onTap: onEditDetails,
-                              borderRadius: BorderRadius.circular(6),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                child: Text(
-                                  'Edit',
-                                  style: GoogleFonts.inter(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.primaryBlue,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                        Text(
+                          'Institution Details',
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                         const SizedBox(height: 12),
                         _buildDetailItem(

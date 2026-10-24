@@ -85,7 +85,7 @@ class _Step7EvidenceState extends State<Step7Evidence> {
                 physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.fromLTRB(16.0, 4.0, 16.0, 16.0),
                 children: [
-                  // GPS Location notice box
+                  // Evidence upload notice box
                   Container(
                     margin: const EdgeInsets.only(bottom: 14),
                     padding: const EdgeInsets.symmetric(
@@ -97,11 +97,11 @@ class _Step7EvidenceState extends State<Step7Evidence> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('📸', style: TextStyle(fontSize: 16)),
+                        const Text('📎', style: TextStyle(fontSize: 16)),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Photos must include GPS location data to validate your evidence.',
+                            'Upload photos (with GPS if applicable), PDF documents, or Word files (.doc, .docx) to validate your evidence.',
                             style: GoogleFonts.inter(
                               fontSize: 12.5,
                               color: const Color(0xFF1D4ED8),

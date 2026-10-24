@@ -157,7 +157,7 @@ class PhoneInputField extends StatefulWidget {
     required this.hintText,
     this.controller,
     this.onChanged,
-    this.initialCountryCode = '+91',
+    this.initialCountryCode = '',
     this.showCountryCode = false,
   });
 

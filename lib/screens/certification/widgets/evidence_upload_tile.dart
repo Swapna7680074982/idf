@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -38,6 +39,69 @@ class EvidenceUploadTile extends StatelessWidget {
         ),
       );
     }
+  }
+
+  Future<void> _pickFile(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final PlatformFile? file = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
+      );
+
+      if (file != null && file.path != null) {
+        item.filePath = file.path;
+        item.fileName = file.name;
+        onUpdated();
+      }
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Could not access files: $e'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  IconData _getAttachmentIcon(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.pdf')) {
+      return Icons.picture_as_pdf_rounded;
+    } else if (lower.endsWith('.doc') || lower.endsWith('.docx')) {
+      return Icons.description_rounded;
+    }
+    return Icons.image_rounded;
+  }
+
+  Color _getAttachmentTextColor(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.pdf')) {
+      return const Color(0xFFDC2626);
+    } else if (lower.endsWith('.doc') || lower.endsWith('.docx')) {
+      return const Color(0xFF2563EB);
+    }
+    return const Color(0xFF15803D);
+  }
+
+  Color _getAttachmentBgColor(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.pdf')) {
+      return const Color(0xFFFEF2F2);
+    } else if (lower.endsWith('.doc') || lower.endsWith('.docx')) {
+      return const Color(0xFFEFF6FF);
+    }
+    return const Color(0xFFF0FDF4);
+  }
+
+  Color _getAttachmentBorderColor(String fileName) {
+    final lower = fileName.toLowerCase();
+    if (lower.endsWith('.pdf')) {
+      return const Color(0xFFFECACA);
+    } else if (lower.endsWith('.doc') || lower.endsWith('.docx')) {
+      return const Color(0xFFBFDBFE);
+    }
+    return const Color(0xFFBBF7D0);
   }
 
   @override
@@ -114,16 +178,16 @@ class EvidenceUploadTile extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               margin: const EdgeInsets.only(bottom: 12),
               decoration: BoxDecoration(
-                color: const Color(0xFFF0FDF4),
+                color: _getAttachmentBgColor(item.fileName!),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFBBF7D0)),
+                border: Border.all(color: _getAttachmentBorderColor(item.fileName!)),
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    size: 16,
-                    color: Color(0xFF16A34A),
+                  Icon(
+                    _getAttachmentIcon(item.fileName!),
+                    size: 18,
+                    color: _getAttachmentTextColor(item.fileName!),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -134,7 +198,7 @@ class EvidenceUploadTile extends StatelessWidget {
                       style: GoogleFonts.inter(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: const Color(0xFF15803D),
+                        color: _getAttachmentTextColor(item.fileName!),
                       ),
                     ),
                   ),
@@ -155,25 +219,41 @@ class EvidenceUploadTile extends StatelessWidget {
             ),
           ],
 
-          // Buttons: [ Take Photo ]  [ Upload ]
+          // Buttons: [ Take Photo ]  [ Gallery ]  [ PDF / Doc ]
           Row(
             children: [
               Expanded(
                 child: _buildActionButton(
                   icon: Icons.camera_alt_outlined,
-                  label: 'Take Photo',
+                  label: 'Photo',
                   onTap: () => _pickImage(context, ImageSource.camera),
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 8),
               Expanded(
                 child: _buildActionButton(
-                  icon: Icons.cloud_upload_outlined,
-                  label: 'Upload',
+                  icon: Icons.photo_library_outlined,
+                  label: 'Gallery',
                   onTap: () => _pickImage(context, ImageSource.gallery),
                 ),
               ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildActionButton(
+                  icon: Icons.description_outlined,
+                  label: 'PDF / Doc',
+                  onTap: () => _pickFile(context),
+                ),
+              ),
             ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Accepted: Photos, PDF documents, Word files (.doc, .docx)',
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              color: const Color(0xFF94A3B8),
+            ),
           ),
         ],
       ),
@@ -187,12 +267,12 @@ class EvidenceUploadTile extends StatelessWidget {
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(24),
+      borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 10),
+        padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
         decoration: BoxDecoration(
           color: const Color(0xFFEFF6FF),
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(color: const Color(0xFFDBEAFE), width: 1.0),
         ),
         child: Row(
@@ -200,16 +280,20 @@ class EvidenceUploadTile extends StatelessWidget {
           children: [
             Icon(
               icon,
-              size: 18,
+              size: 16,
               color: AppColors.primaryBlue,
             ),
-            const SizedBox(width: 7),
-            Text(
-              label,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF1E293B),
+            const SizedBox(width: 5),
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF1E293B),
+                ),
               ),
             ),
           ],

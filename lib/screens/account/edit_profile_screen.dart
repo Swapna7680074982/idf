@@ -70,7 +70,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       setState(() => _isSaving = true);
       try {
         final rawPhone = _phoneController.text.trim();
-        String countryCode = '+91';
+        String countryCode = '';
         String phoneNum = rawPhone;
         if (rawPhone.startsWith('+')) {
           final parts = rawPhone.split(' ');

@@ -1,4 +1,5 @@
 import 'application_item_model.dart';
+import '../services/api_config.dart';
 
 /// Certification Category returned by GET /api/certification/categories
 class CertificationCategory {
@@ -384,6 +385,7 @@ class EvidenceItem {
   final int? sectionId;
   String? filePath;
   String? fileName;
+  String? fileUrl;
 
   EvidenceItem({
     required this.id,
@@ -395,6 +397,7 @@ class EvidenceItem {
     this.sectionId,
     this.filePath,
     this.fileName,
+    this.fileUrl,
   });
 
   factory EvidenceItem.fromRequirement(CertificationEvidenceRequirement req) {
@@ -472,10 +475,19 @@ class CertificationApplicationModel {
   // Step 9: Declaration
   bool declarationAccepted;
 
-  // Submission metadata
+  // Submission metadata & API tracking
+  int? id;
   String? applicationId;
+  String? applicationNo;
   DateTime? submissionDate;
   String status;
+  String reviewStatus;
+  String displayStatus;
+  String decision;
+  String? decisionText;
+  List<CertificationTimelineStage>? timeline;
+  List<CertificationAiValidationCheck>? aiValidation;
+  List<CertificationMaterialItem>? materials;
 
   CertificationApplicationModel({
     this.categoryId,
@@ -517,9 +529,18 @@ class CertificationApplicationModel {
     this.receivesSponsorship,
     List<EvidenceItem>? evidenceItems,
     this.declarationAccepted = false,
+    this.id,
     this.applicationId,
+    this.applicationNo,
     this.submissionDate,
-    this.status = 'AI Audit',
+    this.status = 'Submitted',
+    this.reviewStatus = 'ai_audit',
+    this.displayStatus = 'Submitted',
+    this.decision = 'Pending',
+    this.decisionText,
+    this.timeline,
+    this.aiValidation,
+    this.materials,
   })  : detailFieldValues = detailFieldValues ?? {},
         questionAnswers = questionAnswers ?? {},
         evidenceItems = evidenceItems ?? [];
@@ -535,14 +556,540 @@ class CertificationApplicationModel {
     }
 
     return CertificationApplicationModel(
+      id: int.tryParse(item.id),
       institutionTypeId: item.institutionType,
       institutionTypeTitle: item.institutionType,
       categoryMaxScore: maxScore,
       passScore: pass,
       institutionName: item.institutionName,
       applicationId: item.certificateId.isNotEmpty ? item.certificateId : item.id,
+      applicationNo: item.certificateId.isNotEmpty ? item.certificateId : item.id,
       submissionDate: DateTime.tryParse(item.issuedDate),
       status: item.status,
+    );
+  }
+
+  Map<String, dynamic> toSubmissionJson() {
+    final Map<String, dynamic> qaMap = {};
+    questionAnswers.forEach((k, v) {
+      qaMap[k.toString()] = v;
+    });
+
+    final validEvidence = evidenceItems.where((e) =>
+      (e.fileUrl != null && e.fileUrl!.isNotEmpty) ||
+      (e.filePath != null && e.filePath!.isNotEmpty)
+    ).map((e) {
+      final reqId = int.tryParse(e.id) ?? 1;
+      final effectiveUrl = (e.fileUrl != null && e.fileUrl!.isNotEmpty)
+          ? e.fileUrl!
+          : (e.filePath ?? '');
+      final effectiveName = (e.fileName != null && e.fileName!.isNotEmpty)
+          ? e.fileName!
+          : 'evidence_doc';
+
+      return <String, dynamic>{
+        'id': reqId,
+        'requirement_id': reqId,
+        'title': e.title,
+        'file_name': effectiveName,
+        'file_url': effectiveUrl,
+        'evidence_kind': e.evidenceKind,
+        'source': 'upload',
+      };
+    }).toList();
+
+    return {
+      'category_id': categoryId ?? 1,
+      'institution_name': institutionName,
+      'institution_type': institutionTypeTitle.isNotEmpty ? institutionTypeTitle : 'Workplace / Worksite / Office / Hospital',
+      'address': address,
+      if (countryId != null) 'country_id': countryId,
+      'country': country,
+      if (regionId != null) 'region_id': regionId,
+      'region': regionState,
+      if (cityId != null) 'city_id': cityId,
+      'city': city,
+      'contact_person': contactPerson,
+      'contact_phone': contactPhone,
+      'contact_email': contactEmail,
+      'detail_fields': Map<String, dynamic>.from(detailFieldValues),
+      'question_answers': qaMap,
+      'evidence': validEvidence,
+      'declaration_accepted': declarationAccepted,
+    };
+  }
+
+  void updateFromApiResponse(Map<String, dynamic> data) {
+    Map<String, dynamic>? appMap;
+    if (data['application'] is Map<String, dynamic>) {
+      appMap = data['application'] as Map<String, dynamic>;
+    } else if (data['data'] is Map<String, dynamic>) {
+      final d = data['data'] as Map<String, dynamic>;
+      if (d['application'] is Map<String, dynamic>) {
+        appMap = d['application'] as Map<String, dynamic>;
+      } else {
+        appMap = d;
+      }
+    } else {
+      appMap = data;
+    }
+
+    // Extract ID (e.g. 2)
+    if (appMap.containsKey('id') && appMap['id'] != null) {
+      id = appMap['id'] is int ? appMap['id'] as int : int.tryParse(appMap['id'].toString());
+    } else if (appMap.containsKey('application_id') && appMap['application_id'] != null) {
+      final parsedId = int.tryParse(appMap['application_id'].toString());
+      if (parsedId != null && parsedId > 0) id = parsedId;
+    }
+    if (appMap['submission'] is Map && (appMap['submission'] as Map)['id'] != null) {
+      final parsedId = int.tryParse((appMap['submission'] as Map)['id'].toString());
+      if (parsedId != null && parsedId > 0) id = parsedId;
+    }
+
+    // Extract official Application Number (e.g. "APP-CERT-2026-0002")
+    if (appMap['application_no'] != null && appMap['application_no'].toString().trim().isNotEmpty) {
+      applicationNo = appMap['application_no'].toString().trim();
+      applicationId = applicationNo;
+    } else if (appMap['application_id'] != null) {
+      final appIdStr = appMap['application_id'].toString().trim();
+      if (applicationNo == null || applicationNo!.isEmpty || !applicationNo!.contains('-')) {
+        applicationId = appIdStr;
+        applicationNo = appIdStr;
+      }
+    }
+    if (appMap['submission'] is Map && (appMap['submission'] as Map)['application_id'] != null) {
+      final subAppId = (appMap['submission'] as Map)['application_id'].toString().trim();
+      if (subAppId.isNotEmpty && (applicationNo == null || applicationNo!.isEmpty || !applicationNo!.contains('-') || subAppId.contains('-'))) {
+        applicationId = subAppId;
+        applicationNo = applicationId;
+      }
+    }
+
+    if (appMap['status'] != null) {
+      status = appMap['status'].toString();
+    }
+    if (appMap['review_status'] != null) {
+      reviewStatus = appMap['review_status'].toString();
+    }
+    if (appMap['display_status'] != null) {
+      displayStatus = appMap['display_status'].toString();
+    } else if (reviewStatus == 'under_review' || status == 'under_review') {
+      displayStatus = 'In Review';
+    }
+
+    final subDetails = appMap['submission_details'] is Map ? appMap['submission_details'] as Map : null;
+    if (appMap['decision'] != null) {
+      decision = appMap['decision'].toString();
+    } else if (subDetails != null && subDetails['decision'] != null) {
+      decision = subDetails['decision']?.toString() ?? 'Pending';
+    }
+
+    if (appMap['decision_text'] != null) {
+      decisionText = appMap['decision_text'].toString();
+    } else if (subDetails != null && subDetails['decision_text'] != null) {
+      decisionText = subDetails['decision_text'].toString();
+    }
+
+    if (appMap['submitted_at'] != null) {
+      submissionDate = DateTime.tryParse(appMap['submitted_at'].toString()) ?? submissionDate;
+    } else if (subDetails != null && subDetails['submitted'] != null) {
+      submissionDate = DateTime.tryParse(subDetails['submitted'].toString()) ?? submissionDate;
+    } else if (appMap['submission'] is Map && (appMap['submission'] as Map)['submission_date'] != null) {
+      submissionDate = DateTime.tryParse((appMap['submission'] as Map)['submission_date'].toString()) ?? submissionDate;
+    }
+
+    if (appMap['timeline'] is List) {
+      timeline = (appMap['timeline'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map((e) => CertificationTimelineStage.fromJson(e))
+          .toList();
+    }
+    final rawAi = appMap['ai_audit'] ?? appMap['ai_validation'];
+    if (rawAi is List) {
+      aiValidation = rawAi
+          .whereType<Map<String, dynamic>>()
+          .map((e) => CertificationAiValidationCheck.fromJson(e))
+          .toList();
+    }
+    final rawMaterials = appMap['evidence'] ?? appMap['materials'];
+    if (rawMaterials is List) {
+      materials = rawMaterials
+          .whereType<Map<String, dynamic>>()
+          .map((e) => CertificationMaterialItem.fromJson(e))
+          .toList();
+    }
+  }
+}
+
+/// Timeline stage for certification workflow
+class CertificationTimelineStage {
+  final String stage;
+  final String label;
+  final String state; // 'completed', 'in_progress', 'pending'
+  final String? note;
+  final String? occurredAt;
+
+  const CertificationTimelineStage({
+    required this.stage,
+    required this.label,
+    required this.state,
+    this.note,
+    this.occurredAt,
+  });
+
+  factory CertificationTimelineStage.fromJson(Map<String, dynamic> json) {
+    return CertificationTimelineStage(
+      stage: json['stage']?.toString() ?? '',
+      label: json['label']?.toString() ?? '',
+      state: json['state']?.toString() ?? 'pending',
+      note: json['note']?.toString(),
+      occurredAt: json['occurred_at']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'stage': stage,
+    'label': label,
+    'state': state,
+    if (note != null) 'note': note,
+    if (occurredAt != null) 'occurred_at': occurredAt,
+  };
+}
+
+/// AI Validation check item
+class CertificationAiValidationCheck {
+  final String? check;
+  final String checkType;
+  final String label;
+  final String status; // 'pending', 'approved', 'rejected', 'changes_required'
+  final String? statusLabel;
+  final String? details;
+
+  const CertificationAiValidationCheck({
+    this.check,
+    required this.checkType,
+    required this.label,
+    required this.status,
+    this.statusLabel,
+    this.details,
+  });
+
+  factory CertificationAiValidationCheck.fromJson(Map<String, dynamic> json) {
+    final ct = json['check_type']?.toString() ?? json['check']?.toString() ?? '';
+    final lbl = json['label']?.toString() ?? _defaultLabelForType(ct);
+    final stat = json['status']?.toString() ?? 'pending';
+
+    return CertificationAiValidationCheck(
+      check: json['check']?.toString() ?? ct,
+      checkType: ct,
+      label: lbl,
+      status: stat,
+      statusLabel: json['status_label']?.toString() ?? (stat == 'approved' ? 'Approved' : 'Pending'),
+      details: json['details']?.toString(),
+    );
+  }
+
+  static String _defaultLabelForType(String type) {
+    switch (type.toLowerCase()) {
+      case 'evidence_review':
+        return 'Evidence Review';
+      case 'image_location_validation':
+        return 'Image Location Validation';
+      case 'detail_evidence_match':
+        return 'Detail Evidence Match';
+      case 'overall':
+        return 'Overall';
+      default:
+        return type.replaceAll('_', ' ').toUpperCase();
+    }
+  }
+
+  Map<String, dynamic> toJson() => {
+    if (check != null) 'check': check,
+    'check_type': checkType,
+    'label': label,
+    'status': status,
+    if (statusLabel != null) 'status_label': statusLabel,
+    if (details != null) 'details': details,
+  };
+}
+
+/// Material / uploaded evidence item returned by GET application details
+class CertificationMaterialItem {
+  final dynamic id;
+  final dynamic requirementId;
+  final String title;
+  final String name;
+  final String kind;
+  final String source;
+  final double? latitude;
+  final double? longitude;
+  final String? capturedAt;
+  final String aiStatus;
+  final String? aiNote;
+  final String url;
+
+  const CertificationMaterialItem({
+    required this.id,
+    this.requirementId,
+    required this.title,
+    required this.name,
+    required this.kind,
+    required this.source,
+    this.latitude,
+    this.longitude,
+    this.capturedAt,
+    required this.aiStatus,
+    this.aiNote,
+    required this.url,
+  });
+
+  factory CertificationMaterialItem.fromJson(Map<String, dynamic> json) {
+    final rawUrl = json['url']?.toString() ??
+        json['file_url']?.toString() ??
+        (json['file'] is Map ? (json['file'] as Map)['url']?.toString() : null) ??
+        '';
+    final resolvedUrl = ApiConfig.resolveImageUrl(rawUrl) ?? rawUrl;
+
+    final rawName = json['name']?.toString() ??
+        json['file_name']?.toString() ??
+        (json['file'] is Map ? (json['file'] as Map)['name']?.toString() : null) ??
+        '';
+
+    return CertificationMaterialItem(
+      id: json['id'],
+      requirementId: json['requirement_id'],
+      title: json['title']?.toString() ?? '',
+      name: rawName,
+      kind: json['kind']?.toString() ?? json['evidence_kind']?.toString() ?? 'photo',
+      source: json['source']?.toString() ?? 'upload',
+      latitude: json['latitude'] is num ? (json['latitude'] as num).toDouble() : null,
+      longitude: json['longitude'] is num ? (json['longitude'] as num).toDouble() : null,
+      capturedAt: json['captured_at']?.toString(),
+      aiStatus: json['ai_status']?.toString() ?? 'pending',
+      aiNote: json['ai_note']?.toString(),
+      url: resolvedUrl,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'requirement_id': requirementId,
+    'title': title,
+    'name': name,
+    'kind': kind,
+    'source': source,
+    'latitude': latitude,
+    'longitude': longitude,
+    'captured_at': capturedAt,
+    'ai_status': aiStatus,
+    if (aiNote != null) 'ai_note': aiNote,
+    'url': url,
+  };
+}
+
+/// Institution info in certification application
+class CertificationInstitution {
+  final String name;
+  final int? categoryId;
+  final String category;
+  final String address;
+  final int? countryId;
+  final String country;
+  final int? regionId;
+  final String region;
+  final int? cityId;
+  final String city;
+  final String contactPerson;
+  final String contactEmail;
+  final String contactPhone;
+
+  const CertificationInstitution({
+    required this.name,
+    this.categoryId,
+    required this.category,
+    required this.address,
+    this.countryId,
+    required this.country,
+    this.regionId,
+    required this.region,
+    this.cityId,
+    required this.city,
+    required this.contactPerson,
+    required this.contactEmail,
+    required this.contactPhone,
+  });
+
+  factory CertificationInstitution.fromJson(Map<String, dynamic> json) {
+    return CertificationInstitution(
+      name: json['name']?.toString() ?? '',
+      categoryId: json['category_id'] is int ? json['category_id'] as int : int.tryParse(json['category_id']?.toString() ?? ''),
+      category: json['category']?.toString() ?? '',
+      address: json['address']?.toString() ?? '',
+      countryId: json['country_id'] is int ? json['country_id'] as int : int.tryParse(json['country_id']?.toString() ?? ''),
+      country: json['country']?.toString() ?? '',
+      regionId: json['region_id'] is int ? json['region_id'] as int : int.tryParse(json['region_id']?.toString() ?? ''),
+      region: json['region']?.toString() ?? '',
+      cityId: json['city_id'] is int ? json['city_id'] as int : int.tryParse(json['city_id']?.toString() ?? ''),
+      city: json['city']?.toString() ?? '',
+      contactPerson: json['contact_person']?.toString() ?? '',
+      contactEmail: json['contact_email']?.toString() ?? '',
+      contactPhone: json['contact_phone']?.toString() ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'category_id': categoryId,
+    'category': category,
+    'address': address,
+    'country_id': countryId,
+    'country': country,
+    'region_id': regionId,
+    'region': region,
+    'city_id': cityId,
+    'city': city,
+    'contact_person': contactPerson,
+    'contact_email': contactEmail,
+    'contact_phone': contactPhone,
+  };
+}
+
+/// Submission details block
+class CertificationSubmissionDetails {
+  final String applicationId;
+  final String? submitted;
+  final String? lastUpdated;
+  final String currentStatus;
+  final String displayStatus;
+  final String? decision;
+
+  const CertificationSubmissionDetails({
+    required this.applicationId,
+    this.submitted,
+    this.lastUpdated,
+    required this.currentStatus,
+    required this.displayStatus,
+    this.decision,
+  });
+
+  factory CertificationSubmissionDetails.fromJson(Map<String, dynamic> json) {
+    return CertificationSubmissionDetails(
+      applicationId: json['application_id']?.toString() ?? '',
+      submitted: json['submitted']?.toString(),
+      lastUpdated: json['last_updated']?.toString(),
+      currentStatus: json['current_status']?.toString() ?? '',
+      displayStatus: json['display_status']?.toString() ?? '',
+      decision: json['decision']?.toString(),
+    );
+  }
+}
+
+/// Complete dossier returned by GET /api/applications/certificates/{id}
+class CertificationApplicationDetail {
+  final int id;
+  final String applicationId;
+  final String applicationNo;
+  final String applicationType;
+  final String status;
+  final String reviewStatus;
+  final String displayStatus;
+  final String decision;
+  final String? decisionText;
+  final bool editable;
+  final int currentStep;
+  final int totalSteps;
+  final String? submittedAt;
+  final String? decisionAt;
+  final String? reviewerComment;
+  final String? adminComment;
+  final String? aiValidationComment;
+  final CertificationInstitution? institution;
+  final CertificationSubmissionDetails? submissionDetails;
+  final List<CertificationTimelineStage> timeline;
+  final List<CertificationAiValidationCheck> aiValidation;
+  final List<CertificationMaterialItem> materials;
+
+  const CertificationApplicationDetail({
+    required this.id,
+    required this.applicationId,
+    required this.applicationNo,
+    required this.applicationType,
+    required this.status,
+    required this.reviewStatus,
+    required this.displayStatus,
+    required this.decision,
+    this.decisionText,
+    required this.editable,
+    required this.currentStep,
+    required this.totalSteps,
+    this.submittedAt,
+    this.decisionAt,
+    this.reviewerComment,
+    this.adminComment,
+    this.aiValidationComment,
+    this.institution,
+    this.submissionDetails,
+    this.timeline = const [],
+    this.aiValidation = const [],
+    this.materials = const [],
+  });
+
+  factory CertificationApplicationDetail.fromJson(Map<String, dynamic> json) {
+    final tRaw = json['timeline'];
+    List<CertificationTimelineStage> stages = [];
+    if (tRaw is List) {
+      stages = tRaw
+          .whereType<Map<String, dynamic>>()
+          .map((e) => CertificationTimelineStage.fromJson(e))
+          .toList();
+    }
+
+    final aiRaw = json['ai_validation'];
+    List<CertificationAiValidationCheck> checks = [];
+    if (aiRaw is List) {
+      checks = aiRaw
+          .whereType<Map<String, dynamic>>()
+          .map((e) => CertificationAiValidationCheck.fromJson(e))
+          .toList();
+    }
+
+    final mRaw = json['materials'] ?? json['supporting_material'] ?? json['evidence'];
+    List<CertificationMaterialItem> mats = [];
+    if (mRaw is List) {
+      mats = mRaw
+          .whereType<Map<String, dynamic>>()
+          .map((e) => CertificationMaterialItem.fromJson(e))
+          .toList();
+    }
+
+    return CertificationApplicationDetail(
+      id: json['id'] is int ? json['id'] as int : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+      applicationId: json['application_id']?.toString() ?? '',
+      applicationNo: json['application_no']?.toString() ?? json['application_id']?.toString() ?? '',
+      applicationType: json['application_type']?.toString() ?? 'new',
+      status: json['status']?.toString() ?? 'Submitted',
+      reviewStatus: json['review_status']?.toString() ?? 'ai_audit',
+      displayStatus: json['display_status']?.toString() ?? 'Submitted',
+      decision: json['decision']?.toString() ?? 'Pending',
+      decisionText: json['decision_text']?.toString() ?? 'Pending',
+      editable: json['editable'] == true,
+      currentStep: json['current_step'] is int ? json['current_step'] as int : 4,
+      totalSteps: json['total_steps'] is int ? json['total_steps'] as int : 4,
+      submittedAt: json['submitted_at']?.toString(),
+      decisionAt: json['decision_at']?.toString(),
+      reviewerComment: json['reviewer_comment']?.toString(),
+      adminComment: json['admin_comment']?.toString(),
+      aiValidationComment: json['ai_validation_comment']?.toString(),
+      institution: json['institution'] is Map<String, dynamic>
+          ? CertificationInstitution.fromJson(json['institution'] as Map<String, dynamic>)
+          : null,
+      submissionDetails: json['submission_details'] is Map<String, dynamic>
+          ? CertificationSubmissionDetails.fromJson(json['submission_details'] as Map<String, dynamic>)
+          : null,
+      timeline: stages,
+      aiValidation: checks,
+      materials: mats,
     );
   }
 }

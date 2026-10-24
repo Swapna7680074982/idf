@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
@@ -292,13 +293,60 @@ class _Step6MaterialsState extends State<Step6Materials> {
             widget.model.materials.add({
               'name': uploaded.originalName.isNotEmpty ? uploaded.originalName : f.name,
               'url': effectiveUrl,
-              'mime_type': uploaded.mimeType.isNotEmpty ? uploaded.mimeType : 'application/pdf',
+              'mime_type': uploaded.mimeType.isNotEmpty ? uploaded.mimeType : 'image/jpeg',
             });
           } catch (_) {}
         }
       }
     } catch (e) {
       _pickSupportingDocument(ImageSource.gallery);
+    } finally {
+      if (mounted) setState(() => _isUploadingDoc = false);
+    }
+  }
+
+  Future<void> _pickFileDocuments() async {
+    setState(() => _isUploadingDoc = true);
+    try {
+      final List<PlatformFile> files = await FilePicker.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
+      );
+      if (files.isNotEmpty) {
+        for (final f in files) {
+          if (f.path != null) {
+            if (!_uploadedFiles.contains(f.name)) {
+              setState(() {
+                _uploadedFiles.add(f.name);
+              });
+            }
+            try {
+              final uploaded = await FilesService.uploadFile(File(f.path!));
+              if (!widget.model.supportingFileIds.contains(uploaded.id)) {
+                widget.model.supportingFileIds.add(uploaded.id);
+              }
+              final effectiveUrl = uploaded.url.isNotEmpty
+                  ? uploaded.url
+                  : (ApiConfig.resolveImageUrl(uploaded.storageUrl) ?? uploaded.storageUrl);
+              final ext = f.extension?.toLowerCase();
+              final mime = ext == 'pdf'
+                  ? 'application/pdf'
+                  : (ext == 'doc' || ext == 'docx')
+                      ? 'application/msword'
+                      : uploaded.mimeType.isNotEmpty
+                          ? uploaded.mimeType
+                          : 'application/octet-stream';
+              widget.model.materials.add({
+                'name': uploaded.originalName.isNotEmpty ? uploaded.originalName : f.name,
+                'url': effectiveUrl,
+                'mime_type': mime,
+              });
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error picking files: $e');
     } finally {
       if (mounted) setState(() => _isUploadingDoc = false);
     }
@@ -612,7 +660,7 @@ class _Step6MaterialsState extends State<Step6Materials> {
                               },
                               borderRadius: BorderRadius.circular(14),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 18),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(14),
@@ -621,8 +669,8 @@ class _Step6MaterialsState extends State<Step6Materials> {
                                 child: Column(
                                   children: [
                                     Container(
-                                      width: 48,
-                                      height: 48,
+                                      width: 44,
+                                      height: 44,
                                       decoration: const BoxDecoration(
                                         color: Color(0xFFE0F2FE),
                                         shape: BoxShape.circle,
@@ -630,17 +678,17 @@ class _Step6MaterialsState extends State<Step6Materials> {
                                       child: const Icon(
                                         Icons.camera_alt_rounded,
                                         color: AppColors.primaryBlue,
-                                        size: 24,
+                                        size: 22,
                                       ),
                                     ),
-                                    const SizedBox(height: 10),
-                                    Text('Camera', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600)),
+                                    const SizedBox(height: 8),
+                                    Text('Camera', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
                                   ],
                                 ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: InkWell(
                               onTap: () {
@@ -649,7 +697,7 @@ class _Step6MaterialsState extends State<Step6Materials> {
                               },
                               borderRadius: BorderRadius.circular(14),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 18),
+                                padding: const EdgeInsets.symmetric(vertical: 16),
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFF8FAFC),
                                   borderRadius: BorderRadius.circular(14),
@@ -658,8 +706,8 @@ class _Step6MaterialsState extends State<Step6Materials> {
                                 child: Column(
                                   children: [
                                     Container(
-                                      width: 48,
-                                      height: 48,
+                                      width: 44,
+                                      height: 44,
                                       decoration: const BoxDecoration(
                                         color: Color(0xFFFEF3C7),
                                         shape: BoxShape.circle,
@@ -667,11 +715,48 @@ class _Step6MaterialsState extends State<Step6Materials> {
                                       child: const Icon(
                                         Icons.photo_library_rounded,
                                         color: Color(0xFFD97706),
-                                        size: 24,
+                                        size: 22,
                                       ),
                                     ),
-                                    const SizedBox(height: 10),
-                                    Text('Files / Photos', style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600)),
+                                    const SizedBox(height: 8),
+                                    Text('Photos', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.pop(ctx);
+                                _pickFileDocuments();
+                              },
+                              borderRadius: BorderRadius.circular(14),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Container(
+                                      width: 44,
+                                      height: 44,
+                                      decoration: const BoxDecoration(
+                                        color: Color(0xFFF1F5F9),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.description_rounded,
+                                        color: Color(0xFF475569),
+                                        size: 22,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text('PDF / Docs', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
                                   ],
                                 ),
                               ),

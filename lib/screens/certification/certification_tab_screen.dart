@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme.dart';
 import '../../models/application_item_model.dart';
-import '../../models/certification_model.dart';
+import '../../services/certification_service.dart';
+import '../applications/certificate_view_screen.dart';
+import 'certification_details_screen.dart';
 import 'certification_wizard_screen.dart';
 
 class CertificationTabScreen extends StatefulWidget {
@@ -18,10 +20,52 @@ class CertificationTabScreen extends StatefulWidget {
 }
 
 class _CertificationTabScreenState extends State<CertificationTabScreen> {
-  Future<void> _handleRefresh() async {
-    if (widget.onRefresh != null) {
-      await widget.onRefresh!();
+  CertificateApplicationItem? _latestApp;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchLatestApplication();
+  }
+
+  Future<void> _fetchLatestApplication() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final certs = await CertificationService.getMyCertificateApplications();
+      if (mounted) {
+        final items = certs
+            .map((c) => CertificateApplicationItem.fromJson(c))
+            .toList();
+        // Sort latest first (by id descending or date descending)
+        items.sort((a, b) {
+          final idA = int.tryParse(a.id) ?? 0;
+          final idB = int.tryParse(b.id) ?? 0;
+          return idB.compareTo(idA);
+        });
+
+        setState(() {
+          _latestApp = items.isNotEmpty ? items.first : null;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
+  }
+
+  Future<void> _handleRefresh() async {
+    await Future.wait([
+      if (widget.onRefresh != null) widget.onRefresh!(),
+      _fetchLatestApplication(),
+    ]);
   }
 
 
@@ -72,7 +116,12 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
             ),
             const SizedBox(height: 12),
 
-            _buildCurrentApplicationCard(context),
+            if (_isLoading)
+              _buildLoadingCard()
+            else if (_latestApp != null)
+              _buildCurrentApplicationCard(context, _latestApp!)
+            else
+              _buildEmptyApplicationCard(context),
             const SizedBox(height: 24),
           ],
         ),
@@ -181,28 +230,45 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
   }
 
 
-  Widget _buildCurrentApplicationCard(BuildContext context) {
+  Widget _buildCurrentApplicationCard(
+      BuildContext context, CertificateApplicationItem app) {
+    final statusText = app.displayReviewStatus;
+    final isApproved = app.isApproved;
+    final isChangesRequired = statusText.toLowerCase().contains('changes');
+    final isReview = statusText.toLowerCase().contains('review') ||
+        statusText.toLowerCase().contains('audit');
+
+    Color statusBg = const Color(0xFFE0F2FE);
+    Color statusFg = const Color(0xFF0284C7);
+    if (isApproved) {
+      statusBg = const Color(0xFFDCFCE7);
+      statusFg = const Color(0xFF16A34A);
+    } else if (isReview) {
+      statusBg = const Color(0xFFFEF3C7);
+      statusFg = const Color(0xFFD97706);
+    } else if (isChangesRequired) {
+      statusBg = const Color(0xFFFEE2E2);
+      statusFg = const Color(0xFFDC2626);
+    }
+
     return InkWell(
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => CertificationWizardScreen(
-              initialModel:
-                  CertificationApplicationModel.prefilledForCertificate(
-                const CertificateApplicationItem(
-                  id: '2',
-                  institutionName: 'Lagos State University',
-                  institutionType: 'College / University',
-                  certificateId: '',
-                  issuedDate: '01 Sep 2025',
-                  expiresDate: '01 Sep 2027',
-                  status: 'Changes Required',
-                  score: '7/10',
-                ),
+        if (isApproved && app.hasCertificate) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => CertificateViewScreen(certificate: app),
+            ),
+          );
+        } else {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => CertificationDetailsScreen(
+                applicationId: app.id.isNotEmpty ? app.id : app.applicationNo,
+                certificateItem: app,
               ),
             ),
-          ),
-        );
+          );
+        }
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
@@ -226,13 +292,16 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF3C7),
+                color: isReview
+                    ? const Color(0xFFFEF3C7)
+                    : (isApproved ? const Color(0xFFDCFCE7) : const Color(0xFFE0F2FE)),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: const Icon(
-                Icons.apartment_rounded,
-                color: Color(0xFFD97706),
-                size: 26,
+              child: Center(
+                child: Text(
+                  isApproved ? '🏅' : '🏢',
+                  style: const TextStyle(fontSize: 24),
+                ),
               ),
             ),
             const SizedBox(width: 14),
@@ -241,40 +310,62 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Lagos State University',
+                    app.institutionName.isNotEmpty
+                        ? app.institutionName
+                        : 'Institution Application',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: GoogleFonts.inter(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
                     ),
                   ),
+                  if (app.institutionType.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      app.institutionType,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Text(
-                        'STATUS: ',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF64748B),
-                        ),
-                      ),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 2.5),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEE2E2),
+                          color: statusBg,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          'Changes Required',
+                          statusText,
                           style: GoogleFonts.inter(
                             fontSize: 10.5,
                             fontWeight: FontWeight.w700,
-                            color: const Color(0xFFDC2626),
+                            color: statusFg,
                           ),
                         ),
                       ),
+                      if (app.applicationNo.isNotEmpty) ...[
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            app.applicationNo,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: const Color(0xFF94A3B8),
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ],
@@ -287,6 +378,75 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: const Center(
+        child: SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: AppColors.primaryBlue,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyApplicationCard(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.info_outline_rounded,
+                color: Color(0xFF64748B), size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'No Applications Yet',
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Tap "Apply for Certification" above to submit your institution.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

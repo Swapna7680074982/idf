@@ -10,6 +10,7 @@ import 'certificate_view_screen.dart';
 import 'expired_certificate_details_screen.dart';
 import 'program_application_details_screen.dart';
 import '../../services/programs_service.dart';
+import '../../services/certification_service.dart';
 
 class MyApplicationsScreen extends StatefulWidget {
   final int initialTabIndex; // 0: Programs, 1: Certificates
@@ -52,14 +53,46 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   ];
 
   List<ProgramApplicationItem> _programs = [];
-  final List<CertificateApplicationItem> _certificates = [];
+  List<CertificateApplicationItem> _certificates = [];
   bool _isLoadingPrograms = false;
+  bool _isLoadingCertificates = false;
 
   @override
   void initState() {
     super.initState();
     _selectedTab = widget.initialTabIndex;
     _fetchMyProgramApplications();
+    _fetchMyCertificateApplications();
+  }
+
+  Future<void> _fetchMyCertificateApplications() async {
+    setState(() {
+      _isLoadingCertificates = true;
+    });
+
+    try {
+      final certs = await CertificationService.getMyCertificateApplications();
+      if (mounted) {
+        final items = certs
+            .map((c) => CertificateApplicationItem.fromJson(c))
+            .toList();
+        items.sort((a, b) {
+          final idA = int.tryParse(a.id) ?? 0;
+          final idB = int.tryParse(b.id) ?? 0;
+          return idB.compareTo(idA);
+        });
+        setState(() {
+          _certificates = items;
+          _isLoadingCertificates = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoadingCertificates = false;
+        });
+      }
+    }
   }
 
   Future<void> _fetchMyProgramApplications() async {
@@ -130,7 +163,19 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         if (!matchesName && !matchesId) return false;
       }
       if (_selectedCertFilter != 'All') {
-        if (item.status.toLowerCase() != _selectedCertFilter.toLowerCase()) {
+        final filter = _selectedCertFilter.toLowerCase();
+        final stat = item.status.toLowerCase();
+        final rev = item.reviewStatus.toLowerCase();
+        final disp = item.displayReviewStatus.toLowerCase();
+        if (filter == 'submitted') {
+          final isSub = stat == 'submitted' ||
+              stat == 'under_review' ||
+              rev == 'manual_review' ||
+              rev == 'ai_audit' ||
+              disp.contains('review') ||
+              disp.contains('submitted');
+          if (!isSub) return false;
+        } else if (stat != filter && rev != filter && disp != filter) {
           return false;
         }
       }
@@ -661,35 +706,63 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
 
   // 2. Certificates Tab List (Screen 38)
   Widget _buildCertificatesList() {
-    final items = _filteredCertificates;
-
-    if (items.isEmpty) {
-      return Center(
-        child: Text(
-          'No certificates found.',
-          style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
-        ),
+    if (_isLoadingCertificates && _certificates.isEmpty) {
+      return const Center(
+        child: CircularProgressIndicator(color: AppColors.primaryBlue),
       );
     }
 
-    return ListView.builder(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 4.0),
-      itemCount: items.length,
-      itemBuilder: (context, index) {
-        final item = items[index];
-        return _buildCertificateCard(item);
-      },
+    final items = _filteredCertificates;
+
+    return RefreshIndicator(
+      onRefresh: _fetchMyCertificateApplications,
+      color: AppColors.primaryBlue,
+      child: items.isEmpty
+          ? ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                SizedBox(height: MediaQuery.of(context).size.height * 0.25),
+                Center(
+                  child: Text(
+                    'No certificates found.',
+                    style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
+                  ),
+                ),
+              ],
+            )
+          : ListView.builder(
+              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+              padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 4.0),
+              itemCount: items.length,
+              itemBuilder: (context, index) {
+                final item = items[index];
+                return _buildCertificateCard(item);
+              },
+            ),
     );
   }
 
   Widget _buildCertificateCard(CertificateApplicationItem item) {
-    final isExpired = item.status == 'Expired';
-    final isChangesRequired = item.status == 'Changes Required';
+    final isExpired = item.status.toLowerCase() == 'expired';
+    final isChangesRequired = item.status.toLowerCase() == 'changes required' ||
+        item.status.toLowerCase() == 'changes_required';
+    final isApproved = item.isApproved && item.certificateId.isNotEmpty;
 
     void openCert() {
-      if (isExpired || isChangesRequired) {
-        // Direct edit screen with prefilled data (no middle screen required)
+      if (isApproved) {
+        // Only if approved/certified with an issued certificate, show CertificateViewScreen!
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CertificateViewScreen(certificate: item),
+          ),
+        );
+      } else if (isExpired) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ExpiredCertificateDetailsScreen(certificate: item),
+          ),
+        );
+      } else if (isChangesRequired) {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => CertificationWizardScreen(
@@ -699,9 +772,13 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
           ),
         );
       } else {
+        // Submitted, In Review, AI Audit, etc. -> Show Application Details / Tracking screen!
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => CertificateViewScreen(certificate: item),
+            builder: (_) => CertificationDetailsScreen(
+              applicationId: item.id.isNotEmpty ? item.id : item.applicationNo,
+              certificateItem: item,
+            ),
           ),
         );
       }
@@ -714,19 +791,19 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
             builder: (_) => ExpiredCertificateDetailsScreen(certificate: item),
           ),
         );
-      } else if (isChangesRequired) {
+      } else if (isApproved) {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => CertificationDetailsScreen(
-              application:
-                  CertificationApplicationModel.prefilledForCertificate(item),
-            ),
+            builder: (_) => CertificateViewScreen(certificate: item),
           ),
         );
       } else {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => CertificateViewScreen(certificate: item),
+            builder: (_) => CertificationDetailsScreen(
+              applicationId: item.id.isNotEmpty ? item.id : item.applicationNo,
+              certificateItem: item,
+            ),
           ),
         );
       }
@@ -793,7 +870,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                     ),
                                   ),
                                   const SizedBox(width: 6),
-                                  _buildCertBadge(item.status),
+                                  _buildCertBadge(item.displayReviewStatus),
                                 ],
                               ),
                               const SizedBox(height: 3),
@@ -802,15 +879,23 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xFFE0F2FE),
+                                      color: isApproved
+                                          ? const Color(0xFFE0F2FE)
+                                          : (item.displayReviewStatus.toLowerCase().contains('review')
+                                              ? const Color(0xFFFEF3C7)
+                                              : const Color(0xFFF1F5F9)),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
                                     child: Text(
-                                      'IDF ACTIVE',
+                                      isApproved ? 'IDF ACTIVE' : item.displayReviewStatus.toUpperCase(),
                                       style: GoogleFonts.inter(
                                         fontSize: 9.5,
                                         fontWeight: FontWeight.w700,
-                                        color: AppColors.primaryBlue,
+                                        color: isApproved
+                                            ? AppColors.primaryBlue
+                                            : (item.displayReviewStatus.toLowerCase().contains('review')
+                                                ? const Color(0xFFB45309)
+                                                : const Color(0xFF64748B)),
                                         letterSpacing: 0.5,
                                       ),
                                     ),
@@ -831,7 +916,9 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                               ),
                               const SizedBox(height: 3),
                               Text(
-                                'Certificate ID: ${item.certificateId}',
+                                isApproved
+                                    ? 'Certificate ID: ${item.certificateId}'
+                                    : 'Application No: ${item.applicationNo.isNotEmpty ? item.applicationNo : item.id}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.inter(
@@ -875,7 +962,9 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                             ? 'Renew Certificate'
                                             : isChangesRequired
                                                 ? 'Edit Application'
-                                                : 'View Certificate',
+                                                : isApproved
+                                                    ? 'View Certificate'
+                                                    : 'View Details',
                                         style: GoogleFonts.inter(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w700,
@@ -931,18 +1020,19 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     Color border = const Color(0xFFE2E8F0);
 
     final s = status.trim().toLowerCase();
-    if (s == 'active' || s == 'approved' || s == 'completed') {
+    if (s == 'active' || s == 'approved' || s == 'completed' || s == 'certified') {
       bg = const Color(0xFFDCFCE7);
       text = const Color(0xFF16A34A);
       border = const Color(0xFF86EFAC);
-    } else if (s == 'in review' || s == 'pending' || s == 'under review') {
+    } else if (s.contains('manual') ||
+        s.contains('review') ||
+        s == 'pending' ||
+        s == 'under_review' ||
+        s == 'submitted' ||
+        s == 'ai_audit') {
       bg = const Color(0xFFFEF3C7);
       text = const Color(0xFFB45309);
       border = const Color(0xFFFDE68A);
-    } else if (s == 'submitted') {
-      bg = const Color(0xFFE0F2FE);
-      text = const Color(0xFF0284C7);
-      border = const Color(0xFFBAE6FD);
     } else if (s.contains('changes') || s == 'changes required') {
       bg = const Color(0xFFFFEDD5);
       text = const Color(0xFFC2410C);
@@ -953,6 +1043,10 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       border = const Color(0xFFFCA5A5);
     }
 
+    final displayLabel = (s == 'submitted' || s == 'ai_audit' || s == 'under_review' || s == 'manual_review')
+        ? 'Manual Review'
+        : status;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
@@ -961,7 +1055,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         border: Border.all(color: border, width: 1.0),
       ),
       child: Text(
-        status,
+        displayLabel,
         style: GoogleFonts.inter(
           fontSize: 11,
           fontWeight: FontWeight.w700,

@@ -14,6 +14,9 @@ import 'programs/submission/submit_program_wizard_screen.dart';
 import 'programs/widgets/program_status_pill.dart';
 import 'certification/certification_tab_screen.dart';
 import 'certification/certification_wizard_screen.dart';
+import 'certification/certification_details_screen.dart';
+import 'applications/certificate_view_screen.dart';
+import 'applications/expired_certificate_details_screen.dart';
 import '../models/certification_model.dart';
 import '../models/application_item_model.dart';
 import '../models/home_models.dart';
@@ -489,7 +492,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   title: 'Apply for IDF Active',
                   subtitle: 'Get certified today',
                   onTap: () {
-                    _switchTab(2);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const CertificationWizardScreen(),
+                      ),
+                    );
                   },
                 ),
               ),
@@ -573,7 +580,9 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               GestureDetector(
                 onTap: () {
-                  _switchTab(2);
+                  setState(() {
+                    _currentTabIndex = 2;
+                  });
                 },
                 child: Text(
                   'View',
@@ -1212,33 +1221,39 @@ class _HomeScreenState extends State<HomeScreen> {
     if (cert == null) {
       return InkWell(
         onTap: () {
-          _switchTab(2);
+          setState(() {
+            _currentTabIndex = 2; // Switch to IDF Active tab
+          });
         },
         borderRadius: BorderRadius.circular(16),
         child: Container(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border, width: 1.1),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(4),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: Row(
             children: [
               Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
-                  borderRadius: BorderRadius.circular(14),
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFE0F2FE),
+                  shape: BoxShape.circle,
                 ),
                 child: const Center(
-                  child: Text(
-                    '🏅',
-                    style: TextStyle(fontSize: 24),
-                  ),
+                  child: Text('🏅', style: TextStyle(fontSize: 22)),
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1248,44 +1263,44 @@ class _HomeScreenState extends State<HomeScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
-                        fontSize: 14.5,
+                        fontSize: 14,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
+                        letterSpacing: -0.2,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Get your institution certified today',
+                      'Get your institution accredited today',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
-                        fontSize: 12,
+                        fontSize: 11,
                         color: const Color(0xFF64748B),
                       ),
                     ),
-                    const SizedBox(height: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE0F2FE),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        'Apply Now',
-                        style: GoogleFonts.inter(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFF0284C7),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Apply Now',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.primaryBlue,
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 4),
+                        const Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 13,
+                          color: AppColors.primaryBlue,
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ),
-              const Icon(
-                Icons.arrow_forward_rounded,
-                color: AppColors.primaryBlue,
-                size: 20,
               ),
             ],
           ),
@@ -1299,113 +1314,252 @@ class _HomeScreenState extends State<HomeScreen> {
     final catName = cert.category?.isNotEmpty == true
         ? cert.category!
         : user.organizationType;
-    final statusText = cert.displayStatus?.isNotEmpty == true
-        ? cert.displayStatus!
-        : 'Submitted';
-    final appNo = cert.applicationNo ?? '';
+    final appNo = cert.applicationNo ?? (cert.applicationId != null ? 'APP-CERT-2026-${cert.applicationId!.toString().padLeft(4, '0')}' : '');
+    final rawStatus = cert.displayStatus ?? 'Submitted';
 
-    return InkWell(
-      onTap: () {
+    final item = CertificateApplicationItem(
+      id: cert.applicationId?.toString() ?? '',
+      institutionName: instName,
+      institutionType: catName,
+      certificateId: cert.certificateId != null ? cert.certificateId.toString() : '',
+      applicationNo: appNo,
+      issuedDate: '',
+      expiresDate: cert.expiresOn ?? '',
+      status: rawStatus,
+      reviewStatus: rawStatus,
+      displayStatus: rawStatus,
+      score: '',
+    );
+
+    final isExpired = item.status.toLowerCase() == 'expired';
+    final isChangesRequired = item.status.toLowerCase() == 'changes required' ||
+        item.status.toLowerCase() == 'changes_required';
+    final isApproved = item.isApproved && item.certificateId.isNotEmpty;
+
+    void openCert() {
+      if (isApproved) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CertificateViewScreen(certificate: item),
+          ),
+        );
+      } else if (isExpired) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ExpiredCertificateDetailsScreen(certificate: item),
+          ),
+        );
+      } else if (isChangesRequired) {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => CertificationWizardScreen(
               initialModel:
-                  CertificationApplicationModel.prefilledForCertificate(
-                CertificateApplicationItem(
-                  id: cert.applicationId?.toString() ?? '1',
-                  institutionName: instName,
-                  institutionType: catName,
-                  certificateId: appNo,
-                  issuedDate: '',
-                  expiresDate: cert.expiresOn ?? '',
-                  status: statusText,
-                  score: '',
-                ),
-              ),
+                  CertificationApplicationModel.prefilledForCertificate(item),
             ),
           ),
         );
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
+      } else {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CertificationDetailsScreen(
+              applicationId: item.id.isNotEmpty ? item.id : item.applicationNo,
+              certificateItem: item,
+            ),
+          ),
+        );
+      }
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(4),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border, width: 1.1),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 50,
-              height: 50,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFEF3C7),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Center(
-                child: Text(
-                  '🏅',
-                  style: TextStyle(fontSize: 24),
+          onTap: openCert,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE0F2FE),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Center(
+                    child: Text('🏅', style: TextStyle(fontSize: 22)),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    instName.isNotEmpty ? instName : 'Certification Application',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  if (catName.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      catName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        color: const Color(0xFF64748B),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              item.institutionName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          _buildCertBadge(item.displayReviewStatus),
+                        ],
                       ),
-                    ),
-                  ],
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: statusText.toLowerCase().contains('submit') || statusText.toLowerCase().contains('approv')
-                          ? const Color(0xFFE0F2FE)
-                          : const Color(0xFFFEE2E2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      statusText,
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: statusText.toLowerCase().contains('submit') || statusText.toLowerCase().contains('approv')
-                            ? const Color(0xFF0284C7)
-                            : const Color(0xFFDC2626),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isApproved
+                                  ? const Color(0xFFE0F2FE)
+                                  : (item.displayReviewStatus.toLowerCase().contains('review')
+                                      ? const Color(0xFFFEF3C7)
+                                      : const Color(0xFFF1F5F9)),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              isApproved ? 'IDF ACTIVE' : item.displayReviewStatus.toUpperCase(),
+                              style: GoogleFonts.inter(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.w700,
+                                color: isApproved
+                                    ? AppColors.primaryBlue
+                                    : (item.displayReviewStatus.toLowerCase().contains('review')
+                                        ? const Color(0xFFB45309)
+                                        : const Color(0xFF64748B)),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              item.institutionType,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: const Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
+                      const SizedBox(height: 3),
+                      Text(
+                        isApproved
+                            ? 'Certificate ID: ${item.certificateId}'
+                            : 'Application No: ${item.applicationNo.isNotEmpty ? item.applicationNo : (item.id.isNotEmpty ? item.id : 'APP-CERT-2026-0001')}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            isApproved ? 'View Certificate' : 'View Details',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primaryBlue,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 13,
+                            color: AppColors.primaryBlue,
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-            const Icon(
-              Icons.arrow_forward_rounded,
-              color: AppColors.primaryBlue,
-              size: 20,
-            ),
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCertBadge(String status) {
+    Color bg = const Color(0xFFF1F5F9);
+    Color text = const Color(0xFF475569);
+    Color border = const Color(0xFFE2E8F0);
+
+    final s = status.trim().toLowerCase();
+    if (s == 'active' || s == 'approved' || s == 'completed' || s == 'certified') {
+      bg = const Color(0xFFDCFCE7);
+      text = const Color(0xFF16A34A);
+      border = const Color(0xFF86EFAC);
+    } else if (s.contains('manual') ||
+        s.contains('review') ||
+        s == 'pending' ||
+        s == 'under_review' ||
+        s == 'submitted' ||
+        s == 'ai_audit') {
+      bg = const Color(0xFFFEF3C7);
+      text = const Color(0xFFB45309);
+      border = const Color(0xFFFDE68A);
+    } else if (s.contains('changes') || s == 'changes required') {
+      bg = const Color(0xFFFFEDD5);
+      text = const Color(0xFFC2410C);
+      border = const Color(0xFFFDBA74);
+    } else if (s == 'expired' || s == 'rejected' || s == 'cancelled') {
+      bg = const Color(0xFFFEE2E2);
+      text = const Color(0xFFDC2626);
+      border = const Color(0xFFFCA5A5);
+    }
+
+    final displayLabel = (s == 'submitted' || s == 'ai_audit' || s == 'under_review' || s == 'manual_review')
+        ? 'Manual Review'
+        : status;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: border, width: 1.0),
+      ),
+      child: Text(
+        displayLabel,
+        style: GoogleFonts.inter(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: text,
         ),
       ),
     );

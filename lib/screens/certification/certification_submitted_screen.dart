@@ -16,13 +16,32 @@ class CertificationSubmittedScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final now = application.submissionDate ?? DateTime.now();
     final dateStr = '${now.month}/${now.day}/${now.year}';
-    final appId = (application.applicationId != null && application.applicationId!.trim().isNotEmpty)
-        ? application.applicationId!.trim()
-        : '—';
+    final appId = (application.applicationNo != null && application.applicationNo!.trim().isNotEmpty)
+        ? application.applicationNo!.trim()
+        : ((application.applicationId != null && application.applicationId!.trim().isNotEmpty)
+            ? application.applicationId!.trim()
+            : '—');
     final institution = application.institutionName.trim().isNotEmpty
         ? application.institutionName.trim()
         : '—';
-    final status = application.status.trim().isNotEmpty ? application.status.trim() : 'Submitted';
+    final rev = application.reviewStatus.trim().toLowerCase();
+    final String status;
+    if (rev == 'manual_review' ||
+        rev == 'manual review' ||
+        rev == 'under_review' ||
+        rev == 'in_review' ||
+        rev == 'in review' ||
+        rev == 'ai_audit' ||
+        rev == 'submitted') {
+      status = 'Manual Review';
+    } else if (application.displayStatus.trim().isNotEmpty &&
+        application.displayStatus.trim().toLowerCase() != 'submitted') {
+      status = application.displayStatus.trim();
+    } else if (application.status.trim().toLowerCase() == 'submitted') {
+      status = 'Manual Review';
+    } else {
+      status = application.status.trim().isNotEmpty ? application.status.trim() : 'Manual Review';
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -127,7 +146,11 @@ class CertificationSubmittedScreen extends StatelessWidget {
                             vertical: 3.5,
                           ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFE0F2FE),
+                            color: (status == 'In Review' ||
+                                    status == 'under_review' ||
+                                    status == 'Manual Review')
+                                ? const Color(0xFFFEF3C7)
+                                : const Color(0xFFE0F2FE),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -135,7 +158,11 @@ class CertificationSubmittedScreen extends StatelessWidget {
                             style: GoogleFonts.inter(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: const Color(0xFF0284C7),
+                              color: (status == 'In Review' ||
+                                      status == 'under_review' ||
+                                      status == 'Manual Review')
+                                  ? const Color(0xFFD97706)
+                                  : const Color(0xFF0284C7),
                             ),
                           ),
                         ),
@@ -146,7 +173,7 @@ class CertificationSubmittedScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Blue Notice Box (Exact match to uploaded mockup)
+              // AI Validation Notice Box
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -157,11 +184,11 @@ class CertificationSubmittedScreen extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('🔍', style: TextStyle(fontSize: 13)),
+                    const Text('🤖', style: TextStyle(fontSize: 13)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'AI audit will begin shortly. You\'ll be notified of the outcome and next steps.',
+                        'AI validation recorded. Application has transitioned to Manual Review.',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           color: const Color(0xFF0284C7),
