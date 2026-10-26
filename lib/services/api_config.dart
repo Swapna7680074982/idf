@@ -82,6 +82,8 @@ class ApiConfig {
   static String get notificationsUnreadCount => '$baseUrl/api/notifications/unread-count';
   static String notificationRead(int id) => '$baseUrl/api/notifications/$id/read';
   static String get notificationsReadAll => '$baseUrl/api/notifications/read-all';
+  static String get notificationsFcmToken => '$baseUrl/api/notifications/fcm-token';
+  static String get notificationsPushToken => '$baseUrl/api/notifications/push-token';
 
   // 12. File Uploads
   static String get files => '$baseUrl/api/files';

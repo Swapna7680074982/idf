@@ -6,12 +6,14 @@ import 'core/theme.dart';
 import 'screens/splash_screen.dart';
 import 'screens/welcome_screen.dart';
 import 'services/api_client.dart';
+import 'services/firebase_service.dart';
 import 'services/token_storage.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await FirebaseService.initializeAndGetToken();
   await TokenStorage.init();
 
   ApiClient.onSessionExpired = () {

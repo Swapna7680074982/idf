@@ -22,6 +22,8 @@ import '../models/certification_model.dart';
 import '../models/application_item_model.dart';
 import '../models/home_models.dart';
 import '../services/api_config.dart';
+import '../services/certification_service.dart';
+import '../services/firebase_service.dart';
 import '../services/home_service.dart';
 import '../services/programs_service.dart';
 import 'applications/my_applications_screen.dart';
@@ -47,6 +49,7 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime? _lastBackPressTime;
   HomeSummaryResponse? _homeSummary;
   List<ProgramModel> _allPublicPrograms = [];
+  CertificateApplicationItem? _latestCertApplication;
 
   // Refresh keys to force re-fetch when switching tabs from bottom navigation
   int _programsRefreshKey = 0;
@@ -59,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _currentTabIndex = widget.initialTabIndex;
     _appTabIndex = widget.initialAppTabIndex;
+    FirebaseService.syncTokenWithBackend();
     _fetchHomeData();
   }
 
@@ -85,12 +89,32 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchHomeData() async {
+    FirebaseService.syncTokenWithBackend();
     try {
       final summary = await HomeService.getHomeSummary();
       if (mounted) {
         setState(() {
           _homeSummary = summary;
         });
+      }
+    } catch (_) {}
+
+    try {
+      final certs = await CertificationService.getMyCertificateApplications();
+      if (certs.isNotEmpty) {
+        final items = certs
+            .map((c) => CertificateApplicationItem.fromJson(c))
+            .toList();
+        items.sort((a, b) {
+          final idA = int.tryParse(a.id) ?? 0;
+          final idB = int.tryParse(b.id) ?? 0;
+          return idB.compareTo(idA);
+        });
+        if (mounted) {
+          setState(() {
+            _latestCertApplication = items.first;
+          });
+        }
       }
     } catch (_) {}
 
@@ -1217,9 +1241,39 @@ class _HomeScreenState extends State<HomeScreen> {
   // IDF Active Certification Card
   // -------------------------------------------------------------
   Widget _buildCertificationCard(UserModel user) {
-    final cert = _homeSummary?.certification;
+    CertificateApplicationItem? item = _latestCertApplication;
 
-    if (cert == null) {
+    if (item == null && _homeSummary?.certification != null) {
+      final cert = _homeSummary!.certification!;
+      if (cert.rawJson != null) {
+        item = CertificateApplicationItem.fromJson(cert.rawJson!);
+      } else {
+        final instName = cert.institutionName?.isNotEmpty == true
+            ? cert.institutionName!
+            : user.organizationName;
+        final catName = cert.category?.isNotEmpty == true
+            ? cert.category!
+            : user.organizationType;
+        final appNo = cert.applicationNo ?? (cert.applicationId != null ? cert.applicationId.toString() : '');
+        final rawStatus = cert.displayStatus ?? cert.status ?? 'Submitted';
+
+        item = CertificateApplicationItem(
+          id: cert.applicationId?.toString() ?? '',
+          institutionName: instName,
+          institutionType: catName,
+          certificateId: cert.certificateId ?? '',
+          applicationNo: appNo,
+          issuedDate: cert.issuedOn ?? '',
+          expiresDate: cert.expiresOn ?? '',
+          status: rawStatus,
+          reviewStatus: cert.reviewStatus ?? rawStatus,
+          displayStatus: cert.displayStatus ?? rawStatus,
+          score: '',
+        );
+      }
+    }
+
+    if (item == null) {
       return InkWell(
         onTap: () {
           setState(() {
@@ -1309,54 +1363,32 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    final instName = cert.institutionName?.isNotEmpty == true
-        ? cert.institutionName!
-        : user.organizationName;
-    final catName = cert.category?.isNotEmpty == true
-        ? cert.category!
-        : user.organizationType;
-    final appNo = cert.applicationNo ?? (cert.applicationId != null ? 'APP-CERT-2026-${cert.applicationId!.toString().padLeft(4, '0')}' : '');
-    final rawStatus = cert.displayStatus ?? 'Submitted';
-
-    final item = CertificateApplicationItem(
-      id: cert.applicationId?.toString() ?? '',
-      institutionName: instName,
-      institutionType: catName,
-      certificateId: cert.certificateId != null ? cert.certificateId.toString() : '',
-      applicationNo: appNo,
-      issuedDate: '',
-      expiresDate: cert.expiresOn ?? '',
-      status: rawStatus,
-      reviewStatus: rawStatus,
-      displayStatus: rawStatus,
-      score: '',
-    );
-
-    final isExpired = item.isExpiredOrRenewable;
-    final isChangesRequired = item.status.toLowerCase() == 'changes required' ||
-        item.status.toLowerCase() == 'changes_required';
-    final isApproved = item.isApproved && item.certificateId.isNotEmpty;
+    final certItem = item;
+    final isExpired = certItem.isExpiredOrRenewable;
+    final isChangesRequired = certItem.status.toLowerCase() == 'changes required' ||
+        certItem.status.toLowerCase() == 'changes_required';
+    final isApproved = certItem.isApproved && certItem.certificateId.isNotEmpty;
 
     void openCert() {
       if (isExpired) {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => RenewalWizardScreen(certificate: item),
+            builder: (_) => RenewalWizardScreen(certificate: certItem),
           ),
         );
       } else if (isApproved) {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => CertificateViewScreen(certificate: item),
+            builder: (_) => CertificateViewScreen(certificate: certItem),
           ),
         );
       } else if (isChangesRequired) {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => CertificationWizardScreen(
-              applicationId: item.id.isNotEmpty ? item.id : item.applicationNo,
+              applicationId: certItem.id.isNotEmpty ? certItem.id : certItem.applicationNo,
               initialModel:
-                  CertificationApplicationModel.prefilledForCertificate(item),
+                  CertificationApplicationModel.prefilledForCertificate(certItem),
             ),
           ),
         );
@@ -1364,8 +1396,8 @@ class _HomeScreenState extends State<HomeScreen> {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => CertificationDetailsScreen(
-              applicationId: item.id.isNotEmpty ? item.id : item.applicationNo,
-              certificateItem: item,
+              applicationId: certItem.id.isNotEmpty ? certItem.id : certItem.applicationNo,
+              certificateItem: certItem,
             ),
           ),
         );
@@ -1417,7 +1449,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Expanded(
                             child: Text(
-                              item.institutionName,
+                              certItem.institutionName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: GoogleFonts.inter(
@@ -1429,11 +1461,11 @@ class _HomeScreenState extends State<HomeScreen> {
                             ),
                           ),
                           const SizedBox(width: 6),
-                          _buildCertBadge(item.displayReviewStatus),
+                          _buildCertBadge(certItem.displayReviewStatus),
                         ],
                       ),
                       Text(
-                        item.institutionType,
+                        certItem.institutionType,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
@@ -1444,8 +1476,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 3),
                       Text(
                         isApproved
-                            ? 'Certificate No: ${item.certificateId}'
-                            : 'Application No: ${item.applicationNo.isNotEmpty ? item.applicationNo : (item.id.isNotEmpty ? item.id : 'APP-CERT-2026-0001')}',
+                            ? 'Certificate No: ${certItem.certificateId}'
+                            : 'Application No: ${certItem.applicationNo.isNotEmpty ? certItem.applicationNo : certItem.id}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
@@ -1453,6 +1485,30 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: const Color(0xFF64748B),
                         ),
                       ),
+                      if (certItem.issuedDate.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Issued: ${DateTimeUtils.formatDateTime(certItem.issuedDate)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                      if (certItem.expiresDate.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Expires: ${DateTimeUtils.formatDateTime(certItem.expiresDate)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 10),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1496,15 +1552,15 @@ class _HomeScreenState extends State<HomeScreen> {
                                 if (isExpired) {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
-                                      builder: (_) => ExpiredCertificateDetailsScreen(certificate: item),
+                                      builder: (_) => ExpiredCertificateDetailsScreen(certificate: certItem),
                                     ),
                                   );
                                 } else {
                                   Navigator.of(context).push(
                                     MaterialPageRoute(
                                       builder: (_) => CertificationDetailsScreen(
-                                        applicationId: item.id.isNotEmpty ? item.id : item.applicationNo,
-                                        certificateItem: item,
+                                        applicationId: certItem.id.isNotEmpty ? certItem.id : certItem.applicationNo,
+                                        certificateItem: certItem,
                                       ),
                                     ),
                                   );

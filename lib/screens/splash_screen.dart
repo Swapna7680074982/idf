@@ -7,6 +7,7 @@ import '../bloc/app_event.dart';
 import '../core/theme.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import '../services/firebase_service.dart';
 import '../services/token_storage.dart';
 import '../widgets/dr_mohans_logo.dart';
 import 'home_screen.dart';
@@ -77,6 +78,9 @@ class _SplashScreenState extends State<SplashScreen> {
     if (!mounted) return;
 
     final targetScreen = shouldNavigateToHome ? const HomeScreen() : const WelcomeScreen();
+    if (shouldNavigateToHome) {
+      FirebaseService.syncTokenWithBackend();
+    }
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(

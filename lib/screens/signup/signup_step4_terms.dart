@@ -6,6 +6,7 @@ import '../../bloc/app_event.dart';
 import '../../core/theme.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
+import '../../services/firebase_service.dart';
 import '../../services/metadata_service.dart';
 import '../../widgets/auth_header.dart';
 import '../../widgets/custom_button.dart';
@@ -86,10 +87,12 @@ class _SignUpStep4ScreenState extends State<SignUpStep4Screen> {
         acceptTerms: _agreedToTerms,
         confirmAccuracy: _confirmedAccuracy,
         deviceName: 'Mobile App',
+        pushToken: FirebaseService.token,
       );
 
       if (mounted) {
         context.read<AppBloc>().add(SetAuthenticatedUser(authResult.user));
+        FirebaseService.syncTokenWithBackend();
         setState(() {
           _isLoading = false;
         });

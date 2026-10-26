@@ -1,8 +1,45 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import '../models/notification_model.dart';
 import 'api_client.dart';
 import 'api_config.dart';
 
 class NotificationService {
+  /// POST /api/notifications/fcm-token - Register or Update Device FCM Push Token
+  static Future<bool> registerFcmToken({
+    required String pushToken,
+    String? deviceName,
+  }) async {
+    try {
+      final body = <String, dynamic>{
+        'push_token': pushToken,
+        'device_name': deviceName ?? (Platform.isIOS ? 'iOS Device' : 'Android Device'),
+      };
+
+      try {
+        final response = await ApiClient.post(
+          ApiConfig.notificationsFcmToken,
+          body: body,
+        );
+        if (response is Map<String, dynamic>) {
+          return response['success'] == true || response['data'] != null;
+        }
+      } catch (_) {
+        // Fallback to /api/notifications/push-token
+        final altResponse = await ApiClient.post(
+          ApiConfig.notificationsPushToken,
+          body: body,
+        );
+        if (altResponse is Map<String, dynamic>) {
+          return altResponse['success'] == true || altResponse['data'] != null;
+        }
+      }
+      return false;
+    } catch (e) {
+      debugPrint('⚠️ [NOTIFICATION SERVICE] Failed to register FCM token: $e');
+      return false;
+    }
+  }
   /// GET /api/notifications - List Notifications
   static Future<NotificationListResponse> getNotifications({
     bool? unreadOnly,

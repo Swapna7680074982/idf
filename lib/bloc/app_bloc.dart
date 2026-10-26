@@ -2,6 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../models/program_model.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import '../services/firebase_service.dart';
 import '../services/metadata_service.dart';
 import '../services/token_storage.dart';
 import 'app_event.dart';
@@ -47,6 +48,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
         authStatus: AuthStatus.authenticated,
         user: UserModel.fromAuthUser(TokenStorage.currentUser),
       ));
+      FirebaseService.syncTokenWithBackend();
     }
 
     try {
@@ -55,6 +57,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
         authStatus: AuthStatus.authenticated,
         user: UserModel.fromAuthUser(liveUser),
       ));
+      FirebaseService.syncTokenWithBackend();
     } on ApiException catch (e) {
       if (e.statusCode == 401) {
         await TokenStorage.clearAuth();
@@ -94,6 +97,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
       user: userModel,
       isLoading: false,
     ));
+    FirebaseService.syncTokenWithBackend();
   }
 
   Future<void> _onLoginRequested(
@@ -106,6 +110,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
       final result = await AuthService.login(
         email: event.email,
         password: event.password,
+        pushToken: FirebaseService.token,
       );
 
       final userModel = UserModel.fromAuthUser(result.user);
@@ -114,6 +119,7 @@ class AppBloc extends Bloc<AppEvent, AppState> {
         user: userModel,
         isLoading: false,
       ));
+      FirebaseService.syncTokenWithBackend();
     } on ApiException catch (e) {
       emit(state.copyWith(
         isLoading: false,

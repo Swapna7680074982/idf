@@ -90,8 +90,12 @@ class HomeCertificationSummary {
   final String? institutionName;
   final String? category;
   final String? displayStatus;
-  final int? certificateId;
+  final String? certificateId;
   final String? expiresOn;
+  final String? issuedOn;
+  final String? status;
+  final String? reviewStatus;
+  final Map<String, dynamic>? rawJson;
 
   const HomeCertificationSummary({
     this.applicationId,
@@ -101,21 +105,39 @@ class HomeCertificationSummary {
     this.displayStatus,
     this.certificateId,
     this.expiresOn,
+    this.issuedOn,
+    this.status,
+    this.reviewStatus,
+    this.rawJson,
   });
 
   factory HomeCertificationSummary.fromJson(Map<String, dynamic> json) {
+    final rawCertId = json['certificate_no'] ??
+        json['certificate_code'] ??
+        json['certificate_number'] ??
+        json['certificate_id'];
+    final certIdStr = (rawCertId != null && rawCertId.toString() != 'null')
+        ? rawCertId.toString().trim()
+        : null;
+
+    final appNoStr = (json['application_no'] ??
+        json['application_id'] ??
+        json['id'])?.toString().trim();
+
     return HomeCertificationSummary(
       applicationId: json['application_id'] is int
           ? json['application_id'] as int
           : int.tryParse(json['application_id']?.toString() ?? ''),
-      applicationNo: json['application_no']?.toString(),
+      applicationNo: appNoStr,
       institutionName: json['institution_name']?.toString(),
-      category: json['category']?.toString(),
-      displayStatus: json['display_status']?.toString(),
-      certificateId: json['certificate_id'] is int
-          ? json['certificate_id'] as int
-          : int.tryParse(json['certificate_id']?.toString() ?? ''),
-      expiresOn: json['expires_on']?.toString(),
+      category: (json['category'] ?? json['institution_type'])?.toString(),
+      displayStatus: (json['display_status'] ?? json['displayStatus'])?.toString(),
+      certificateId: certIdStr,
+      expiresOn: (json['expires_on'] ?? json['expires_date'])?.toString(),
+      issuedOn: (json['issued_on'] ?? json['issued_date'] ?? json['applied_at'])?.toString(),
+      status: json['status']?.toString(),
+      reviewStatus: (json['review_status'] ?? json['reviewStatus'])?.toString(),
+      rawJson: json,
     );
   }
 }

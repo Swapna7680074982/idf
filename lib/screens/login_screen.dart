@@ -13,6 +13,7 @@ import 'signup/signup_step1_account.dart';
 
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import '../services/firebase_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -66,10 +67,12 @@ class _LoginScreenState extends State<LoginScreen> {
       final authResult = await AuthService.login(
         email: email,
         password: password,
+        pushToken: FirebaseService.token,
       );
 
       if (mounted) {
         context.read<AppBloc>().add(SetAuthenticatedUser(authResult.user));
+        FirebaseService.syncTokenWithBackend();
         setState(() {
           _isLoading = false;
         });
