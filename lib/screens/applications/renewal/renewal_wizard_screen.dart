@@ -3,7 +3,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme.dart';
 import '../../../models/application_item_model.dart';
 import '../../../models/certification_model.dart';
+import '../../../services/certification_service.dart';
 import '../../certification/certification_wizard_screen.dart';
+import '../../certification/widgets/yes_no_selector.dart';
 import 'renewal_submitted_screen.dart';
 
 class RenewalWizardScreen extends StatefulWidget {
@@ -19,68 +21,122 @@ class RenewalWizardScreen extends StatefulWidget {
 }
 
 class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
-  int _currentStep = 1; // 1: Institution, 2: Questionnaire, 3: Evidence, 4: Documents, 5: Review
+  int _currentStep = 1; // 1: Institution, 2: Questionnaire, 3: Evidence, 4: Review
+  bool _isLoading = true;
+  late CertificationApplicationModel _model;
+  final List<Map<String, dynamic>> _uploadedEvidence = [];
 
-  // Step 2 Questionnaire state
-  final Map<String, bool> _questionnaireAnswers = {
-    'Dedicated safe physical activity spaces (indoor/outdoor) available': true,
-    'Clean, accessible drinking water & hydration stations on campus': true,
-    'Well-lit walkways and recreational areas maintained': true,
-    'Formal institutional policy promoting daily physical activity enacted': true,
-    'Structured active pauses / physical activity breaks integrated': true,
-    'Annual diabetes screening & awareness programs conducted': true,
-    'Healthy nutritional guidance and balanced dining options provided': true,
-  };
+  @override
+  void initState() {
+    super.initState();
+    _model = CertificationApplicationModel.prefilledForCertificate(widget.certificate);
+    _loadRealData();
+  }
 
-  // Step 3 Evidence state
-  final List<Map<String, dynamic>> _evidenceFiles = [
-    {
-      'title': 'Campus Physical Activity Area Photo',
-      'fileName': 'campus_grounds_verified.jpg',
-      'size': '2.4 MB',
-      'gpsTagged': true,
-      'isUpdated': false,
-    },
-    {
-      'title': 'Hydration Station Facilities',
-      'fileName': 'water_stations_main.jpg',
-      'size': '1.8 MB',
-      'gpsTagged': true,
-      'isUpdated': false,
-    },
-    {
-      'title': 'Recent Annual Wellness Event (Past 12 Months)',
-      'fileName': 'wellness_event_2026.png',
-      'size': '3.1 MB',
-      'gpsTagged': true,
-      'isUpdated': true,
-    },
-    {
-      'title': 'Annual Fitness Program Participation Log',
-      'fileName': 'attendance_log_2025_26.pdf',
-      'size': '850 KB',
-      'gpsTagged': false,
-      'isUpdated': true,
-    },
-  ];
+  Future<void> _loadRealData() async {
+    final targetId = widget.certificate.id.isNotEmpty
+        ? widget.certificate.id
+        : widget.certificate.applicationNo;
 
-  // Step 4 Documents state
-  final List<Map<String, dynamic>> _documents = [
-    {
-      'title': 'Institutional Operating License / Accreditation',
-      'fileName': 'gov_license_verified.pdf',
-      'status': 'Verified on file',
-      'validThrough': 'Valid through 2028',
-    },
-    {
-      'title': 'Authorized Representative Renewal Declaration',
-      'fileName': 'signed_renewal_declaration_2026.pdf',
-      'status': 'Uploaded & Signed',
-      'validThrough': 'Cycle 2026-2028',
-    },
-  ];
+    if (targetId.isEmpty) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
 
-  bool _agreeToDeclaration = true;
+    try {
+      final fullModel = await CertificationService.getApplicationModelForEdit(targetId);
+
+      // If categoryConfig is null or sections empty, resolve categoryConfig by category name or id
+      if (fullModel.categoryConfig == null || fullModel.categoryConfig!.sections.isEmpty) {
+        try {
+          final cats = await CertificationService.getCategories();
+          final typeName = widget.certificate.institutionType.trim().toLowerCase();
+          final modelTypeName = fullModel.institutionTypeTitle.trim().toLowerCase();
+
+          final match = cats.firstWhere(
+            (c) =>
+                c.name.trim().toLowerCase() == typeName ||
+                c.name.trim().toLowerCase() == modelTypeName,
+            orElse: () => cats.first,
+          );
+
+          final config = await CertificationService.getCategoryConfig(match.id);
+          fullModel.categoryConfig = config;
+          fullModel.categoryId = config.category.id;
+          fullModel.categoryMaxScore = config.category.maxScore;
+          fullModel.passScore = config.category.passScore;
+          fullModel.institutionTypeTitle = config.category.name;
+
+          if (config.evidenceRequirements.isNotEmpty) {
+            final existingEvidence = List<EvidenceItem>.from(fullModel.evidenceItems);
+            fullModel.evidenceItems = config.evidenceRequirements.map((req) {
+              final m = existingEvidence.firstWhere(
+                (e) =>
+                    e.requirementId == req.id.toString() ||
+                    e.id == req.id.toString() ||
+                    e.title.trim().toLowerCase() == req.title.trim().toLowerCase(),
+                orElse: () => EvidenceItem.fromRequirement(req),
+              );
+              return m.copyWithRequirement(req);
+            }).toList();
+          }
+        } catch (e) {
+          debugPrint('Notice resolving category config for renewal: $e');
+        }
+      }
+
+      // Ensure institution name and type fallback to widget.certificate if model is sparse
+      if (fullModel.institutionName.isEmpty && widget.certificate.institutionName.isNotEmpty) {
+        fullModel.institutionName = widget.certificate.institutionName;
+      }
+      if (fullModel.institutionTypeTitle.isEmpty && widget.certificate.institutionType.isNotEmpty) {
+        fullModel.institutionTypeTitle = widget.certificate.institutionType;
+      }
+
+      // Also parse materials / evidence if available
+      try {
+        final rawData = await CertificationService.getApplicationRawMap(targetId);
+        final rawMaterials = rawData['materials'] ??
+            rawData['evidence'] ??
+            rawData['supporting_material'] ??
+            (rawData['application'] is Map ? (rawData['application'] as Map)['materials'] : null);
+
+        _uploadedEvidence.clear();
+        if (rawMaterials is List && rawMaterials.isNotEmpty) {
+          for (final m in rawMaterials) {
+            if (m is Map) {
+              final name = m['name']?.toString() ?? m['file_name']?.toString();
+              final title = m['title']?.toString() ?? name ?? 'Evidence File';
+              if (name != null && name.isNotEmpty) {
+                _uploadedEvidence.add({
+                  'title': title,
+                  'fileName': name,
+                  'url': m['url']?.toString(),
+                  'size': 'Uploaded on record',
+                  'gpsTagged': m['latitude'] != null || m['requires_gps'] == true,
+                });
+              }
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Notice reading raw materials: $e');
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _model = fullModel;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading renewal data: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   void _showSubmitConfirmationSheet() {
     showModalBottomSheet(
@@ -120,17 +176,27 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
                       Navigator.pop(ctx);
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => RenewalSubmittedScreen(
-                            institutionName: widget.certificate.institutionName,
-                            applicationNumber:
-                                'RNW-${widget.certificate.certificateId}',
+                      try {
+                        await CertificationService.submitUnifiedApplication(_model);
+                      } catch (e) {
+                        debugPrint('Notice during renewal submit: $e');
+                      }
+
+                      if (mounted) {
+                        Navigator.of(context).pushReplacement(
+                          MaterialPageRoute(
+                            builder: (_) => RenewalSubmittedScreen(
+                              institutionName: _model.institutionName.isNotEmpty
+                                  ? _model.institutionName
+                                  : widget.certificate.institutionName,
+                              applicationNumber: _model.applicationNo ??
+                                  'RNW-${widget.certificate.certificateId.isNotEmpty ? widget.certificate.certificateId : widget.certificate.id}',
+                            ),
                           ),
-                        ),
-                      );
+                        );
+                      }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryBlue,
@@ -186,16 +252,20 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Top Bar with 5-segment progress bar
+            // Top Bar with 4-segment progress bar
             _buildTopHeader(),
 
             // Content
             Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
-                child: _buildCurrentStepContent(),
-              ),
+              child: _isLoading
+                  ? const Center(
+                      child: CircularProgressIndicator(color: AppColors.primaryBlue),
+                    )
+                  : SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 14.0),
+                      child: _buildCurrentStepContent(),
+                    ),
             ),
           ],
         ),
@@ -212,9 +282,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
       case 3:
         return _buildStep3Evidence();
       case 4:
-        return _buildStep4Documents();
-      case 5:
-        return _buildStep5Review();
+        return _buildStep4Review();
       default:
         return _buildStep1Institution();
     }
@@ -224,8 +292,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
     String stepTitle = 'Institution';
     if (_currentStep == 2) stepTitle = 'Questionnaire';
     if (_currentStep == 3) stepTitle = 'Evidence';
-    if (_currentStep == 4) stepTitle = 'Documents';
-    if (_currentStep == 5) stepTitle = 'Review';
+    if (_currentStep == 4) stepTitle = 'Review';
 
     return Container(
       color: Colors.white,
@@ -260,7 +327,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'RENEWAL · STEP $_currentStep OF 5',
+                    'RENEWAL · STEP $_currentStep OF 4',
                     style: GoogleFonts.inter(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
@@ -281,14 +348,14 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          // 5-segment bar
+          // 4-segment bar
           Row(
-            children: List.generate(5, (index) {
+            children: List.generate(4, (index) {
               final isCompleted = (index + 1) <= _currentStep;
               return Expanded(
                 child: Container(
                   height: 4,
-                  margin: EdgeInsets.only(right: index == 4 ? 0 : 5),
+                  margin: EdgeInsets.only(right: index == 3 ? 0 : 5),
                   decoration: BoxDecoration(
                     color: isCompleted ? AppColors.primaryBlue : const Color(0xFFE2E8F0),
                     borderRadius: BorderRadius.circular(2),
@@ -304,6 +371,13 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
 
   // Step 1: Pre-populated Institution Details
   Widget _buildStep1Institution() {
+    final instName = _model.institutionName.isNotEmpty
+        ? _model.institutionName
+        : widget.certificate.institutionName;
+    final catName = _model.institutionTypeTitle.isNotEmpty
+        ? _model.institutionTypeTitle
+        : widget.certificate.institutionType;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -333,13 +407,13 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                       Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => CertificationWizardScreen(
-                            initialModel:
-                                CertificationApplicationModel.prefilledForCertificate(
-                              widget.certificate,
-                            ),
+                            applicationId: widget.certificate.id.isNotEmpty
+                                ? widget.certificate.id
+                                : widget.certificate.applicationNo,
+                            initialModel: _model,
                           ),
                         ),
-                      );
+                      ).then((_) => _loadRealData());
                     },
                     child: Text(
                       'Edit',
@@ -353,17 +427,38 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 ],
               ),
               const SizedBox(height: 14),
-              _buildDetailRow('Institution Name', widget.certificate.institutionName),
-              const SizedBox(height: 8),
-              _buildDetailRow('Category', widget.certificate.institutionType),
-              const SizedBox(height: 8),
-              _buildDetailRow('Previous Cert ID', widget.certificate.certificateId),
-              const SizedBox(height: 8),
-              _buildDetailRow('Primary Contact', 'Dr. Sarah Osei'),
-              const SizedBox(height: 8),
-              _buildDetailRow('Contact Email', 'contact@org.com'),
-              const SizedBox(height: 8),
-              _buildDetailRow('Contact Phone', '+234 800 000 0000'),
+              _buildDetailRow('Institution Name', instName),
+              if (catName.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _buildDetailRow('Category', catName),
+              ],
+              if (widget.certificate.certificateId.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _buildDetailRow('Previous Cert ID', widget.certificate.certificateId),
+              ],
+              if (_model.contactPerson.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _buildDetailRow('Primary Contact', _model.contactPerson),
+              ],
+              if (_model.contactEmail.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _buildDetailRow('Contact Email', _model.contactEmail),
+              ],
+              if (_model.contactPhone.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _buildDetailRow('Contact Phone', _model.contactPhone),
+              ],
+              if (_model.address.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _buildDetailRow('Address', _model.address),
+              ],
+              if (_model.city.isNotEmpty || _model.country.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _buildDetailRow(
+                  'Location',
+                  [_model.city, _model.country].where((s) => s.isNotEmpty).join(', '),
+                ),
+              ],
             ],
           ),
         ),
@@ -397,7 +492,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
         ),
         const SizedBox(height: 24),
 
-        // Continue Button (Inside Flow)
+        // Continue Button
         SizedBox(
           width: double.infinity,
           height: 48,
@@ -425,8 +520,10 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
     );
   }
 
-  // Step 2: Questionnaire (Middle Screen 1)
+  // Step 2: Questionnaire (Prefilled with real questions same as submit flow)
   Widget _buildStep2Questionnaire() {
+    final sections = _model.categoryConfig?.sections;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -458,63 +555,97 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
         ),
         const SizedBox(height: 14),
 
-        // Questions list
-        ..._questionnaireAnswers.entries.map((entry) {
-          final question = entry.key;
-          final answer = entry.value;
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(14),
+        // Questions organized by section exact as submit flow
+        if (sections != null && sections.isNotEmpty)
+          ...sections.map((section) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 8, bottom: 12),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(section.emoji, style: const TextStyle(fontSize: 16)),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          section.name,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0F172A),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        '${section.questions.length} questions',
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          color: const Color(0xFF64748B),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (section.questions.isNotEmpty)
+                  ...section.questions.map((q) {
+                    final val = _model.getQuestionBool(q.id);
+                    return YesNoSelector(
+                      question: q.text,
+                      value: val,
+                      onChanged: (newVal) {
+                        setState(() {
+                          _model.setQuestionAnswer(q.id, newVal);
+                        });
+                      },
+                    );
+                  })
+                else
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16.0),
+                    child: Center(
+                      child: Text(
+                        'No questions available in this section.',
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          })
+        else
+          Container(
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.only(bottom: 16),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  question,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                    height: 1.3,
-                  ),
+            child: Center(
+              child: Text(
+                'No questionnaire questions recorded for this category.',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: const Color(0xFF64748B),
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    _buildChoicePill(
-                      title: 'Yes',
-                      isSelected: answer == true,
-                      onTap: () {
-                        setState(() {
-                          _questionnaireAnswers[question] = true;
-                        });
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    _buildChoicePill(
-                      title: 'No',
-                      isSelected: answer == false,
-                      onTap: () {
-                        setState(() {
-                          _questionnaireAnswers[question] = false;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ],
+              ),
             ),
-          );
-        }),
+          ),
 
         const SizedBox(height: 16),
 
-        // Continue Button (Inside Flow)
+        // Continue Button
         SizedBox(
           width: double.infinity,
           height: 48,
@@ -571,37 +702,12 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
     );
   }
 
-  Widget _buildChoicePill({
-    required String title,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primaryBlue : const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected ? AppColors.primaryBlue : const Color(0xFFCBD5E1),
-          ),
-        ),
-        child: Text(
-          title,
-          style: GoogleFonts.inter(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: isSelected ? Colors.white : const Color(0xFF475569),
-          ),
-        ),
-      ),
-    );
-  }
-
-  // Step 3: Evidence (Middle Screen 2)
+  // Step 3: Evidence Materials
   Widget _buildStep3Evidence() {
+    final evidenceItems = _model.evidenceItems.isNotEmpty
+        ? _model.evidenceItems
+        : null;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -634,124 +740,221 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
         const SizedBox(height: 14),
 
         // Evidence list
-        ..._evidenceFiles.map((evidence) {
-          final isUpdated = evidence['isUpdated'] as bool;
-          final gpsTagged = evidence['gpsTagged'] as bool;
+        if (evidenceItems != null && evidenceItems.isNotEmpty)
+          ...evidenceItems.map((evidence) {
+            final hasFile = evidence.fileName != null && evidence.fileName!.isNotEmpty;
 
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: isUpdated ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0),
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        evidence['title'],
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                    if (isUpdated)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDBEAFE),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
                         child: Text(
-                          'Updated',
+                          evidence.title,
                           style: GoogleFonts.inter(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF1D4ED8),
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ),
+                      if (hasFile)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDCFCE7),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            'On File',
+                            style: GoogleFonts.inter(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.w700,
+                              color: const Color(0xFF16A34A),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  if (hasFile) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Icon(Icons.attachment_rounded, size: 16, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            evidence.fileName!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 11.5,
+                              color: const Color(0xFF0F172A),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.attachment_rounded, size: 16, color: Color(0xFF64748B)),
-                    const SizedBox(width: 4),
-                    Expanded(
+                  if (evidence.requiresGps) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, size: 13, color: Color(0xFF16A34A)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'GPS Location metadata required / attached',
+                          style: GoogleFonts.inter(
+                            fontSize: 10.5,
+                            color: const Color(0xFF16A34A),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: InkWell(
+                      onTap: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Replace photo for ${evidence.title}')),
+                        );
+                      },
                       child: Text(
-                        evidence['fileName'],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        hasFile ? 'Replace Photo / File' : 'Upload Photo / File',
                         style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          color: const Color(0xFF0F172A),
-                          fontWeight: FontWeight.w500,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryBlue,
                         ),
                       ),
                     ),
-                    Text(
-                      evidence['size'],
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: const Color(0xFF94A3B8),
-                      ),
-                    ),
-                  ],
-                ),
-                if (gpsTagged) ...[
-                  const SizedBox(height: 4),
+                  ),
+                ],
+              ),
+            );
+          })
+        else if (_uploadedEvidence.isNotEmpty)
+          ..._uploadedEvidence.map((evidence) {
+            final gpsTagged = evidence['gpsTagged'] == true;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Icon(Icons.location_on, size: 13, color: Color(0xFF16A34A)),
-                      const SizedBox(width: 4),
-                      Text(
-                        'GPS Location metadata attached',
-                        style: GoogleFonts.inter(
-                          fontSize: 10.5,
-                          color: const Color(0xFF16A34A),
-                          fontWeight: FontWeight.w500,
+                      Expanded(
+                        child: Text(
+                          evidence['title'] ?? 'Evidence File',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          'On File',
+                          style: GoogleFonts.inter(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF16A34A),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ],
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: InkWell(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Replace dialog for ${evidence['title']}')),
-                      );
-                    },
-                    child: Text(
-                      'Replace Photo / File',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryBlue,
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(Icons.attachment_rounded, size: 16, color: Color(0xFF64748B)),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          evidence['fileName'] ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 11.5,
+                            color: const Color(0xFF0F172A),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                ),
-              ],
+                  if (gpsTagged) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, size: 13, color: Color(0xFF16A34A)),
+                        const SizedBox(width: 4),
+                        Text(
+                          'GPS Location metadata attached',
+                          style: GoogleFonts.inter(
+                            fontSize: 10.5,
+                            color: const Color(0xFF16A34A),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            );
+          })
+        else
+          Container(
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
             ),
-          );
-        }),
+            child: Center(
+              child: Text(
+                'No prior evidence files recorded on file.',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: const Color(0xFF64748B),
+                ),
+              ),
+            ),
+          ),
 
         const SizedBox(height: 16),
 
-        // Continue Button (Inside Flow)
+        // Continue Button
         SizedBox(
           width: double.infinity,
           height: 48,
@@ -808,228 +1011,30 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
     );
   }
 
-  // Step 4: Documents (Middle Screen 3)
-  Widget _buildStep4Documents() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Notice banner
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFEFF6FF),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFBFDBFE)),
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('📄', style: TextStyle(fontSize: 15)),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Ensure institutional registration and authorized declaration documents remain up to date for this renewal cycle.',
-                  style: GoogleFonts.inter(
-                    fontSize: 11.5,
-                    color: const Color(0xFF1D4ED8),
-                    height: 1.35,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 14),
+  // Step 4: Review Application (Exact submit flow style without documents)
+  Widget _buildStep4Review() {
+    final sections = _model.categoryConfig?.sections;
+    final instName = _model.institutionName.isNotEmpty
+        ? _model.institutionName
+        : widget.certificate.institutionName;
+    final catName = _model.institutionTypeTitle.isNotEmpty
+        ? _model.institutionTypeTitle
+        : widget.certificate.institutionType;
 
-        // Documents list
-        ..._documents.map((doc) {
-          return Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        doc['title'],
-                        style: GoogleFonts.inter(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFDCFCE7),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        doc['status'],
-                        style: GoogleFonts.inter(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.w700,
-                          color: const Color(0xFF16A34A),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.file_present_rounded, size: 16, color: Color(0xFF64748B)),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        doc['fileName'],
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.inter(
-                          fontSize: 11.5,
-                          color: const Color(0xFF0F172A),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                    Text(
-                      doc['validThrough'],
-                      style: GoogleFonts.inter(
-                        fontSize: 10.5,
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: InkWell(
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Update dialog for ${doc['title']}')),
-                      );
-                    },
-                    child: Text(
-                      'Update Document',
-                      style: GoogleFonts.inter(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryBlue,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }),
+    // Calculate answered questions count
+    int totalQuestions = 0;
+    int answeredCount = 0;
+    if (sections != null) {
+      for (final s in sections) {
+        totalQuestions += s.questions.length;
+        for (final q in s.questions) {
+          if (_model.getQuestionBool(q.id) != null) {
+            answeredCount++;
+          }
+        }
+      }
+    }
 
-        const SizedBox(height: 8),
-
-        // Declaration agreement
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Checkbox(
-              value: _agreeToDeclaration,
-              onChanged: (val) => setState(() => _agreeToDeclaration = val ?? false),
-              activeColor: AppColors.primaryBlue,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 10),
-                child: Text(
-                  'I declare that all attached compliance documents are officially approved and authentic.',
-                  style: GoogleFonts.inter(
-                    fontSize: 11.5,
-                    color: const Color(0xFF475569),
-                    height: 1.3,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        // Continue Button (Inside Flow)
-        SizedBox(
-          width: double.infinity,
-          height: 48,
-          child: ElevatedButton(
-            onPressed: () {
-              if (!_agreeToDeclaration) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Please accept the declaration to proceed.')),
-                );
-                return;
-              }
-              setState(() => _currentStep = 5);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryBlue,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-            ),
-            child: Text(
-              'Continue',
-              style: GoogleFonts.inter(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        // Save as Draft Button
-        SizedBox(
-          width: double.infinity,
-          height: 44,
-          child: OutlinedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Progress saved as draft.')),
-              );
-              Navigator.pop(context);
-            },
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.primaryBlue),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-            ),
-            child: Text(
-              'Save as Draft',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primaryBlue,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 32),
-      ],
-    );
-  }
-
-  // Step 5: Review with Updated badges (Screen 43)
-  Widget _buildStep5Review() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1041,36 +1046,421 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
           ),
         ),
         const SizedBox(height: 14),
-        _buildReviewSection(
-          'Institution Details',
-          subtitle: widget.certificate.institutionName,
-          hasUpdatedBadge: false,
-          onEdit: () => setState(() => _currentStep = 1),
+
+        // 1. Completion Status Card (Exact submit flow Step 8 style)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(4),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Completion Status',
+                style: GoogleFonts.inter(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildStatusRow(
+                'Institution Details',
+                isDone: true,
+                onEdit: () => setState(() => _currentStep = 1),
+              ),
+              if (sections != null && sections.isNotEmpty)
+                ...sections.map((sect) {
+                  return _buildStatusRow(
+                    sect.name,
+                    isDone: true,
+                    onEdit: () => setState(() => _currentStep = 2),
+                  );
+                })
+              else
+                _buildStatusRow(
+                  'Certification Questionnaire',
+                  isDone: true,
+                  onEdit: () => setState(() => _currentStep = 2),
+                ),
+              _buildStatusRow(
+                'Evidence',
+                isDone: true,
+                onEdit: () => setState(() => _currentStep = 3),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
-        _buildReviewSection(
-          'Certification Questionnaire',
-          subtitle: '7 of 7 Standards Verified',
-          hasUpdatedBadge: true,
-          onEdit: () => setState(() => _currentStep = 2),
+        const SizedBox(height: 14),
+
+        // 2. Institution Details Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(4),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Institution Details',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => setState(() => _currentStep = 1),
+                    child: Text(
+                      'Edit',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryBlue,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _buildDetailItem('Institution', instName),
+              const SizedBox(height: 6),
+              _buildDetailItem('Category', catName),
+              if (_model.categoryMaxScore > 0) ...[
+                const SizedBox(height: 6),
+                _buildDetailItem('Max Score', '${_model.categoryMaxScore} points'),
+              ],
+              if (widget.certificate.certificateId.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _buildDetailItem('Previous Cert ID', widget.certificate.certificateId),
+              ],
+              if (_model.contactPerson.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _buildDetailItem('Primary Contact', _model.contactPerson),
+              ],
+              if (_model.city.isNotEmpty || _model.country.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _buildDetailItem(
+                  'Location',
+                  [_model.city, _model.country].where((s) => s.isNotEmpty).join(', '),
+                ),
+              ],
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
-        _buildReviewSection(
-          'Evidence',
-          subtitle: '4 Files Attached · GPS Verified',
-          hasUpdatedBadge: true,
-          onEdit: () => setState(() => _currentStep = 3),
+        const SizedBox(height: 14),
+
+        // 3. Questionnaire Responses Breakdown Card (exact review format)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(4),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Questionnaire Responses',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => setState(() => _currentStep = 2),
+                    child: Text(
+                      'Edit',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryBlue,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (totalQuestions > 0) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '$answeredCount of $totalQuestions criteria answered',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.5,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              if (sections != null && sections.isNotEmpty)
+                ...sections.map((sect) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 6),
+                        child: Text(
+                          '${sect.emoji} ${sect.name}',
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF334155),
+                          ),
+                        ),
+                      ),
+                      ...sect.questions.map((q) {
+                        final val = _model.getQuestionBool(q.id);
+                        final String answerLabel = val == true ? 'Yes' : (val == false ? 'No' : '—');
+                        final Color badgeBg = val == true
+                            ? const Color(0xFFDCFCE7)
+                            : (val == false ? const Color(0xFFF1F5F9) : const Color(0xFFFEF3C7));
+                        final Color badgeFg = val == true
+                            ? const Color(0xFF16A34A)
+                            : (val == false ? const Color(0xFF475569) : const Color(0xFFD97706));
+
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4.0),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  q.text,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: const Color(0xFF475569),
+                                    height: 1.3,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: badgeBg,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  answerLabel,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: badgeFg,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                      const Divider(height: 16, color: Color(0xFFF1F5F9)),
+                    ],
+                  );
+                })
+              else
+                Text(
+                  'No questionnaire items available.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+            ],
+          ),
         ),
-        const SizedBox(height: 12),
-        _buildReviewSection(
-          'Documents',
-          subtitle: '2 Institutional Documents Validated',
-          hasUpdatedBadge: false,
-          onEdit: () => setState(() => _currentStep = 4),
+        const SizedBox(height: 14),
+
+        // 4. Evidence Summary Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(4),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Evidence Files',
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => setState(() => _currentStep = 3),
+                    child: Text(
+                      'Edit',
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryBlue,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              if (_model.evidenceItems.isNotEmpty)
+                ..._model.evidenceItems.map((ev) {
+                  final hasFile = ev.fileName != null && ev.fileName!.isNotEmpty;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3.5),
+                    child: Row(
+                      children: [
+                        Icon(
+                          hasFile ? Icons.check_circle_rounded : Icons.pending_outlined,
+                          size: 15,
+                          color: hasFile ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            ev.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF334155),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        if (hasFile)
+                          Text(
+                            ev.fileName!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 11,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                })
+              else if (_uploadedEvidence.isNotEmpty)
+                ..._uploadedEvidence.map((ev) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3.5),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle_rounded, size: 15, color: Color(0xFF16A34A)),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            ev['title'] ?? 'Evidence File',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF334155),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          ev['fileName'] ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                })
+              else
+                Text(
+                  'No evidence files attached.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // Notice Box
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFEFF6FF),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: const Color(0xFFBFDBFE)),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('ℹ️', style: TextStyle(fontSize: 15)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Please review your renewal submission before submitting. Once submitted, it will be transferred directly to IDF review.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF1D4ED8),
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 24),
 
-        // Submit Button (Inside Flow)
+        // Submit Button
         SizedBox(
           width: double.infinity,
           height: 48,
@@ -1085,7 +1475,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
               ),
             ),
             child: Text(
-              'Submit',
+              'Submit Renewal Application',
               style: GoogleFonts.inter(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
@@ -1095,7 +1485,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
         ),
         const SizedBox(height: 10),
 
-        // Save as Draft Button (Inside Flow)
+        // Save as Draft Button
         SizedBox(
           width: double.infinity,
           height: 44,
@@ -1127,82 +1517,74 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
     );
   }
 
-  Widget _buildReviewSection(
+  Widget _buildStatusRow(
     String title, {
-    required String subtitle,
-    required bool hasUpdatedBadge,
-    required VoidCallback onEdit,
+    required bool isDone,
+    VoidCallback? onEdit,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5.0),
       child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      title,
-                      style: GoogleFonts.inter(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    if (hasUpdatedBadge) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'Updated',
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFFB45309),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.inter(
-                    fontSize: 11.5,
-                    color: const Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          InkWell(
-            onTap: onEdit,
-            child: Padding(
-              padding: const EdgeInsets.all(4.0),
-              child: Text(
-                'Edit',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryBlue,
-                ),
+            child: Text(
+              title,
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF334155),
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
+          const Icon(
+            Icons.check_circle_outline_rounded,
+            size: 19,
+            color: Color(0xFF16A34A),
+          ),
+          if (onEdit != null) ...[
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: onEdit,
+              borderRadius: BorderRadius.circular(6),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                child: Text(
+                  'Edit',
+                  style: GoogleFonts.inter(
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryBlue,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
+    );
+  }
+
+  Widget _buildDetailItem(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12.5,
+            color: const Color(0xFF64748B),
+          ),
+        ),
+        Text(
+          value,
+          style: GoogleFonts.inter(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+      ],
     );
   }
 

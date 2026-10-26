@@ -5,6 +5,7 @@ import '../../models/application_item_model.dart';
 import '../../models/certification_model.dart';
 import '../../services/certification_service.dart';
 import '../applications/certificate_view_screen.dart';
+import '../applications/renewal/renewal_wizard_screen.dart';
 import 'certification_details_screen.dart';
 import 'certification_wizard_screen.dart';
 
@@ -234,6 +235,7 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
   Widget _buildCurrentApplicationCard(
       BuildContext context, CertificateApplicationItem app) {
     final statusText = app.displayReviewStatus;
+    final isExpired = app.isExpiredOrRenewable;
     final isApproved = app.isApproved;
     final isChangesRequired = statusText.toLowerCase().contains('changes');
     final isReview = statusText.toLowerCase().contains('review') ||
@@ -241,7 +243,10 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
 
     Color statusBg = const Color(0xFFE0F2FE);
     Color statusFg = const Color(0xFF0284C7);
-    if (isApproved) {
+    if (isExpired) {
+      statusBg = const Color(0xFFFFF7ED);
+      statusFg = const Color(0xFFEA580C);
+    } else if (isApproved) {
       statusBg = const Color(0xFFDCFCE7);
       statusFg = const Color(0xFF16A34A);
     } else if (isReview) {
@@ -254,7 +259,13 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
 
     return InkWell(
       onTap: () {
-        if (isApproved && app.hasCertificate) {
+        if (isExpired) {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => RenewalWizardScreen(certificate: app),
+            ),
+          );
+        } else if (isApproved && app.hasCertificate) {
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => CertificateViewScreen(certificate: app),

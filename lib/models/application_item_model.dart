@@ -178,11 +178,14 @@ class CertificateApplicationItem {
   final String applicationNo;
   final String issuedDate;
   final String expiresDate;
-  final String status; // 'Active', 'Changes Required', 'Expired', 'Submitted'
+  final String status; // 'Active', 'Changes Required', 'Expired', 'Submitted', 'Renew Certificate'
   final String reviewStatus;
   final String displayStatus;
   final String score;
   final String emoji;
+  final String? rejectionReason;
+  final bool canRenew;
+  final bool isExpiredStatus;
 
   const CertificateApplicationItem({
     required this.id,
@@ -197,9 +200,27 @@ class CertificateApplicationItem {
     this.displayStatus = '',
     required this.score,
     this.emoji = '🏅',
+    this.rejectionReason,
+    this.canRenew = false,
+    this.isExpiredStatus = false,
   });
 
+  bool get isExpiredOrRenewable {
+    if (canRenew || isExpiredStatus) return true;
+    final s = status.trim().toLowerCase();
+    final d = displayStatus.trim().toLowerCase();
+    final r = reviewStatus.trim().toLowerCase();
+    return s == 'expired' ||
+        d == 'expired' ||
+        r == 'expired' ||
+        s == 'renew certificate' ||
+        d == 'renew certificate' ||
+        s.contains('renew') ||
+        d.contains('renew');
+  }
+
   bool get isApproved {
+    if (isExpiredOrRenewable) return false;
     final s = status.trim().toLowerCase();
     final d = displayStatus.trim().toLowerCase();
     final r = reviewStatus.trim().toLowerCase();
@@ -213,6 +234,13 @@ class CertificateApplicationItem {
   }
 
   String get displayReviewStatus {
+    if (isExpiredOrRenewable) {
+      if (status.trim().toLowerCase().contains('renew') ||
+          displayStatus.trim().toLowerCase().contains('renew')) {
+        return 'Renew Certificate';
+      }
+      return 'Expired';
+    }
     if (reviewStatus.isNotEmpty) {
       return formatReviewStatus(reviewStatus);
     }
@@ -234,6 +262,7 @@ class CertificateApplicationItem {
     if (lower == 'scoring') return 'Scoring';
     if (lower == 'rejected') return 'Rejected';
     if (lower == 'expired') return 'Expired';
+    if (lower == 'renew certificate' || lower.contains('renew')) return 'Renew Certificate';
     if (lower == 'changes_required' || lower == 'changes required') return 'Changes Required';
     return raw.replaceAll('_', ' ').split(' ').map((word) {
       if (word.isEmpty) return '';
@@ -248,6 +277,14 @@ class CertificateApplicationItem {
     final revStatus = (json['review_status'] ?? json['reviewStatus'] ?? '').toString().trim();
     final dispStatus = (json['display_status'] ?? json['displayStatus'] ?? '').toString().trim();
     final rawStatus = (json['status'] ?? 'Submitted').toString().trim();
+    final reason = json['rejection_reason']?.toString() ??
+        json['reason']?.toString() ??
+        json['reviewer_comment']?.toString() ??
+        json['comment']?.toString();
+    final canRenewVal = json['can_renew'] == true ||
+        (json['certificate'] is Map && (json['certificate'] as Map)['can_renew'] == true);
+    final expiredVal = json['expired'] == true ||
+        (json['certificate'] is Map && (json['certificate'] as Map)['expired'] == true);
 
     return CertificateApplicationItem(
       id: (json['id'] ?? json['application_id'] ?? '').toString(),
@@ -262,6 +299,9 @@ class CertificateApplicationItem {
       displayStatus: dispStatus,
       score: (json['score'] ?? '').toString(),
       emoji: (json['emoji'] ?? '🏅').toString(),
+      rejectionReason: reason,
+      canRenew: canRenewVal,
+      isExpiredStatus: expiredVal,
     );
   }
 

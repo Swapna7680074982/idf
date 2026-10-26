@@ -6,6 +6,7 @@ import '../../models/application_item_model.dart';
 import '../../models/certification_model.dart';
 import '../../services/api_config.dart';
 import '../../services/certification_service.dart';
+import '../applications/renewal/renewal_wizard_screen.dart';
 import 'certification_wizard_screen.dart';
 
 class CertificationDetailsScreen extends StatefulWidget {
@@ -400,19 +401,49 @@ class _CertificationDetailsScreenState
 
   CertificationApplicationDetail _buildFallbackDetailFromItem(
       CertificateApplicationItem item) {
+    final statusLower = item.status.toLowerCase();
+    final isRejected = statusLower.contains('reject');
+    final isChangesRequired = statusLower.contains('change');
+    final isApproved = item.isApproved;
+
+    final reviewStatus = isApproved
+        ? 'approved'
+        : (isRejected
+            ? 'rejected'
+            : (isChangesRequired ? 'changes_required' : 'ai_audit'));
+
+    final decision = isApproved
+        ? 'Approved'
+        : (isRejected
+            ? 'Rejected'
+            : (isChangesRequired ? 'Changes Required' : 'Pending'));
+
+    final reason = item.rejectionReason ??
+        (isRejected
+            ? 'Application did not meet the IDF Active accreditation requirements.'
+            : (isChangesRequired
+                ? 'Auditor requested modifications before certification can be granted.'
+                : null));
+
     return CertificationApplicationDetail(
       id: int.tryParse(item.id) ?? 1,
       applicationId: item.certificateId.isNotEmpty ? item.certificateId : 'APP-CERT-${item.id}',
       applicationNo: item.certificateId.isNotEmpty ? item.certificateId : 'APP-CERT-${item.id}',
       applicationType: 'new',
       status: item.status,
-      reviewStatus: item.status.toLowerCase() == 'active' ? 'approved' : 'ai_audit',
+      reviewStatus: reviewStatus,
       displayStatus: item.status,
-      decision: item.status == 'Active' ? 'Approved' : 'Pending',
-      editable: item.status.toLowerCase().contains('changes'),
+      decision: decision,
+      decisionText: isRejected
+          ? 'Application Rejected'
+          : (isApproved ? 'Approved' : (isChangesRequired ? 'Changes Required' : 'Pending')),
+      editable: isChangesRequired || isRejected,
       currentStep: 4,
       totalSteps: 4,
       submittedAt: item.issuedDate,
+      decisionAt: isApproved || isRejected ? item.issuedDate : null,
+      reviewerComment: reason,
+      adminComment: reason,
       institution: CertificationInstitution(
         name: item.institutionName,
         category: item.institutionType,
@@ -424,11 +455,78 @@ class _CertificationDetailsScreenState
         contactEmail: '—',
         contactPhone: '—',
       ),
-      timeline: const [
-        CertificationTimelineStage(stage: 'submitted', label: 'Submitted', state: 'completed'),
-        CertificationTimelineStage(stage: 'ai_validation', label: 'AI Audit', state: 'completed'),
-        CertificationTimelineStage(stage: 'manual_review', label: 'Manual Review', state: 'completed'),
-        CertificationTimelineStage(stage: 'certificate', label: 'Certificate', state: 'completed'),
+      timeline: [
+        const CertificationTimelineStage(
+          stage: 'submitted',
+          label: 'Submitted',
+          state: 'completed',
+          note: 'Application submitted successfully',
+        ),
+        const CertificationTimelineStage(
+          stage: 'ai_validation',
+          label: 'AI Audit',
+          state: 'completed',
+          note: 'AI automated checks completed',
+        ),
+        CertificationTimelineStage(
+          stage: 'manual_review',
+          label: 'Manual Review',
+          state: isApproved
+              ? 'completed'
+              : (isRejected
+                  ? 'rejected'
+                  : (isChangesRequired ? 'changes_required' : 'in_progress')),
+          note: isApproved
+              ? 'Manual review completed • Approved'
+              : (isRejected
+                  ? 'Manual review completed • Rejected'
+                  : (isChangesRequired
+                      ? 'Auditor requested modifications'
+                      : 'Manual review in progress')),
+          comment: reason,
+        ),
+        CertificationTimelineStage(
+          stage: 'certificate',
+          label: 'Certificate',
+          state: isApproved
+              ? 'completed'
+              : (isRejected
+                  ? 'blocked'
+                  : (isChangesRequired ? 'blocked' : 'pending')),
+          note: isApproved
+              ? 'Certificate issued'
+              : (isRejected
+                  ? 'Certificate not issued • Application rejected'
+                  : (isChangesRequired
+                      ? 'Certificate not issued due to changes required'
+                      : 'Certificate issuance pending completion of review')),
+        ),
+      ],
+      aiValidation: const [
+        CertificationAiValidationCheck(
+          checkType: 'evidence_review',
+          label: 'Evidence Review',
+          status: 'approved',
+          details: 'Mandatory documentation inspected.',
+        ),
+        CertificationAiValidationCheck(
+          checkType: 'image_location_validation',
+          label: 'Image Location Validation',
+          status: 'approved',
+          details: 'GPS & timestamp validation completed.',
+        ),
+        CertificationAiValidationCheck(
+          checkType: 'detail_evidence_match',
+          label: 'Detail Evidence Match',
+          status: 'approved',
+          details: 'Institution details verified.',
+        ),
+        CertificationAiValidationCheck(
+          checkType: 'overall',
+          label: 'Overall AI Audit',
+          status: 'approved',
+          details: 'Automated validation completed.',
+        ),
       ],
     );
   }
@@ -511,6 +609,9 @@ class _CertificationDetailsScreenState
   Widget _buildContentView() {
     final detail = _detail!;
     final inst = detail.institution;
+    final isRenewable = detail.status.toLowerCase().contains('renew') ||
+        detail.displayStatus.toLowerCase().contains('renew') ||
+        (widget.certificateItem != null && widget.certificateItem!.isExpiredOrRenewable);
 
     return RefreshIndicator(
       onRefresh: _fetchApplicationDetail,
@@ -551,14 +652,22 @@ class _CertificationDetailsScreenState
               const SizedBox(height: 14),
             ],
 
-            // 7. Actions (Edit Application if editable or changes required)
-            if (detail.editable ||
+            // 7. Actions (Renew if renewable, Edit Application if editable/changes required, or re-apply if rejected)
+            if (isRenewable) ...[
+              _buildRenewButton(detail),
+              const SizedBox(height: 20),
+            ] else if (detail.editable ||
                 detail.status.toLowerCase().contains('change') ||
                 detail.displayStatus.toLowerCase().contains('change') ||
-                detail.reviewStatus.toLowerCase().contains('change')) ...[
+                detail.reviewStatus.toLowerCase().contains('change') ||
+                detail.status.toLowerCase().contains('reject') ||
+                detail.displayStatus.toLowerCase().contains('reject') ||
+                detail.reviewStatus.toLowerCase().contains('reject') ||
+                detail.decision.toLowerCase().contains('reject')) ...[
               _buildActionButtons(detail),
               const SizedBox(height: 20),
             ],
+            const SizedBox(height: 14),
           ],
         ),
       ),
@@ -761,11 +870,17 @@ class _CertificationDetailsScreenState
         revStatus == 'approved' ||
         decision == 'approved';
 
-    final isChangesRequired = status.contains('change') ||
-        dispStatus.contains('change') ||
-        revStatus.contains('change') ||
-        decision.contains('change') ||
-        (_detail?.editable == true && !isApproved);
+    final isRejected = status.contains('reject') ||
+        dispStatus.contains('reject') ||
+        revStatus.contains('reject') ||
+        decision.contains('reject');
+
+    final isChangesRequired = !isRejected &&
+        (status.contains('change') ||
+            dispStatus.contains('change') ||
+            revStatus.contains('change') ||
+            decision.contains('change') ||
+            (_detail?.editable == true && !isApproved));
 
     final Map<String, CertificationTimelineStage> stageMap = {};
     for (final s in stages) {
@@ -777,7 +892,13 @@ class _CertificationDetailsScreenState
     final manualStage = stageMap['manual_review'] ?? stageMap['review'] ?? stageMap['audit'];
     final certStage = stageMap['certificate'] ?? stageMap['cert'];
 
-    final comment = _detail?.effectiveComment ?? manualStage?.comment;
+    final comment = _detail?.effectiveComment ??
+        manualStage?.comment ??
+        (isRejected
+            ? 'Application did not meet the IDF Active accreditation requirements.'
+            : (isChangesRequired
+                ? 'Auditor requested modifications before certification can be granted.'
+                : null));
 
     return [
       CertificationTimelineStage(
@@ -792,20 +913,24 @@ class _CertificationDetailsScreenState
         label: 'AI Audit',
         state: 'completed',
         note: aiStage?.note ?? 'AI automated checks completed',
-        occurredAt: aiStage?.occurredAt,
+        occurredAt: aiStage?.occurredAt ?? _detail?.submittedAt,
       ),
       CertificationTimelineStage(
         stage: 'manual_review',
         label: 'Manual Review',
         state: isApproved
             ? 'completed'
-            : (isChangesRequired ? 'changes_required' : (manualStage?.state ?? 'in_progress')),
+            : (isRejected
+                ? 'rejected'
+                : (isChangesRequired ? 'changes_required' : (manualStage?.state ?? 'in_progress'))),
         note: isApproved
             ? 'Manual review completed • Approved'
-            : (isChangesRequired
-                ? 'Auditor requested modifications'
-                : (manualStage?.note ?? 'Manual review in progress')),
-        comment: isChangesRequired ? comment : manualStage?.comment,
+            : (isRejected
+                ? 'Manual review completed • Rejected'
+                : (isChangesRequired
+                    ? 'Auditor requested modifications'
+                    : (manualStage?.note ?? 'Manual review in progress'))),
+        comment: (isRejected || isChangesRequired) ? comment : manualStage?.comment,
         occurredAt: manualStage?.occurredAt ?? _detail?.decisionAt,
       ),
       CertificationTimelineStage(
@@ -813,13 +938,15 @@ class _CertificationDetailsScreenState
         label: 'Certificate',
         state: isApproved
             ? 'completed'
-            : (isChangesRequired ? 'blocked' : 'pending'),
+            : (isRejected || isChangesRequired ? 'blocked' : 'pending'),
         note: isApproved
             ? 'Certificate issued'
-            : (isChangesRequired
-                ? 'Certificate not issued due to changes required'
-                : 'Certificate issuance pending completion of review'),
-        occurredAt: isApproved ? (_detail?.decisionAt ?? certStage?.occurredAt) : null,
+            : (isRejected
+                ? 'Certificate not issued • Application rejected'
+                : (isChangesRequired
+                    ? 'Certificate not issued due to changes required'
+                    : 'Certificate issuance pending completion of review')),
+        occurredAt: (isApproved || isRejected) ? (_detail?.decisionAt ?? certStage?.occurredAt) : null,
       ),
     ];
   }
@@ -868,6 +995,7 @@ class _CertificationDetailsScreenState
     final isCompleted = state == 'completed';
     final isInProgress = state == 'in_progress';
     final isStageChangesRequired = state == 'changes_required';
+    final isStageRejected = state == 'rejected';
     final isStageBlocked = state == 'blocked';
 
     Color nodeColor = const Color(0xFFCBD5E1);
@@ -886,9 +1014,12 @@ class _CertificationDetailsScreenState
     } else if (isStageChangesRequired) {
       nodeColor = const Color(0xFFEA580C);
       iconChild = const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.white);
-    } else if (isStageBlocked) {
+    } else if (isStageRejected) {
       nodeColor = const Color(0xFFDC2626);
-      iconChild = const Icon(Icons.close_rounded, size: 13, color: Colors.white);
+      iconChild = const Icon(Icons.close_rounded, size: 14, color: Colors.white);
+    } else if (isStageBlocked) {
+      nodeColor = const Color(0xFF94A3B8);
+      iconChild = const Icon(Icons.block_rounded, size: 13, color: Colors.white);
     } else if (isInProgress) {
       nodeColor = AppColors.primaryBlue;
       iconChild = Container(
@@ -906,6 +1037,8 @@ class _CertificationDetailsScreenState
       lineColor = const Color(0xFF86EFAC);
     } else if (isStageChangesRequired) {
       lineColor = const Color(0xFFFED7AA);
+    } else if (isStageRejected) {
+      lineColor = const Color(0xFFFECACA);
     }
 
     return IntrinsicHeight(
@@ -953,7 +1086,7 @@ class _CertificationDetailsScreenState
                               fontWeight: FontWeight.w700,
                               color: isStageChangesRequired
                                   ? const Color(0xFFC2410C)
-                                  : (isStageBlocked
+                                  : (isStageRejected || isStageBlocked
                                       ? const Color(0xFFDC2626)
                                       : (isInProgress
                                           ? AppColors.primaryBlue
@@ -962,21 +1095,29 @@ class _CertificationDetailsScreenState
                                               : const Color(0xFF64748B)))),
                             ),
                           ),
-                          if (isStageChangesRequired) ...[
+                          if (isStageChangesRequired || isStageRejected) ...[
                             const SizedBox(width: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFFEDD5),
+                                color: isStageRejected
+                                    ? const Color(0xFFFEE2E2)
+                                    : const Color(0xFFFFEDD5),
                                 borderRadius: BorderRadius.circular(6),
-                                border: Border.all(color: const Color(0xFFFDBA74)),
+                                border: Border.all(
+                                  color: isStageRejected
+                                      ? const Color(0xFFFECACA)
+                                      : const Color(0xFFFDBA74),
+                                ),
                               ),
                               child: Text(
-                                'Changes Required',
+                                isStageRejected ? 'Rejected' : 'Changes Required',
                                 style: GoogleFonts.inter(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
-                                  color: const Color(0xFFC2410C),
+                                  color: isStageRejected
+                                      ? const Color(0xFFDC2626)
+                                      : const Color(0xFFC2410C),
                                 ),
                               ),
                             ),
@@ -999,40 +1140,47 @@ class _CertificationDetailsScreenState
                       stage.note!,
                       style: GoogleFonts.inter(
                         fontSize: 12,
-                        color: isStageBlocked
+                        color: (isStageBlocked || isStageRejected)
                             ? const Color(0xFFDC2626)
                             : (isStageChangesRequired
                                 ? const Color(0xFFC2410C)
                                 : const Color(0xFF64748B)),
-                        fontWeight: (isStageBlocked || isStageChangesRequired)
+                        fontWeight: (isStageBlocked || isStageChangesRequired || isStageRejected)
                             ? FontWeight.w600
                             : FontWeight.w400,
                       ),
                     ),
                   ],
-                  if (isStageChangesRequired && stage.comment != null && stage.comment!.isNotEmpty) ...[
+                  if ((isStageChangesRequired || isStageRejected) && stage.comment != null && stage.comment!.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF7ED),
+                        color: isStageRejected ? const Color(0xFFFEF2F2) : const Color(0xFFFFF7ED),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFFDBA74), width: 1),
+                        border: Border.all(
+                          color: isStageRejected ? const Color(0xFFFECACA) : const Color(0xFFFDBA74),
+                          width: 1,
+                        ),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.rate_review_outlined, size: 13, color: Color(0xFFC2410C)),
+                              Icon(
+                                isStageRejected ? Icons.cancel_outlined : Icons.rate_review_outlined,
+                                size: 13,
+                                color: isStageRejected ? const Color(0xFFDC2626) : const Color(0xFFC2410C),
+                              ),
                               const SizedBox(width: 5),
                               Text(
-                                'Auditor Notes / Action Required:',
+                                isStageRejected ? 'Auditor Rejection Reason:' : 'Auditor Notes / Action Required:',
                                 style: GoogleFonts.inter(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w700,
-                                  color: const Color(0xFFC2410C),
+                                  color: isStageRejected ? const Color(0xFFDC2626) : const Color(0xFFC2410C),
                                 ),
                               ),
                             ],
@@ -1043,7 +1191,7 @@ class _CertificationDetailsScreenState
                             style: GoogleFonts.inter(
                               fontSize: 12,
                               height: 1.35,
-                              color: const Color(0xFF9A3412),
+                              color: isStageRejected ? const Color(0xFF991B1B) : const Color(0xFF9A3412),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -1063,11 +1211,11 @@ class _CertificationDetailsScreenState
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.info_outline_rounded, size: 13, color: Color(0xFFDC2626)),
+                          const Icon(Icons.block_rounded, size: 13, color: Color(0xFFDC2626)),
                           const SizedBox(width: 5),
                           Flexible(
                             child: Text(
-                              'Certificate not issued due to changes required',
+                              stage.note ?? 'Certificate not issued',
                               style: GoogleFonts.inter(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
@@ -1116,7 +1264,56 @@ class _CertificationDetailsScreenState
     );
   }
 
+  List<CertificationAiValidationCheck> _resolveAiValidationChecks(
+      CertificationApplicationDetail detail) {
+    if (detail.aiValidation.isNotEmpty) {
+      return detail.aiValidation;
+    }
+
+    final isRejected = detail.status.toLowerCase().contains('reject') ||
+        detail.reviewStatus.toLowerCase().contains('reject') ||
+        detail.displayStatus.toLowerCase().contains('reject') ||
+        detail.decision.toLowerCase().contains('reject');
+
+    return [
+      const CertificationAiValidationCheck(
+        checkType: 'evidence_review',
+        label: 'Evidence Review',
+        status: 'approved',
+        statusLabel: 'VERIFIED',
+        details: 'Mandatory documentation inspected.',
+      ),
+      const CertificationAiValidationCheck(
+        checkType: 'image_location_validation',
+        label: 'Image Location Validation',
+        status: 'approved',
+        statusLabel: 'VERIFIED',
+        details: 'GPS & timestamp validation completed.',
+      ),
+      CertificationAiValidationCheck(
+        checkType: 'detail_evidence_match',
+        label: 'Detail Evidence Match',
+        status: isRejected ? 'rejected' : 'approved',
+        statusLabel: isRejected ? 'INSUFFICIENT' : 'VERIFIED',
+        details: isRejected
+            ? 'Institution documentation did not satisfy minimum score threshold.'
+            : 'Institution details verified.',
+      ),
+      CertificationAiValidationCheck(
+        checkType: 'overall',
+        label: 'Overall AI Audit',
+        status: isRejected ? 'rejected' : 'approved',
+        statusLabel: isRejected ? 'FAILED' : 'PASSED',
+        details: isRejected
+            ? 'Automated review flagged criteria deficiencies.'
+            : 'Automated validation completed.',
+      ),
+    ];
+  }
+
   Widget _buildAiValidationCard(CertificationApplicationDetail detail) {
+    final checks = _resolveAiValidationChecks(detail);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1153,7 +1350,7 @@ class _CertificationDetailsScreenState
             ],
           ),
           const SizedBox(height: 12),
-          ...detail.aiValidation.map((c) => _buildCheckItem(c)),
+          ...checks.map((c) => _buildCheckItem(c)),
           const SizedBox(height: 12),
           // Trigger manual re-run/verify button
           SizedBox(
@@ -1360,29 +1557,47 @@ class _CertificationDetailsScreenState
   }
 
   Widget _buildCommentsCard(CertificationApplicationDetail detail) {
-    final comment = detail.aiValidationComment ?? detail.reviewerComment ?? detail.adminComment ?? '';
+    final isRejected = detail.status.toLowerCase().contains('reject') ||
+        detail.reviewStatus.toLowerCase().contains('reject') ||
+        detail.displayStatus.toLowerCase().contains('reject') ||
+        detail.decision.toLowerCase().contains('reject');
+
+    final comment = detail.effectiveComment ??
+        (isRejected
+            ? 'Application did not meet the IDF Active accreditation requirements.'
+            : '');
+
+    if (comment.isEmpty) return const SizedBox.shrink();
+
+    final bg = isRejected ? const Color(0xFFFEF2F2) : const Color(0xFFFFFBEB);
+    final border = isRejected ? const Color(0xFFFECACA) : const Color(0xFFFDE68A);
+    final titleColor = isRejected ? const Color(0xFF991B1B) : const Color(0xFF92400E);
+    final textColor = isRejected ? const Color(0xFF7F1D1D) : const Color(0xFF78350F);
+    final title = isRejected ? 'Auditor Rejection Reason' : 'Reviewer / Auditor Feedback';
+    final icon = isRejected ? '❌' : '📝';
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
+        color: bg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFDE68A)),
+        border: Border.all(color: border),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('📝', style: TextStyle(fontSize: 16)),
+          Text(icon, style: const TextStyle(fontSize: 16)),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Reviewer / Auditor Feedback',
+                  title,
                   style: GoogleFonts.inter(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: const Color(0xFF92400E),
+                    color: titleColor,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -1390,7 +1605,7 @@ class _CertificationDetailsScreenState
                   comment,
                   style: GoogleFonts.inter(
                     fontSize: 12,
-                    color: const Color(0xFF78350F),
+                    color: textColor,
                     height: 1.35,
                   ),
                 ),
@@ -1403,11 +1618,27 @@ class _CertificationDetailsScreenState
   }
 
   Widget _buildActionButtons(CertificationApplicationDetail detail) {
+    final isRejected = detail.status.toLowerCase().contains('reject') ||
+        detail.reviewStatus.toLowerCase().contains('reject') ||
+        detail.displayStatus.toLowerCase().contains('reject') ||
+        detail.decision.toLowerCase().contains('reject');
+
     return SizedBox(
       width: double.infinity,
       height: 48,
       child: ElevatedButton.icon(
         onPressed: () {
+          if (isRejected) {
+            // For Rejected: Start a completely fresh application without prefilled data
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const CertificationWizardScreen(),
+              ),
+            );
+            return;
+          }
+
+          // For Changes Required: Prefill existing application data for editing
           final appId = detail.applicationId.isNotEmpty
               ? detail.applicationId
               : (detail.id > 0 ? detail.id.toString() : detail.applicationNo);
@@ -1434,13 +1665,57 @@ class _CertificationDetailsScreenState
             ),
           ).then((_) => _fetchApplicationDetail());
         },
-        icon: const Icon(Icons.edit_note_rounded, size: 20),
+        icon: Icon(
+          isRejected ? Icons.replay_rounded : Icons.edit_note_rounded,
+          size: 20,
+        ),
         label: Text(
-          'Edit / Resubmit Application',
+          isRejected ? 'Re-apply for Certification' : 'Edit / Resubmit Application',
           style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryBlue,
+          backgroundColor: isRejected ? const Color(0xFFDC2626) : AppColors.primaryBlue,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRenewButton(CertificationApplicationDetail detail) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton.icon(
+        onPressed: () {
+          final certItem = widget.certificateItem ??
+              CertificateApplicationItem(
+                id: detail.id.toString(),
+                institutionName: detail.institution?.name ?? '',
+                institutionType: detail.institution?.category ?? '',
+                certificateId: detail.applicationNo,
+                applicationNo: detail.applicationNo,
+                issuedDate: detail.submittedAt ?? '',
+                expiresDate: '',
+                status: detail.status,
+                reviewStatus: detail.reviewStatus,
+                displayStatus: detail.displayStatus,
+                score: widget.certificateItem?.score ?? '',
+                canRenew: true,
+              );
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => RenewalWizardScreen(certificate: certItem),
+            ),
+          );
+        },
+        icon: const Icon(Icons.autorenew_rounded, size: 20),
+        label: Text(
+          'Renew Certificate',
+          style: GoogleFonts.inter(fontSize: 14.5, fontWeight: FontWeight.w700),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFEA580C),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
@@ -1460,10 +1735,16 @@ class _CertificationDetailsScreenState
     } else if (lower.contains('manual') || lower.contains('review') || lower == 'under_review') {
       bg = const Color(0xFFFEF3C7);
       fg = const Color(0xFFD97706);
+    } else if (lower.contains('renew')) {
+      bg = const Color(0xFFFFF7ED);
+      fg = const Color(0xFFEA580C);
     } else if (lower.contains('changes')) {
+      bg = const Color(0xFFFFF7ED);
+      fg = const Color(0xFFC2410C);
+    } else if (lower.contains('reject')) {
       bg = const Color(0xFFFEE2E2);
       fg = const Color(0xFFDC2626);
-    } else if (lower == 'expired' || lower == 'rejected') {
+    } else if (lower == 'expired') {
       bg = const Color(0xFFF1F5F9);
       fg = const Color(0xFF64748B);
     }
@@ -1486,6 +1767,12 @@ class _CertificationDetailsScreenState
   }
 
   bool _hasComment(CertificationApplicationDetail detail) {
+    if (detail.status.toLowerCase().contains('reject') ||
+        detail.reviewStatus.toLowerCase().contains('reject') ||
+        detail.displayStatus.toLowerCase().contains('reject') ||
+        detail.decision.toLowerCase().contains('reject')) {
+      return true;
+    }
     return (detail.aiValidationComment != null && detail.aiValidationComment!.isNotEmpty) ||
         (detail.reviewerComment != null && detail.reviewerComment!.isNotEmpty) ||
         (detail.adminComment != null && detail.adminComment!.isNotEmpty);
@@ -1515,6 +1802,8 @@ class _CertificationDetailsScreenState
         return 'Changes Required';
       case 'expired':
         return 'Expired';
+      case 'renew certificate':
+        return 'Renew Certificate';
       default:
         if (reviewStatus.trim().isEmpty) return 'Manual Review';
         return reviewStatus.replaceAll('_', ' ').split(' ').map((word) {

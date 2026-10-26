@@ -8,6 +8,7 @@ import '../certification/certification_details_screen.dart';
 import '../certification/certification_wizard_screen.dart';
 import 'certificate_view_screen.dart';
 import 'expired_certificate_details_screen.dart';
+import 'renewal/renewal_wizard_screen.dart';
 import 'program_application_details_screen.dart';
 import '../../services/programs_service.dart';
 import '../../services/certification_service.dart';
@@ -743,23 +744,23 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   }
 
   Widget _buildCertificateCard(CertificateApplicationItem item) {
-    final isExpired = item.status.toLowerCase() == 'expired';
+    final isExpired = item.isExpiredOrRenewable;
     final isChangesRequired = item.status.toLowerCase() == 'changes required' ||
         item.status.toLowerCase() == 'changes_required';
     final isApproved = item.isApproved && item.certificateId.isNotEmpty;
 
     void openCert() {
-      if (isApproved) {
+      if (isExpired) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => RenewalWizardScreen(certificate: item),
+          ),
+        );
+      } else if (isApproved) {
         // Only if approved/certified with an issued certificate, show CertificateViewScreen!
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => CertificateViewScreen(certificate: item),
-          ),
-        );
-      } else if (isExpired) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ExpiredCertificateDetailsScreen(certificate: item),
           ),
         );
       } else if (isChangesRequired) {
@@ -934,7 +935,9 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                           fontWeight: FontWeight.w700,
                                           color: isChangesRequired
                                               ? const Color(0xFFDC2626)
-                                              : AppColors.primaryBlue,
+                                              : isExpired
+                                                  ? const Color(0xFFEA580C)
+                                                  : AppColors.primaryBlue,
                                         ),
                                       ),
                                       const SizedBox(width: 4),
@@ -943,7 +946,9 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                         size: 13,
                                         color: isChangesRequired
                                             ? const Color(0xFFDC2626)
-                                            : AppColors.primaryBlue,
+                                            : isExpired
+                                                ? const Color(0xFFEA580C)
+                                                : AppColors.primaryBlue,
                                       ),
                                     ],
                                   ),
@@ -997,6 +1002,10 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       bg = const Color(0xFFFEF3C7);
       text = const Color(0xFFB45309);
       border = const Color(0xFFFDE68A);
+    } else if (s.contains('renew')) {
+      bg = const Color(0xFFFFF7ED);
+      text = const Color(0xFFEA580C);
+      border = const Color(0xFFFDBA74);
     } else if (s.contains('changes') || s == 'changes required') {
       bg = const Color(0xFFFFEDD5);
       text = const Color(0xFFC2410C);

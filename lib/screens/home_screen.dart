@@ -17,6 +17,7 @@ import 'certification/certification_wizard_screen.dart';
 import 'certification/certification_details_screen.dart';
 import 'applications/certificate_view_screen.dart';
 import 'applications/expired_certificate_details_screen.dart';
+import 'applications/renewal/renewal_wizard_screen.dart';
 import '../models/certification_model.dart';
 import '../models/application_item_model.dart';
 import '../models/home_models.dart';
@@ -1331,22 +1332,22 @@ class _HomeScreenState extends State<HomeScreen> {
       score: '',
     );
 
-    final isExpired = item.status.toLowerCase() == 'expired';
+    final isExpired = item.isExpiredOrRenewable;
     final isChangesRequired = item.status.toLowerCase() == 'changes required' ||
         item.status.toLowerCase() == 'changes_required';
     final isApproved = item.isApproved && item.certificateId.isNotEmpty;
 
     void openCert() {
-      if (isApproved) {
+      if (isExpired) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => RenewalWizardScreen(certificate: item),
+          ),
+        );
+      } else if (isApproved) {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => CertificateViewScreen(certificate: item),
-          ),
-        );
-      } else if (isExpired) {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ExpiredCertificateDetailsScreen(certificate: item),
           ),
         );
       } else if (isChangesRequired) {
@@ -1472,7 +1473,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   fontWeight: FontWeight.w700,
                                   color: isChangesRequired
                                       ? const Color(0xFFDC2626)
-                                      : AppColors.primaryBlue,
+                                      : isExpired
+                                          ? const Color(0xFFEA580C)
+                                          : AppColors.primaryBlue,
                                 ),
                               ),
                               const SizedBox(width: 4),
@@ -1481,7 +1484,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 size: 13,
                                 color: isChangesRequired
                                     ? const Color(0xFFDC2626)
-                                    : AppColors.primaryBlue,
+                                    : isExpired
+                                        ? const Color(0xFFEA580C)
+                                        : AppColors.primaryBlue,
                               ),
                             ],
                           ),
