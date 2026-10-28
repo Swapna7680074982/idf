@@ -1,3 +1,4 @@
+import '../services/api_config.dart';
 import 'program_api_models.dart';
 import 'program_model.dart';
 
@@ -77,7 +78,7 @@ class ProgramApplicationItem {
       lastUpdatedDate: (json['last_updated'] ?? json['updated_at'] ?? json['registered_at'] ?? '').toString(),
       status: normalizedStatus,
       description: (json['description'] ?? json['about'] ?? '').toString(),
-      banner: (json['banner_image_url'] ?? json['cover_image_url'] ?? json['banner'])?.toString(),
+      banner: ApiConfig.extractBannerUrl(json),
       contactPerson: json['contact_person']?.toString(),
       contactPhone: json['phone']?.toString(),
       contactEmail: json['email']?.toString(),
@@ -108,7 +109,11 @@ class ProgramApplicationItem {
       submittedDate: item.registeredAt ?? item.startDate ?? '',
       lastUpdatedDate: item.registeredAt ?? item.startDate ?? '',
       status: normalizedStatus,
-      banner: item.coverImageUrl ?? item.bannerImageUrl ?? item.banner,
+      banner: ApiConfig.extractBannerUrl({
+        'cover_image_url': item.coverImageUrl,
+        'banner_image_url': item.bannerImageUrl,
+        'banner': item.banner,
+      }) ?? item.coverImageUrl ?? item.bannerImageUrl ?? item.banner,
       supportingMaterials: const [],
       materials: const [],
       agenda: const [],
@@ -156,13 +161,21 @@ class ProgramApplicationItem {
 
   static String _normalizeStatus(String raw) {
     final lower = raw.trim().toLowerCase();
-    if (lower == 'submitted') return 'Submitted';
-    if (lower == 'approved') return 'Approved';
+    if (lower == 'submitted' ||
+        lower == 'in review' ||
+        lower == 'in_review' ||
+        lower == 'review' ||
+        lower == 'manual_review' ||
+        lower == 'manual review' ||
+        lower == 'under_review') {
+      return 'Manual Review';
+    }
+    if (lower == 'approved' || lower == 'completed' || lower == 'complete') return 'Approved';
+    if (lower == 'rejected' || lower == 'cancelled' || lower == 'canceled') return 'Rejected';
+    if (lower == 'changes_required' || lower == 'changes required' || lower.contains('changes')) {
+      return 'Changes Required';
+    }
     if (lower == 'draft') return 'Draft';
-    if (lower == 'in review' || lower == 'in_review' || lower == 'review' || lower == 'manual_review') return 'In Review';
-    if (lower == 'completed') return 'Completed';
-    if (lower == 'changes_required' || lower == 'changes required') return 'Changes Required';
-    if (lower == 'rejected') return 'Rejected';
     return raw;
   }
 
@@ -186,6 +199,7 @@ class CertificateApplicationItem {
   final String? rejectionReason;
   final bool canRenew;
   final bool isExpiredStatus;
+  final String? certificateRecordId;
 
   const CertificateApplicationItem({
     required this.id,
@@ -203,7 +217,24 @@ class CertificateApplicationItem {
     this.rejectionReason,
     this.canRenew = false,
     this.isExpiredStatus = false,
+    this.certificateRecordId,
   });
+
+  /// Primary certificate identifier for the renewal endpoint /api/certification/certificates/:id/renew
+  String get effectiveCertificateId {
+    if (certificateRecordId != null && certificateRecordId!.isNotEmpty) {
+      return certificateRecordId!;
+    }
+    if (int.tryParse(id) != null && int.parse(id) > 0) {
+      return id;
+    }
+    if (int.tryParse(certificateId) != null && int.parse(certificateId) > 0) {
+      return certificateId;
+    }
+    if (id.isNotEmpty) return id;
+    if (certificateId.isNotEmpty) return certificateId;
+    return applicationNo;
+  }
 
   bool get isExpiredOrRenewable {
     if (canRenew || isExpiredStatus) return true;
@@ -237,7 +268,7 @@ class CertificateApplicationItem {
     if (isExpiredOrRenewable) {
       if (status.trim().toLowerCase().contains('renew') ||
           displayStatus.trim().toLowerCase().contains('renew')) {
-        return 'Renew Certificate';
+        return 'Renewal';
       }
       return 'Expired';
     }
@@ -262,7 +293,7 @@ class CertificateApplicationItem {
     if (lower == 'scoring') return 'Scoring';
     if (lower == 'rejected') return 'Rejected';
     if (lower == 'expired') return 'Expired';
-    if (lower == 'renew certificate' || lower.contains('renew')) return 'Renew Certificate';
+    if (lower == 'renew certificate' || lower.contains('renew') || lower == 'renewal') return 'Renewal';
     if (lower == 'changes_required' || lower == 'changes required') return 'Changes Required';
     return raw.replaceAll('_', ' ').split(' ').map((word) {
       if (word.isEmpty) return '';
@@ -286,6 +317,15 @@ class CertificateApplicationItem {
     final expiredVal = json['expired'] == true ||
         (json['certificate'] is Map && (json['certificate'] as Map)['expired'] == true);
 
+    final certMap = json['certificate'] is Map ? json['certificate'] as Map : null;
+    final dynamic rawCertDbId = certMap?['id'] ??
+        certMap?['certificate_id'] ??
+        json['certificate_id'] ??
+        json['renewal_of_certificate_id'];
+    final certRecordIdStr = (rawCertDbId != null && rawCertDbId.toString() != 'null')
+        ? rawCertDbId.toString().trim()
+        : null;
+
     return CertificateApplicationItem(
       id: (json['id'] ?? json['application_id'] ?? '').toString(),
       institutionName: (json['institution_name'] ?? '').toString(),
@@ -302,6 +342,7 @@ class CertificateApplicationItem {
       rejectionReason: reason,
       canRenew: canRenewVal,
       isExpiredStatus: expiredVal,
+      certificateRecordId: certRecordIdStr,
     );
   }
 

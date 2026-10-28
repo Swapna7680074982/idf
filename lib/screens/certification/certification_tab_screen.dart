@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../core/date_time_utils.dart';
 import '../../core/theme.dart';
 import '../../models/application_item_model.dart';
 import '../../models/certification_model.dart';
 import '../../services/certification_service.dart';
 import '../applications/certificate_view_screen.dart';
+import '../applications/expired_certificate_details_screen.dart';
 import '../applications/renewal/renewal_wizard_screen.dart';
 import 'certification_details_screen.dart';
 import 'certification_wizard_screen.dart';
@@ -232,223 +234,293 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
   }
 
 
-  Widget _buildCurrentApplicationCard(
-      BuildContext context, CertificateApplicationItem app) {
-    final statusText = app.displayReviewStatus;
-    final isExpired = app.isExpiredOrRenewable;
-    final isApproved = app.isApproved;
-    final isChangesRequired = statusText.toLowerCase().contains('changes');
-    final isReview = statusText.toLowerCase().contains('review') ||
-        statusText.toLowerCase().contains('audit');
+  Widget _buildCertBadge(String status) {
+    Color bg = const Color(0xFFF1F5F9);
+    Color text = const Color(0xFF475569);
+    Color border = const Color(0xFFE2E8F0);
 
-    Color statusBg = const Color(0xFFE0F2FE);
-    Color statusFg = const Color(0xFF0284C7);
-    if (isExpired) {
-      statusBg = const Color(0xFFFFF7ED);
-      statusFg = const Color(0xFFEA580C);
-    } else if (isApproved) {
-      statusBg = const Color(0xFFDCFCE7);
-      statusFg = const Color(0xFF16A34A);
-    } else if (isReview) {
-      statusBg = const Color(0xFFFEF3C7);
-      statusFg = const Color(0xFFD97706);
-    } else if (isChangesRequired) {
-      statusBg = const Color(0xFFFEE2E2);
-      statusFg = const Color(0xFFDC2626);
+    final s = status.trim().toLowerCase();
+    String displayLabel = status;
+
+    if (s == 'active' || s == 'approved' || s == 'completed' || s == 'certified') {
+      bg = const Color(0xFFDCFCE7);
+      text = const Color(0xFF16A34A);
+      border = const Color(0xFF86EFAC);
+      displayLabel = 'Approved';
+    } else if (s.contains('manual') ||
+        s.contains('review') ||
+        s == 'pending' ||
+        s == 'under_review' ||
+        s == 'submitted' ||
+        s == 'ai_audit') {
+      bg = const Color(0xFFFEF3C7);
+      text = const Color(0xFFB45309);
+      border = const Color(0xFFFDE68A);
+      displayLabel = 'Manual Review';
+    } else if (s.contains('renew') || s == 'renewal') {
+      bg = const Color(0xFFFFF7ED);
+      text = const Color(0xFFEA580C);
+      border = const Color(0xFFFDBA74);
+      displayLabel = 'Renewal';
+    } else if (s.contains('changes') || s == 'changes required') {
+      bg = const Color(0xFFFFEDD5);
+      text = const Color(0xFFC2410C);
+      border = const Color(0xFFFDBA74);
+      displayLabel = 'Changes Required';
+    } else if (s == 'expired' || s == 'rejected' || s == 'cancelled') {
+      bg = const Color(0xFFFEE2E2);
+      text = const Color(0xFFDC2626);
+      border = const Color(0xFFFCA5A5);
+      displayLabel = s == 'expired' ? 'Expired' : 'Rejected';
     }
 
-    return InkWell(
-      onTap: () {
-        if (isExpired) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => RenewalWizardScreen(certificate: app),
-            ),
-          );
-        } else if (isApproved && app.hasCertificate) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => CertificateViewScreen(certificate: app),
-            ),
-          );
-        } else if (isChangesRequired) {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => CertificationWizardScreen(
-                applicationId: app.id.isNotEmpty ? app.id : app.applicationNo,
-                initialModel: CertificationApplicationModel.prefilledForCertificate(app),
-              ),
-            ),
-          );
-        } else {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => CertificationDetailsScreen(
-                applicationId: app.id.isNotEmpty ? app.id : app.applicationNo,
-                certificateItem: app,
-              ),
-            ),
-          );
-        }
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(6),
-              blurRadius: 10,
-              offset: const Offset(0, 2),
-            ),
-          ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: border, width: 1.0),
+      ),
+      child: Text(
+        displayLabel,
+        style: GoogleFonts.inter(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: text,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: isReview
-                    ? const Color(0xFFFEF3C7)
-                    : (isApproved ? const Color(0xFFDCFCE7) : const Color(0xFFE0F2FE)),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Center(
-                child: Text(
-                  isApproved ? '🏅' : '🏢',
-                  style: const TextStyle(fontSize: 24),
-                ),
-              ),
+      ),
+    );
+  }
+
+  Widget _buildCurrentApplicationCard(
+      BuildContext context, CertificateApplicationItem app) {
+    final isExpired = app.isExpiredOrRenewable;
+    final isChangesRequired = app.status.toLowerCase() == 'changes required' ||
+        app.status.toLowerCase() == 'changes_required' ||
+        app.displayReviewStatus.toLowerCase().contains('changes');
+    final isApproved = app.isApproved && app.certificateId.isNotEmpty;
+
+    void openCert() {
+      if (isExpired) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => RenewalWizardScreen(certificate: app),
+          ),
+        );
+      } else if (isApproved) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CertificateViewScreen(certificate: app),
+          ),
+        );
+      } else if (isChangesRequired) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CertificationWizardScreen(
+              applicationId: app.id.isNotEmpty ? app.id : app.applicationNo,
+              initialModel:
+                  CertificationApplicationModel.prefilledForCertificate(app),
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    app.institutionName.isNotEmpty
-                        ? app.institutionName
-                        : 'Institution Application',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
+          ),
+        );
+      } else {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CertificationDetailsScreen(
+              applicationId: app.id.isNotEmpty ? app.id : app.applicationNo,
+              certificateItem: app,
+            ),
+          ),
+        );
+      }
+    }
+
+    void openDetailsRedirect() {
+      if (isExpired) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ExpiredCertificateDetailsScreen(certificate: app),
+          ),
+        );
+      } else {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CertificationDetailsScreen(
+              applicationId: app.id.isNotEmpty ? app.id : app.applicationNo,
+              certificateItem: app,
+            ),
+          ),
+        );
+      }
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0), width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(4),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: openCert,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE0F2FE),
+                    shape: BoxShape.circle,
                   ),
-                  if (app.institutionType.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      app.institutionType,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.inter(
-                        fontSize: 11.5,
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 6),
-                  Row(
+                  child: const Center(
+                    child: Text('🏅', style: TextStyle(fontSize: 22)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 2.5),
-                        decoration: BoxDecoration(
-                          color: statusBg,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          statusText,
-                          style: GoogleFonts.inter(
-                            fontSize: 10.5,
-                            fontWeight: FontWeight.w700,
-                            color: statusFg,
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              app.institutionName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                                letterSpacing: -0.2,
+                              ),
+                            ),
                           ),
+                          const SizedBox(width: 6),
+                          _buildCertBadge(app.displayReviewStatus),
+                        ],
+                      ),
+                      Text(
+                        app.institutionType,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: const Color(0xFF64748B),
                         ),
                       ),
-                      if (app.applicationNo.isNotEmpty) ...[
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            app.applicationNo,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: const Color(0xFF94A3B8),
-                            ),
+                      const SizedBox(height: 3),
+                      Text(
+                        isApproved
+                            ? 'Certificate No: ${app.certificateId}'
+                            : 'Application No: ${app.applicationNo.isNotEmpty ? app.applicationNo : app.id}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                      if (app.issuedDate.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Issued: ${DateTimeUtils.formatDateTime(app.issuedDate)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: const Color(0xFF64748B),
                           ),
                         ),
                       ],
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            isChangesRequired
-                                ? 'Edit Application'
-                                : (isApproved ? 'View Certificate' : 'View Details'),
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              color: isChangesRequired
-                                  ? const Color(0xFFDC2626)
-                                  : AppColors.primaryBlue,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.arrow_forward_rounded,
-                            size: 13,
-                            color: isChangesRequired
-                                ? const Color(0xFFDC2626)
-                                : AppColors.primaryBlue,
-                          ),
-                        ],
-                      ),
-                      if (isApproved || isChangesRequired)
-                        InkWell(
-                          onTap: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => CertificationDetailsScreen(
-                                  applicationId: app.id.isNotEmpty ? app.id : app.applicationNo,
-                                  certificateItem: app,
-                                ),
-                              ),
-                            );
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                            child: Text(
-                              'Auditor Notes',
-                              style: GoogleFonts.inter(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF64748B),
-                                decoration: TextDecoration.underline,
-                              ),
-                            ),
+                      if (app.expiresDate.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Expires: ${DateTimeUtils.formatDateTime(app.expiresDate)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 11,
+                            color: const Color(0xFF64748B),
                           ),
                         ),
+                      ],
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                isExpired
+                                    ? 'Renew Certificate'
+                                    : isChangesRequired
+                                        ? 'Edit Application'
+                                        : isApproved
+                                            ? 'View Certificate'
+                                            : 'View Details',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: isChangesRequired
+                                      ? const Color(0xFFDC2626)
+                                      : isExpired
+                                          ? const Color(0xFFEA580C)
+                                          : AppColors.primaryBlue,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 13,
+                                color: isChangesRequired
+                                    ? const Color(0xFFDC2626)
+                                    : isExpired
+                                        ? const Color(0xFFEA580C)
+                                        : AppColors.primaryBlue,
+                              ),
+                            ],
+                          ),
+                          if (isExpired || isChangesRequired || isApproved)
+                            InkWell(
+                              onTap: openDetailsRedirect,
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 4, vertical: 2),
+                                child: Text(
+                                  isExpired ? 'View Details' : 'Auditor Notes',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF64748B),
+                                    decoration: TextDecoration.underline,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

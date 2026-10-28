@@ -1,3 +1,5 @@
+import '../services/api_config.dart';
+
 class PaginationInfo {
   final int page;
   final int limit;
@@ -86,8 +88,8 @@ class ProgramApiItem {
   });
 
   factory ProgramApiItem.fromJson(Map<String, dynamic> json) {
-    final effectiveCover = json['cover_image_url'] ?? json['banner_image_url'] ?? json['banner'];
-    final effectiveBanner = json['banner_image_url'] ?? json['banner'] ?? json['cover_image_url'];
+    final effectiveCover = ApiConfig.extractBannerUrl(json);
+    final effectiveBanner = effectiveCover;
     final statusStr = (json['review_status'] ?? json['status'])?.toString().toLowerCase() ?? '';
     final isSubmittedOrDraft = statusStr == 'submitted' || statusStr == 'draft' || statusStr == 'in_review';
     final isOrg = json['is_organizer'] == 1 ||
@@ -314,9 +316,9 @@ class ProgramProposalCreated {
       programNo: json['program_no']?.toString() ?? '',
       title: (json['title'] ?? json['program_name'] ?? '').toString(),
       programName: (json['program_name'] ?? json['title'] ?? '').toString(),
-      bannerImageUrl: json['banner_image_url']?.toString(),
-      coverImageUrl: json['cover_image_url']?.toString(),
-      banner: json['banner']?.toString(),
+      bannerImageUrl: ApiConfig.extractBannerUrl(json),
+      coverImageUrl: ApiConfig.extractBannerUrl(json),
+      banner: ApiConfig.extractBannerUrl(json),
       agenda: agendaList
           .whereType<Map<String, dynamic>>()
           .map((a) => ProgramAgendaScheduleItem.fromJson(a))

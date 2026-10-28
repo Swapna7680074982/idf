@@ -43,7 +43,7 @@ class ProgramsService {
     String? status,
     int? typeId,
     int? page,
-    int? limit,
+    int limit = 50,
   }) async {
     final queryParams = <String, String>{};
     if (search != null && search.trim().isNotEmpty) {
@@ -58,9 +58,8 @@ class ProgramsService {
     if (page != null && page > 1) {
       queryParams['page'] = page.toString();
     }
-    if (limit != null && limit != 20) {
-      queryParams['limit'] = limit.toString();
-    }
+    final effectiveLimit = limit > 50 ? 50 : (limit < 1 ? 20 : limit);
+    queryParams['limit'] = effectiveLimit.toString();
 
     final response = await ApiClient.get(
       ApiConfig.programs,

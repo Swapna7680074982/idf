@@ -119,7 +119,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    "Dr. Mohan's",
+                    "MDRF Activate",
                     style: GoogleFonts.inter(
                       fontSize: 26,
                       fontWeight: FontWeight.w700,
@@ -127,16 +127,7 @@ class _SplashScreenState extends State<SplashScreen> {
                       letterSpacing: -0.3,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'DIABETES SPECIALITIES CENTRE',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withAlpha(210),
-                      letterSpacing: 1.4,
-                    ),
-                  ),
+
                 ],
               ),
 

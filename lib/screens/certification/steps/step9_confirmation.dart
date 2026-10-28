@@ -205,9 +205,21 @@ class _Step9ConfirmationState extends State<Step9Confirmation> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: (_accepted && !widget.isSubmitting)
-                    ? widget.onSubmit
-                    : null,
+                onPressed: widget.isSubmitting
+                    ? null
+                    : () {
+                        if (!_accepted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please accept the declaration to submit'),
+                              backgroundColor: Color(0xFFEF4444),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          return;
+                        }
+                        widget.onSubmit();
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryBlue,
                   disabledBackgroundColor: const Color(0xFFCBD5E1),

@@ -49,6 +49,14 @@ class _Step5RegistrationState extends State<Step5Registration> {
       }
       widget.model.registrationLink = link;
       widget.onContinue();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid registration link or leave it blank'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 

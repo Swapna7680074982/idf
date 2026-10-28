@@ -1,20 +1,32 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../core/date_time_utils.dart';
 import '../../../core/theme.dart';
 import '../../home_screen.dart';
 
 class RenewalSubmittedScreen extends StatelessWidget {
   final String institutionName;
   final String applicationNumber;
+  final String status;
+  final String? submissionDate;
+  final String? originalCertificateNo;
 
   const RenewalSubmittedScreen({
     super.key,
     required this.institutionName,
     required this.applicationNumber,
+    this.status = 'Manual Review',
+    this.submissionDate,
+    this.originalCertificateNo,
   });
+
+  String _formatCurrentDate() {
+    return DateTimeUtils.formatDateTime(DateTime.now().toIso8601String());
+  }
 
   @override
   Widget build(BuildContext context) {
+    final displayDate = submissionDate ?? _formatCurrentDate();
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -66,7 +78,7 @@ class RenewalSubmittedScreen extends StatelessWidget {
 
               // Subtitle
               Text(
-                'Your renewal application has been submitted and will be reviewed.',
+                'Your renewal application has been submitted and queued for AI audit and IDF review.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 13,
@@ -98,13 +110,15 @@ class RenewalSubmittedScreen extends StatelessWidget {
                     const Divider(height: 18, color: Color(0xFFF1F5F9)),
                     _buildRow('Application ID', applicationNumber, isBold: true),
                     const Divider(height: 18, color: Color(0xFFF1F5F9)),
-                    _buildRow('Submission Date', '28 Sept 2026'),
+                    _buildRow('Submission Date', displayDate),
                     const Divider(height: 18, color: Color(0xFFF1F5F9)),
-                    _buildRow('Status', 'Submitted'),
+                    _buildRow('Status', status),
                     const Divider(height: 18, color: Color(0xFFF1F5F9)),
                     _buildRow(
                       'Original Certificate',
-                      'Expired (until renewal approved)',
+                      originalCertificateNo != null && originalCertificateNo!.isNotEmpty
+                          ? originalCertificateNo!
+                          : 'Previous Certificate',
                       isSmallValue: true,
                     ),
                   ],

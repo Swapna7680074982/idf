@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../bloc/app_bloc.dart';
 import '../bloc/app_state.dart';
 import '../core/date_time_utils.dart';
@@ -11,6 +12,7 @@ import 'notifications/notifications_screen.dart';
 import 'programs/program_details_screen.dart';
 import 'programs/programs_screen.dart';
 import 'programs/submission/submit_program_wizard_screen.dart';
+import 'programs/widgets/program_image_banner.dart';
 import 'programs/widgets/program_status_pill.dart';
 import 'certification/certification_tab_screen.dart';
 import 'certification/certification_wizard_screen.dart';
@@ -21,7 +23,6 @@ import 'applications/renewal/renewal_wizard_screen.dart';
 import '../models/certification_model.dart';
 import '../models/application_item_model.dart';
 import '../models/home_models.dart';
-import '../services/api_config.dart';
 import '../services/certification_service.dart';
 import '../services/firebase_service.dart';
 import '../services/home_service.dart';
@@ -79,7 +80,6 @@ class _HomeScreenState extends State<HomeScreen> {
         _programsRefreshKey++;
       } else if (index == 2) {
         _idfActiveRefreshKey++;
-        _fetchHomeData();
       } else if (index == 3) {
         _applicationsRefreshKey++;
       } else if (index == 4) {
@@ -119,53 +119,77 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {}
 
     try {
-      final progRes = await ProgramsService.getPrograms(status: 'all', limit: 10);
+      final progRes = await ProgramsService.getPrograms(limit: 50);
+      final approvedList = <ProgramModel>[];
+      final approvedSeen = <String>{};
 
-      // Fetch user's applications to reliably know which programs the user organized (exact same logic as details screen)
-      final myOrganizedIds = <String>{};
-      final myOrganizedNos = <String>{};
-      final myOrganizedTitles = <String>{};
+      for (final item in progRes.items) {
+        final prog = ProgramModel.fromApiItem(item);
+        final revStatus = (prog.reviewStatus ?? '').toLowerCase();
+        // ONLY APPROVED programs belong in public programs
+        final isUnapproved = revStatus == 'submitted' || revStatus == 'draft' || revStatus == 'in_review';
+        if (!isUnapproved) {
+          if (approvedSeen.add(prog.id)) {
+            approvedList.add(prog);
+          }
+        }
+      }
+
+      // Check registered & user's applications to reliably know which programs the user organized/registered
+      try {
+        final regRes = await ProgramsService.getRegisteredPrograms();
+        for (final item in regRes.items) {
+          final prog = ProgramModel.fromApiItem(item);
+          final existingIdx = approvedList.indexWhere((p) => p.id == prog.id);
+          if (existingIdx != -1) {
+            final isOrg = prog.isOrganizer || approvedList[existingIdx].isOrganizer;
+            approvedList[existingIdx] = approvedList[existingIdx].copyWith(
+              isOrganizer: isOrg,
+              isRegistered: isOrg ? false : (prog.isRegistered || approvedList[existingIdx].isRegistered),
+            );
+          }
+        }
+      } catch (_) {}
+
       try {
         final myApps = await ProgramsService.getMyApplications();
         final items = myApps['items'] is List ? myApps['items'] as List : [];
+        final myAppIds = <String>{};
+        final myAppNos = <String>{};
+        final myAppTitles = <String>{};
         for (final it in items) {
           if (it is Map) {
             final idStr = (it['id'] ?? '').toString();
             final pNo = (it['program_no'] ?? it['application_id'] ?? '').toString().trim();
             final titleStr = (it['title'] ?? it['program_name'] ?? '').toString().trim().toLowerCase();
-            if (idStr.isNotEmpty) myOrganizedIds.add(idStr);
-            if (pNo.isNotEmpty) myOrganizedNos.add(pNo);
-            if (titleStr.isNotEmpty) myOrganizedTitles.add(titleStr);
+            if (idStr.isNotEmpty) myAppIds.add(idStr);
+            if (pNo.isNotEmpty) myAppNos.add(pNo);
+            if (titleStr.isNotEmpty) myAppTitles.add(titleStr);
+          }
+        }
+
+        for (int i = 0; i < approvedList.length; i++) {
+          final prog = approvedList[i];
+          final pId = prog.id.toString();
+          final pNo = (prog.programNo ?? '').trim();
+          final pTitle = prog.title.trim().toLowerCase();
+
+          final isUserApp = myAppIds.contains(pId) ||
+              (pNo.isNotEmpty && myAppNos.contains(pNo)) ||
+              (pTitle.isNotEmpty && myAppTitles.contains(pTitle));
+
+          if (isUserApp) {
+            approvedList[i] = prog.copyWith(
+              isOrganizer: true,
+              isRegistered: false,
+            );
           }
         }
       } catch (_) {}
 
       if (mounted) {
         setState(() {
-          // Home screen "Programs" section shows ALL community programs across platform
-          // Filter to approved / published public programs only (exclude unapproved user proposals)
-          _allPublicPrograms = progRes.items
-              .where((p) {
-                final rev = (p.reviewStatus ?? '').toLowerCase();
-                return rev.isEmpty || rev == 'approved' || rev == 'completed';
-              })
-              .map((apiItem) {
-                final prog = ProgramModel.fromApiItem(apiItem);
-                final pId = prog.id.toString();
-                final pNo = (prog.programNo ?? '').trim();
-                final pTitle = prog.title.trim().toLowerCase();
-
-                final isOrg = prog.isOrganizer ||
-                    myOrganizedIds.contains(pId) ||
-                    (pNo.isNotEmpty && myOrganizedNos.contains(pNo)) ||
-                    (pTitle.isNotEmpty && myOrganizedTitles.contains(pTitle));
-
-                return prog.copyWith(
-                  isOrganizer: isOrg,
-                  isRegistered: isOrg ? false : prog.isRegistered,
-                );
-              })
-              .toList();
+          _allPublicPrograms = approvedList;
         });
       }
     } catch (_) {}
@@ -476,158 +500,158 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
 
-          // Hero Initiative Banner
-          _buildHeroBanner(),
-          const SizedBox(height: 20),
+            // Hero Initiative Banner
+            _buildHeroBanner(),
+            const SizedBox(height: 20),
 
-          // Quick Actions
-          Text(
-            'Quick Actions',
-            style: GoogleFonts.inter(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+            // Quick Actions
+            Text(
+              'Quick Actions',
+              style: GoogleFonts.inter(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _buildQuickActionCard(
-                  emoji: '📋',
-                  iconBg: const Color(0xFFFEF3C7),
-                  title: 'Submit a Program',
-                  subtitle: 'Share your PA initiative',
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildQuickActionCard(
+                    emoji: '📋',
+                    iconBg: const Color(0xFFFEF3C7),
+                    title: 'Submit a Program',
+                    subtitle: 'Share your PA initiative',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const SubmitProgramWizardScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildQuickActionCard(
+                    emoji: '🏅',
+                    iconBg: const Color(0xFFE0F2FE),
+                    title: 'Apply for IDF Active',
+                    subtitle: 'Get certified today',
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CertificationWizardScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // My Applications
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'My Applications',
+                  style: GoogleFonts.inter(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                GestureDetector(
                   onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const SubmitProgramWizardScreen(),
-                      ),
-                    );
+                    _switchTab(3, appTabIndex: 0);
                   },
+                  child: Text(
+                    'View All',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryBlue,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildQuickActionCard(
-                  emoji: '🏅',
-                  iconBg: const Color(0xFFE0F2FE),
-                  title: 'Apply for IDF Active',
-                  subtitle: 'Get certified today',
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildMyApplicationsCard(state),
+            const SizedBox(height: 20),
+
+            // Programs Section
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Programs',
+                  style: GoogleFonts.inter(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                GestureDetector(
                   onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const CertificationWizardScreen(),
-                      ),
-                    );
+                    _switchTab(1);
                   },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-
-          // My Applications
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'My Applications',
-                style: GoogleFonts.inter(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  _switchTab(3, appTabIndex: 0);
-                },
-                child: Text(
-                  'View All',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryBlue,
+                  child: Text(
+                    'See All',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryBlue,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildMyApplicationsCard(state),
-          const SizedBox(height: 20),
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildProgramsCarousel(state),
+            const SizedBox(height: 20),
 
-          // Programs Section
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Programs',
-                style: GoogleFonts.inter(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  _switchTab(1);
-                },
-                child: Text(
-                  'See All',
+            // IDF Active Certification Section
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'IDF Active Certification',
                   style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryBlue,
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildProgramsCarousel(state),
-          const SizedBox(height: 20),
-
-          // IDF Active Certification Section
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'IDF Active Certification',
-                style: GoogleFonts.inter(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _currentTabIndex = 2;
-                  });
-                },
-                child: Text(
-                  'View',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryBlue,
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _currentTabIndex = 2;
+                    });
+                  },
+                  child: Text(
+                    'View',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryBlue,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          _buildCertificationCard(user),
-          const SizedBox(height: 16),
-        ],
+              ],
+            ),
+            const SizedBox(height: 12),
+            _buildCertificationCard(user),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   // -------------------------------------------------------------
   // Hero Banner Widget (Responsive)
@@ -734,12 +758,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
                 const SizedBox(height: 14),
                 InkWell(
-                  onTap: () {
-                    final url = card?.actionUrl ?? '';
-                    if (url == '/programs' || url.contains('program')) {
-                      _switchTab(1);
-                    } else {
-                      _switchTab(2);
+                  onTap: () async {
+                    final uri = Uri.parse('https://mdrf.in/');
+                    try {
+                      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      if (!launched) {
+                        await launchUrl(uri, mode: LaunchMode.platformDefault);
+                      }
+                    } catch (_) {
+                      try {
+                        await launchUrl(uri, mode: LaunchMode.inAppBrowserView);
+                      } catch (_) {}
                     }
                   },
                   borderRadius: BorderRadius.circular(20),
@@ -1018,10 +1047,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildProgramCard({required ProgramModel program}) {
-    final colors = program.gradientColors.isNotEmpty
-        ? program.gradientColors.map((c) => Color(c)).toList()
-        : [const Color(0xFF006097), const Color(0xFF017CC2)];
-
     return Container(
       width: 250,
       decoration: BoxDecoration(
@@ -1043,129 +1068,89 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                height: 105,
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: colors,
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+              Stack(
+                children: [
+                  ProgramImageBanner(
+                    program: program,
+                    height: 105,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
                   ),
-                ),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (ApiConfig.resolveImageUrl(program.imageUrl) != null)
-                      Image.network(
-                        ApiConfig.resolveImageUrl(program.imageUrl)!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Center(
-                          child: Icon(
-                            Icons.fitness_center_rounded,
-                            size: 40,
-                            color: Colors.white.withAlpha(160),
-                          ),
-                        ),
-                        loadingBuilder: (context, child, loadingProgress) {
-                          if (loadingProgress == null) return child;
-                          return Container(
-                            color: const Color(0xFFE2E8F0),
-                            child: const Center(
-                              child: SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                            ),
-                          );
-                        },
-                      )
-                    else
-                      Center(
-                        child: Icon(
-                          Icons.fitness_center_rounded,
-                          size: 40,
-                          color: Colors.white.withAlpha(160),
-                        ),
-                      ),
                     // Top-right status pill (Organizer / Registered if joined / Event timeline status)
                     Positioned(
                       top: 10,
                       right: 10,
                       child: program.isOrganizer
                           ? Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF4F46E5),
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withAlpha(40),
-                                    blurRadius: 4,
-                                    offset: const Offset(0, 1),
-                                  ),
-                                ],
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF4F46E5),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(40),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.workspace_premium_rounded,
+                              size: 12,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Organizer',
+                              style: GoogleFonts.inter(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(
-                                    Icons.workspace_premium_rounded,
-                                    size: 12,
-                                    color: Colors.white,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Organizer',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w700,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
+                            ),
+                          ],
+                        ),
+                      )
                           : ((program.isRegistered && !program.isOrganizer)
-                              ? Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF16A34A),
-                                    borderRadius: BorderRadius.circular(12),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withAlpha(40),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 1),
-                                      ),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.check_circle_rounded,
-                                        size: 12,
-                                        color: Colors.white,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Registered',
-                                        style: GoogleFonts.inter(
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : ProgramStatusPill(status: program.status)),
+                          ? Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF16A34A),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withAlpha(40),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              size: 12,
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Registered',
+                              style: GoogleFonts.inter(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                          : ProgramStatusPill(status: program.status)),
                     ),
                   ],
                 ),
-              ),
               Padding(
                 padding: const EdgeInsets.all(12.0),
                 child: Column(
@@ -1388,7 +1373,7 @@ class _HomeScreenState extends State<HomeScreen> {
             builder: (_) => CertificationWizardScreen(
               applicationId: certItem.id.isNotEmpty ? certItem.id : certItem.applicationNo,
               initialModel:
-                  CertificationApplicationModel.prefilledForCertificate(certItem),
+              CertificationApplicationModel.prefilledForCertificate(certItem),
             ),
           ),
         );
@@ -1520,18 +1505,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                 isExpired
                                     ? 'Renew Certificate'
                                     : isChangesRequired
-                                        ? 'Edit Application'
-                                        : isApproved
-                                            ? 'View Certificate'
-                                            : 'View Details',
+                                    ? 'Edit Application'
+                                    : isApproved
+                                    ? 'View Certificate'
+                                    : 'View Details',
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   color: isChangesRequired
                                       ? const Color(0xFFDC2626)
                                       : isExpired
-                                          ? const Color(0xFFEA580C)
-                                          : AppColors.primaryBlue,
+                                      ? const Color(0xFFEA580C)
+                                      : AppColors.primaryBlue,
                                 ),
                               ),
                               const SizedBox(width: 4),
@@ -1541,8 +1526,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                 color: isChangesRequired
                                     ? const Color(0xFFDC2626)
                                     : isExpired
-                                        ? const Color(0xFFEA580C)
-                                        : AppColors.primaryBlue,
+                                    ? const Color(0xFFEA580C)
+                                    : AppColors.primaryBlue,
                               ),
                             ],
                           ),
@@ -1650,7 +1635,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildIDFActiveTab(AppState state) {
     return CertificationTabScreen(
       key: ValueKey('idf_active_$_idfActiveRefreshKey'),
-      onRefresh: _fetchHomeData,
     );
   }
 

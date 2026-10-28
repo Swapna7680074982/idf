@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme.dart';
 import '../../../models/application_item_model.dart';
 import '../../../models/certification_model.dart';
+import '../../../services/api_client.dart';
 import '../../../services/certification_service.dart';
 import '../../certification/certification_wizard_screen.dart';
 import '../../certification/widgets/yes_no_selector.dart';
@@ -23,6 +24,7 @@ class RenewalWizardScreen extends StatefulWidget {
 class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
   int _currentStep = 1; // 1: Institution, 2: Questionnaire, 3: Evidence, 4: Review
   bool _isLoading = true;
+  bool _isSubmitting = false;
   late CertificationApplicationModel _model;
   final List<Map<String, dynamic>> _uploadedEvidence = [];
 
@@ -138,6 +140,336 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
     }
   }
 
+  /// Submits the renewal request using the dedicated renewal API:
+  /// POST /api/certification/certificates/:id/renew
+  /// Option A: isQuick = true -> { "submit": true, "declaration_accepted": true }
+  /// Option B: isQuick = false -> { "submit": true, "declaration_accepted": true, "institution_name": ..., "details": ..., "answers": [...] }
+  Future<void> _submitRenewal({required bool isQuick}) async {
+    if (_isSubmitting) return;
+
+    setState(() => _isSubmitting = true);
+
+    // Show loading modal
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => PopScope(
+        canPop: false,
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 22),
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(25),
+                  blurRadius: 24,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: AppColors.primaryBlue),
+                const SizedBox(height: 18),
+                Text(
+                  isQuick
+                      ? 'Submitting Instant Renewal...'
+                      : 'Submitting Renewal Application...',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Validating eligibility & queuing IDF AI audit',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      final certId = widget.certificate.effectiveCertificateId;
+      final altId = widget.certificate.certificateId != certId
+          ? widget.certificate.certificateId
+          : widget.certificate.id;
+
+      final response = await CertificationService.renewCertificate(
+        certificateId: certId,
+        alternativeCertificateId: altId,
+        isQuickRenewal: isQuick,
+        submit: true,
+        declarationAccepted: true,
+        model: isQuick ? null : _model,
+      );
+
+      final newAppNo = CertificationService.extractRenewalApplicationNo(
+        response,
+        fallback: _model.applicationNo ??
+            'RNW-${widget.certificate.certificateId.isNotEmpty ? widget.certificate.certificateId : widget.certificate.id}',
+      );
+
+      String displayStatus = 'Manual Review';
+      if (response['data'] is Map && (response['data'] as Map)['application'] is Map) {
+        displayStatus = ((response['data'] as Map)['application']['display_status'] ?? 'Manual Review').toString();
+      } else if (response['application'] is Map) {
+        displayStatus = (response['application']['display_status'] ?? 'Manual Review').toString();
+      }
+
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // dismiss loading dialog
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => RenewalSubmittedScreen(
+              institutionName: _model.institutionName.isNotEmpty
+                  ? _model.institutionName
+                  : widget.certificate.institutionName,
+              applicationNumber: newAppNo,
+              status: CertificateApplicationItem.formatReviewStatus(displayStatus),
+              originalCertificateNo: widget.certificate.certificateId,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop(); // dismiss loading dialog
+        setState(() => _isSubmitting = false);
+
+        String errorMsg = e.toString();
+        if (e is ApiException) {
+          errorMsg = e.displayMessage;
+        }
+
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: Row(
+              children: [
+                const Icon(Icons.error_outline_rounded, color: Color(0xFFDC2626), size: 24),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Renewal Submission Error',
+                    style: GoogleFonts.inter(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            content: Text(
+              errorMsg.replaceAll('Exception: ', ''),
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                color: const Color(0xFF475569),
+                height: 1.35,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'Dismiss',
+                  style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryBlue,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  /// Option A: Quick Instant Renewal Confirmation
+  void _showQuickInstantRenewalDialog() {
+    bool declarationChecked = true;
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final instName = _model.institutionName.isNotEmpty
+                ? _model.institutionName
+                : widget.certificate.institutionName;
+            final certNo = widget.certificate.certificateId.isNotEmpty
+                ? widget.certificate.certificateId
+                : widget.certificate.id;
+
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.flash_on_rounded, color: Color(0xFF2563EB), size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Quick Instant Renewal',
+                                style: GoogleFonts.inter(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                'Option A · No Form Changes',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: const Color(0xFF64748B),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        children: [
+                          _buildDetailRow('Institution', instName),
+                          const SizedBox(height: 6),
+                          _buildDetailRow('Certificate No', certNo),
+                          const SizedBox(height: 6),
+                          _buildDetailRow('Renewal Mode', 'Duplicate Previous Verified Record'),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    InkWell(
+                      onTap: () => setSheetState(() => declarationChecked = !declarationChecked),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Checkbox(
+                            value: declarationChecked,
+                            activeColor: AppColors.primaryBlue,
+                            onChanged: (val) => setSheetState(() => declarationChecked = val ?? true),
+                          ),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: Text(
+                                'I accept the IDF declaration and confirm that all previous institution details, facilities, and questionnaire answers remain accurate and unchanged.',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  color: const Color(0xFF475569),
+                                  height: 1.35,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        onPressed: !declarationChecked
+                            ? null
+                            : () {
+                                Navigator.pop(ctx);
+                                _submitRenewal(isQuick: true);
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primaryBlue,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: Text(
+                          'Confirm & Submit Renewal',
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 44,
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: Text(
+                          'Cancel',
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: const Color(0xFF64748B),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  /// Option B: Submit Confirmation after Reviewing / Updating
   void _showSubmitConfirmationSheet() {
     showModalBottomSheet(
       context: context,
@@ -163,7 +495,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Please review your application before submitting. Once submitted, it will be sent for IDF accreditation review.',
+                  'Please review your updated application before submitting. Once submitted, it will be queued for IDF accreditation AI audit and committee review.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 13,
@@ -176,27 +508,9 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: () async {
+                    onPressed: () {
                       Navigator.pop(ctx);
-                      try {
-                        await CertificationService.submitUnifiedApplication(_model);
-                      } catch (e) {
-                        debugPrint('Notice during renewal submit: $e');
-                      }
-
-                      if (mounted) {
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (_) => RenewalSubmittedScreen(
-                              institutionName: _model.institutionName.isNotEmpty
-                                  ? _model.institutionName
-                                  : widget.certificate.institutionName,
-                              applicationNumber: _model.applicationNo ??
-                                  'RNW-${widget.certificate.certificateId.isNotEmpty ? widget.certificate.certificateId : widget.certificate.id}',
-                            ),
-                          ),
-                        );
-                      }
+                      _submitRenewal(isQuick: false);
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primaryBlue,
@@ -207,7 +521,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                       ),
                     ),
                     child: Text(
-                      'Submit Application',
+                      'Submit Renewal',
                       style: GoogleFonts.inter(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -237,6 +551,135 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                     ),
                   ),
                 ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// In-place quick edit sheet for Contact & Institution details (Option B updates)
+  void _showEditContactDetailsSheet() {
+    final nameCtrl = TextEditingController(text: _model.institutionName);
+    final contactCtrl = TextEditingController(text: _model.contactPerson);
+    final emailCtrl = TextEditingController(text: _model.contactEmail);
+    final phoneCtrl = TextEditingController(text: _model.contactPhone);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+            left: 20,
+            right: 20,
+            top: 20,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Edit Institution & Contact',
+                      style: GoogleFonts.inter(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  'Institution Name',
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: nameCtrl,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Contact Person',
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: contactCtrl,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Contact Email',
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: emailCtrl,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Contact Phone',
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: phoneCtrl,
+                  keyboardType: TextInputType.phone,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        if (nameCtrl.text.trim().isNotEmpty) _model.institutionName = nameCtrl.text.trim();
+                        _model.contactPerson = contactCtrl.text.trim();
+                        _model.contactEmail = emailCtrl.text.trim();
+                        _model.contactPhone = phoneCtrl.text.trim();
+                      });
+                      Navigator.pop(ctx);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                    ),
+                    child: Text('Save Changes', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -381,6 +824,101 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Option A: Quick Instant Renewal Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFFEFF6FF), Color(0xFFF0FDF4)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF93C5FD)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2563EB),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.bolt_rounded, color: Colors.white, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Option A: Quick Instant Renewal',
+                    style: GoogleFonts.inter(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF1E3A8A),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'No changes to institution details or questionnaire? Renew instantly with 1-tap confirmation.',
+                style: GoogleFonts.inter(
+                  fontSize: 12.5,
+                  color: const Color(0xFF334155),
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton.icon(
+                  onPressed: _isSubmitting ? null : _showQuickInstantRenewalDialog,
+                  icon: const Icon(Icons.flash_on_rounded, size: 18),
+                  label: Text(
+                    'Renew Instantly (No Changes)',
+                    style: GoogleFonts.inter(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        // Section Divider
+        Row(
+          children: [
+            const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text(
+                'OR UPDATE INFORMATION (OPTION B)',
+                style: GoogleFonts.inter(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: const Color(0xFF64748B),
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+            const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+          ],
+        ),
+        const SizedBox(height: 18),
+
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -402,27 +940,50 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  InkWell(
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => CertificationWizardScreen(
-                            applicationId: widget.certificate.id.isNotEmpty
-                                ? widget.certificate.id
-                                : widget.certificate.applicationNo,
-                            initialModel: _model,
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      InkWell(
+                        onTap: _showEditContactDetailsSheet,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          child: Text(
+                            'Edit Info',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primaryBlue,
+                            ),
                           ),
                         ),
-                      ).then((_) => _loadRealData());
-                    },
-                    child: Text(
-                      'Edit',
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primaryBlue,
                       ),
-                    ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => CertificationWizardScreen(
+                                applicationId: widget.certificate.id.isNotEmpty
+                                    ? widget.certificate.id
+                                    : widget.certificate.applicationNo,
+                                initialModel: _model,
+                              ),
+                            ),
+                          ).then((_) => _loadRealData());
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          child: Text(
+                            'Full Wizard',
+                            style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -1465,7 +2026,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
           width: double.infinity,
           height: 48,
           child: ElevatedButton(
-            onPressed: _showSubmitConfirmationSheet,
+            onPressed: _isSubmitting ? null : _showSubmitConfirmationSheet,
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryBlue,
               foregroundColor: Colors.white,

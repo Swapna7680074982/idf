@@ -88,7 +88,16 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
 
   Future<void> _handleContinue() async {
     if (_isFetchingConfig) return;
-    if (_categories.isEmpty) return;
+    if (_categories.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select an institution category to continue'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
 
     final currentType = _categories.firstWhere(
       (c) => c.id == _selectedId,

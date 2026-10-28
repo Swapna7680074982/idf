@@ -24,11 +24,20 @@ class ProgramImageBanner extends StatelessWidget {
         ? program.gradientColors.map((c) => Color(c)).toList()
         : [const Color(0xFF006097), const Color(0xFF017CC2)];
 
-    final rawUrl = program.imageUrl;
-    final hasImage = rawUrl != null && rawUrl.isNotEmpty;
-    final isLocalFile = hasImage && File(rawUrl).existsSync();
+    final rawUrl = program.imageUrl?.trim();
+    final hasImage = rawUrl != null && rawUrl.isNotEmpty && rawUrl != 'null';
+    final isHttp = hasImage && (rawUrl.startsWith('http://') || rawUrl.startsWith('https://'));
+    bool isLocalFile = false;
+    if (hasImage && !isHttp) {
+      try {
+        isLocalFile = File(rawUrl).existsSync();
+      } catch (_) {
+        isLocalFile = false;
+      }
+    }
 
-    final String effectiveUrl = isLocalFile ? rawUrl : ApiConfig.resolveMediaUrl(rawUrl);
+    final String? resolved = isLocalFile ? rawUrl : ApiConfig.resolveImageUrl(rawUrl);
+    final bool canDisplayNetwork = !isLocalFile && resolved != null && resolved.isNotEmpty;
 
     return ClipRRect(
       borderRadius: borderRadius ?? BorderRadius.circular(16),
@@ -47,24 +56,33 @@ class ProgramImageBanner extends StatelessWidget {
           children: [
             if (isLocalFile)
               Image.file(
-                File(rawUrl),
+                File(rawUrl!),
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => _buildArtisticBackground(colors),
               )
-            else if (hasImage)
+            else if (canDisplayNetwork)
               Image.network(
-                effectiveUrl,
+                resolved,
                 fit: BoxFit.cover,
                 errorBuilder: (context, error, stackTrace) => _buildArtisticBackground(colors),
                 loadingBuilder: (context, child, loadingProgress) {
                   if (loadingProgress == null) return child;
                   return Container(
-                    color: const Color(0xFFE2E8F0),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: colors,
+                      ),
+                    ),
                     child: const Center(
                       child: SizedBox(
                         width: 24,
                         height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
                   );

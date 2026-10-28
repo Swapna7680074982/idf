@@ -123,7 +123,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
             final matchingReg = regRes?.items.where((r) => r.id.toString() == idStr).firstOrNull;
             final matchingApp = approvedList.where((p) => p.id == idStr || (item['program_no'] != null && p.programNo == item['program_no'].toString())).firstOrNull;
 
-            var bannerUrl = item['banner_image_url'] ?? item['cover_image_url'] ?? item['banner'];
+            var bannerUrl = ApiConfig.extractBannerUrl(item);
             var startDate = item['start_date'];
             var endDate = item['end_date'];
             var city = item['city_text'] ?? item['city'];
@@ -151,15 +151,15 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
             }
 
             // If still missing image or date, fetch full application details
-            if ((bannerUrl == null || bannerUrl.toString().isEmpty) ||
-                (startDate == null || startDate.toString().isEmpty)) {
+            if ((bannerUrl == null || bannerUrl.toString().trim().isEmpty) ||
+                (startDate == null || startDate.toString().trim().isEmpty)) {
               try {
                 final detail = await ProgramsService.getMyApplicationDetail(item['id']);
                 final progInfo = detail['program_information'] is Map<String, dynamic>
                     ? detail['program_information'] as Map<String, dynamic>
                     : null;
+                bannerUrl ??= ApiConfig.extractBannerUrl(progInfo) ?? ApiConfig.extractBannerUrl(detail);
                 if (progInfo != null) {
-                  bannerUrl ??= progInfo['banner_image_url'] ?? progInfo['cover_image_url'] ?? progInfo['banner'];
                   startDate ??= progInfo['start_date'];
                   endDate ??= progInfo['end_date'];
                   city ??= progInfo['city'] ?? progInfo['city_text'];
@@ -223,7 +223,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                 reviewStatus: statusStr.toLowerCase(),
                 gradientColors: const [0xFF006097, 0xFF017CC2],
                 category: progType,
-                imageUrl: ApiConfig.resolveImageUrl(item['banner_image_url'] ?? item['cover_image_url'] ?? item['banner']),
+                imageUrl: ApiConfig.resolveImageUrl(ApiConfig.extractBannerUrl(item)),
               ));
             }
           }
@@ -295,11 +295,11 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
   }
 
   void _onSearchChanged(String val) {
+    setState(() {
+      _searchQuery = val.trim();
+    });
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 350), () {
-      setState(() {
-        _searchQuery = val.trim();
-      });
       _fetchPrograms();
     });
   }
@@ -659,15 +659,17 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       } else if (_selectedFilter == 'Completed') {
         activeList = activeList.where((p) => p.status == ProgramStatus.completed).toList();
       }
-    } else {
-      // Tab 1: filter by search query if any
-      if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery.toLowerCase();
-        activeList = activeList.where((p) =>
-            p.title.toLowerCase().contains(q) ||
-            p.organizer.toLowerCase().contains(q) ||
-            p.city.toLowerCase().contains(q)).toList();
-      }
+    }
+
+    // Filter by name (applies to both tabs so searching by name works reliably and instantly)
+    if (_searchQuery.trim().isNotEmpty) {
+      final q = _searchQuery.trim().toLowerCase();
+      activeList = activeList.where((p) {
+        final title = p.title.toLowerCase();
+        final cat = (p.category ?? '').toLowerCase();
+        final tag = p.tag.toLowerCase();
+        return title.contains(q) || cat.contains(q) || tag.contains(q);
+      }).toList();
     }
 
     return Scaffold(
@@ -675,13 +677,13 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
       appBar: widget.isTabMode
           ? null
           : AppBar(
-              backgroundColor: Colors.white,
-              elevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -766,12 +768,12 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                             borderRadius: BorderRadius.circular(9),
                             boxShadow: _selectedTab == 0
                                 ? [
-                                    BoxShadow(
-                                      color: Colors.black.withAlpha(12),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 1),
-                                    ),
-                                  ]
+                              BoxShadow(
+                                color: Colors.black.withAlpha(12),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ]
                                 : null,
                           ),
                           child: Center(
@@ -804,12 +806,12 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                             borderRadius: BorderRadius.circular(9),
                             boxShadow: _selectedTab == 1
                                 ? [
-                                    BoxShadow(
-                                      color: Colors.black.withAlpha(12),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 1),
-                                    ),
-                                  ]
+                              BoxShadow(
+                                color: Colors.black.withAlpha(12),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ]
                                 : null,
                           ),
                           child: Row(
@@ -878,9 +880,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                           color: AppColors.textPrimary,
                         ),
                         decoration: InputDecoration(
-                          hintText: _selectedTab == 0
-                              ? 'Search title, organizer, city...'
-                              : 'Search my submitted or registered programs...',
+                          hintText: 'Search programs by name',
                           hintStyle: GoogleFonts.inter(
                             fontSize: 13,
                             color: const Color(0xFFB0BAC9),
@@ -892,15 +892,15 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                           ),
                           suffixIcon: _searchQuery.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    setState(() {
-                                      _searchQuery = '';
-                                    });
-                                    _fetchPrograms();
-                                  },
-                                )
+                            icon: const Icon(Icons.clear_rounded, size: 18, color: Color(0xFF94A3B8)),
+                            onPressed: () {
+                              _searchController.clear();
+                              setState(() {
+                                _searchQuery = '';
+                              });
+                              _fetchPrograms();
+                            },
+                          )
                               : null,
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
@@ -910,14 +910,16 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  _buildFilterButton(),
+                  if (_selectedTab == 0) ...[
+                    const SizedBox(width: 8),
+                    _buildFilterButton(),
+                  ],
                 ],
               ),
             ),
 
-            // Active Filter indicator pills (if any filter is selected)
-            if (_selectedFilter != 'All' || _selectedProgramType != null)
+            // Active Filter indicator pills (only on All Programs tab)
+            if (_selectedTab == 0 && (_selectedFilter != 'All' || _selectedProgramType != null))
               Padding(
                 padding: const EdgeInsets.only(left: 18.0, right: 18.0, top: 2.0, bottom: 6.0),
                 child: Row(
@@ -997,82 +999,82 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
             Expanded(
               child: _isLoading
                   ? const Center(
-                      child: CircularProgressIndicator(color: AppColors.primaryBlue),
-                    )
+                child: CircularProgressIndicator(color: AppColors.primaryBlue),
+              )
                   : RefreshIndicator(
-                      onRefresh: _fetchPrograms,
-                      color: AppColors.primaryBlue,
-                      child: activeList.isEmpty
-                          ? ListView(
-                              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                              children: [
-                                SizedBox(height: MediaQuery.of(context).size.height * 0.15),
-                                Center(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(24.0),
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Container(
-                                          width: 64,
-                                          height: 64,
-                                          decoration: const BoxDecoration(
-                                            color: Color(0xFFF1F5F9),
-                                            shape: BoxShape.circle,
-                                          ),
-                                          child: Icon(
-                                            _selectedTab == 0
-                                                ? Icons.event_note_outlined
-                                                : Icons.workspace_premium_outlined,
-                                            size: 32,
-                                            color: const Color(0xFF94A3B8),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 14),
-                                        Text(
-                                          _selectedTab == 0
-                                              ? 'No approved programs found'
-                                              : 'No submitted or registered programs yet',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w700,
-                                            color: AppColors.textPrimary,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 6),
-                                        Text(
-                                          _errorMessage != null
-                                              ? 'Could not connect to server. Pull down to retry.'
-                                              : (_selectedTab == 0
-                                                  ? 'Try searching with different keywords or reset filters.'
-                                                  : 'Tap "+ New" above to submit a proposal or register for programs.'),
-                                          textAlign: TextAlign.center,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 13,
-                                            color: const Color(0xFF64748B),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            )
-                          : ListView.separated(
-                              physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                              padding: const EdgeInsets.only(left: 18.0, right: 18.0, top: 6.0, bottom: 24.0),
-                              itemCount: activeList.length,
-                              separatorBuilder: (context, index) => const SizedBox(height: 14),
-                              itemBuilder: (context, index) {
-                                final program = activeList[index];
-                                return ProgramCard(
-                                  program: program,
-                                  isMyPrograms: _selectedTab == 1,
-                                  onTap: () => _openProgramItem(program),
-                                );
-                              },
+                onRefresh: _fetchPrograms,
+                color: AppColors.primaryBlue,
+                child: activeList.isEmpty
+                    ? ListView(
+                  physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                  children: [
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.15),
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 64,
+                              height: 64,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFF1F5F9),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                _selectedTab == 0
+                                    ? Icons.event_note_outlined
+                                    : Icons.workspace_premium_outlined,
+                                size: 32,
+                                color: const Color(0xFF94A3B8),
+                              ),
                             ),
+                            const SizedBox(height: 14),
+                            Text(
+                              _selectedTab == 0
+                                  ? 'No approved programs found'
+                                  : 'No submitted or registered programs yet',
+                              style: GoogleFonts.inter(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _errorMessage != null
+                                  ? 'Could not connect to server. Pull down to retry.'
+                                  : (_selectedTab == 0
+                                  ? 'Try searching with different keywords or reset filters.'
+                                  : 'Tap "+ New" above to submit a proposal or register for programs.'),
+                              textAlign: TextAlign.center,
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                color: const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
+                  ],
+                )
+                    : ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                  padding: const EdgeInsets.only(left: 18.0, right: 18.0, top: 6.0, bottom: 24.0),
+                  itemCount: activeList.length,
+                  separatorBuilder: (context, index) => const SizedBox(height: 14),
+                  itemBuilder: (context, index) {
+                    final program = activeList[index];
+                    return ProgramCard(
+                      program: program,
+                      isMyPrograms: _selectedTab == 1,
+                      onTap: () => _openProgramItem(program),
+                    );
+                  },
+                ),
+              ),
             ),
           ],
         ),

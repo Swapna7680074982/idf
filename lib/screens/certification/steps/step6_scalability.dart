@@ -36,7 +36,20 @@ class _Step6ScalabilityState extends State<Step6Scalability> {
     super.dispose();
   }
 
-  void _onNext() {
+  void _onNext(List<dynamic> dynamicQuestions) {
+    if (dynamicQuestions.isNotEmpty) {
+      final unanswered = dynamicQuestions.where((q) => widget.model.getQuestionBool(q.id) == null);
+      if (unanswered.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please answer all questions before proceeding'),
+            backgroundColor: Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
     widget.model.advocacyActivitiesDescription =
         _advocacyController.text.trim();
     widget.onContinue();
@@ -189,7 +202,7 @@ class _Step6ScalabilityState extends State<Step6Scalability> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: _onNext,
+                onPressed: () => _onNext(dynamicQuestions),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryBlue,
                   foregroundColor: Colors.white,

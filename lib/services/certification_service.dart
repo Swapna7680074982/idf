@@ -470,6 +470,212 @@ class CertificationService {
     return [];
   }
 
+  /// Renew Certificate API
+  /// Method: POST
+  /// Primary URL: /api/certification/certificates/:id/renew
+  /// (or alias: /api/applications/certificates/:id/renew)
+  /// (where :id is the Certificate ID)
+  ///
+  /// Option A: Quick Instant Renewal (No Form Changes)
+  /// Body: { "submit": true, "declaration_accepted": true }
+  ///
+  /// Option B: Renewal With Updated Answers / Contact Info
+  /// Body: {
+  ///   "submit": true,
+  ///   "declaration_accepted": true,
+  ///   "institution_name": ...,
+  ///   "contact_person": ...,
+  ///   "contact_email": ...,
+  ///   "contact_phone": ...,
+  ///   "details": { ... },
+  ///   "answers": [ { "question_id": 1, "answer_bool": true }, ... ]
+  /// }
+  static Future<Map<String, dynamic>> renewCertificate({
+    required dynamic certificateId,
+    dynamic alternativeCertificateId,
+    bool declarationAccepted = true,
+    bool submit = true,
+    bool isQuickRenewal = false,
+    String? institutionName,
+    String? contactPerson,
+    String? contactEmail,
+    String? contactPhone,
+    Map<String, dynamic>? details,
+    List<Map<String, dynamic>>? answers,
+    CertificationApplicationModel? model,
+  }) async {
+    final body = <String, dynamic>{
+      'submit': submit,
+      'declaration_accepted': declarationAccepted,
+    };
+
+    if (!isQuickRenewal) {
+      if (model != null) {
+        if (model.institutionName.isNotEmpty) {
+          body['institution_name'] = model.institutionName;
+        }
+        if (model.contactPerson.isNotEmpty) {
+          body['contact_person'] = model.contactPerson;
+        }
+        if (model.contactEmail.isNotEmpty) {
+          body['contact_email'] = model.contactEmail;
+        }
+        if (model.contactPhone.isNotEmpty) {
+          body['contact_phone'] = model.contactPhone;
+        }
+
+        final effDetails = <String, dynamic>{};
+        if (model.detailFieldValues.isNotEmpty) {
+          model.detailFieldValues.forEach((k, v) {
+            if (v != null && v.toString().trim().isNotEmpty) {
+              effDetails[k.toString()] = v.toString();
+            }
+          });
+        }
+        if (model.numberOfRooms.isNotEmpty) {
+          effDetails['number_of_rooms'] = model.numberOfRooms;
+        }
+        if (model.distanceFromMainRoad.isNotEmpty) {
+          effDetails['distance_from_main_road_km'] = model.distanceFromMainRoad;
+        }
+        if (model.parkingAvailability.isNotEmpty) {
+          effDetails['parking_availability'] = model.parkingAvailability;
+        }
+        if (effDetails.isNotEmpty) {
+          body['details'] = effDetails;
+        }
+
+        if (model.questionAnswers.isNotEmpty) {
+          final list = <Map<String, dynamic>>[];
+          model.questionAnswers.forEach((qId, val) {
+            if (val == null) return;
+            final item = <String, dynamic>{'question_id': qId};
+            if (val is bool) {
+              item['answer_bool'] = val;
+            } else if (val is num) {
+              item['answer_number'] = val;
+            } else if (int.tryParse(val.toString()) != null &&
+                !val.toString().startsWith('+') &&
+                !val.toString().startsWith('0')) {
+              item['answer_number'] = int.tryParse(val.toString());
+            } else {
+              final s = val.toString().trim().toLowerCase();
+              if (s == 'true' || s == 'yes') {
+                item['answer_bool'] = true;
+              } else if (s == 'false' || s == 'no') {
+                item['answer_bool'] = false;
+              } else {
+                item['answer_text'] = val.toString();
+              }
+            }
+            list.add(item);
+          });
+          if (list.isNotEmpty) {
+            body['answers'] = list;
+          }
+        }
+      } else {
+        if (institutionName != null && institutionName.isNotEmpty) {
+          body['institution_name'] = institutionName;
+        }
+        if (contactPerson != null && contactPerson.isNotEmpty) {
+          body['contact_person'] = contactPerson;
+        }
+        if (contactEmail != null && contactEmail.isNotEmpty) {
+          body['contact_email'] = contactEmail;
+        }
+        if (contactPhone != null && contactPhone.isNotEmpty) {
+          body['contact_phone'] = contactPhone;
+        }
+        if (details != null && details.isNotEmpty) {
+          body['details'] = details;
+        }
+        if (answers != null && answers.isNotEmpty) {
+          body['answers'] = answers;
+        }
+      }
+    }
+
+    // Collect candidate identifiers to try
+    final candidateIds = <String>[];
+    if (certificateId != null && certificateId.toString().trim().isNotEmpty) {
+      candidateIds.add(certificateId.toString().trim());
+    }
+    if (alternativeCertificateId != null &&
+        alternativeCertificateId.toString().trim().isNotEmpty &&
+        !candidateIds.contains(alternativeCertificateId.toString().trim())) {
+      candidateIds.add(alternativeCertificateId.toString().trim());
+    }
+
+    dynamic lastError;
+
+    for (final id in candidateIds) {
+      // 1. Primary route: POST /api/certification/certificates/:id/renew
+      try {
+        final res = await ApiClient.post(
+          ApiConfig.certificateRenew(id),
+          body: body,
+        );
+        if (res is Map<String, dynamic>) {
+          return res;
+        }
+      } catch (e1) {
+        lastError = e1;
+        debugPrint('⚠️ [CERTIFICATION SERVICE] Primary /certification/certificates/$id/renew failed: $e1');
+
+        // 2. Alias route: POST /api/applications/certificates/:id/renew
+        try {
+          final resAlt = await ApiClient.post(
+            ApiConfig.certificateRenewAlt(id),
+            body: body,
+          );
+          if (resAlt is Map<String, dynamic>) {
+            return resAlt;
+          }
+        } catch (e2) {
+          lastError = e2;
+          debugPrint('⚠️ [CERTIFICATION SERVICE] Alias /applications/certificates/$id/renew failed: $e2');
+        }
+      }
+    }
+
+    if (lastError != null) {
+      throw lastError;
+    }
+
+    throw const ApiException(
+      code: 'RENEWAL_FAILED',
+      message: 'Failed to submit certificate renewal.',
+      statusCode: 500,
+    );
+  }
+
+  /// Extracts the newly generated renewal application number (e.g. RNW-IDF-ACT-XXXXX)
+  /// from the renewal API response.
+  static String extractRenewalApplicationNo(
+    Map<String, dynamic> response, {
+    String fallback = '',
+  }) {
+    if (response['data'] is Map<String, dynamic>) {
+      final d = response['data'] as Map<String, dynamic>;
+      final res = extractRenewalApplicationNo(d, fallback: '');
+      if (res.isNotEmpty) return res;
+    }
+    if (response['application'] is Map<String, dynamic>) {
+      final app = response['application'] as Map<String, dynamic>;
+      final no = app['application_no']?.toString();
+      if (no != null && no.isNotEmpty) return no;
+    }
+    if (response['submission'] is Map<String, dynamic>) {
+      final sub = response['submission'] as Map<String, dynamic>;
+      final no = sub['application_no']?.toString();
+      if (no != null && no.isNotEmpty) return no;
+    }
+    final topNo = response['application_no']?.toString();
+    if (topNo != null && topNo.isNotEmpty) return topNo;
+    return fallback;
+  }
+
   /// Clear in-memory caches
   static void clearCache() {
     _cachedCategories = null;

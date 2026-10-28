@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -324,8 +325,8 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
     final title = _liveProgram?.title.isNotEmpty == true
         ? _liveProgram!.title
         : (programInfo?['program_name']?.toString() ??
-            programInfo?['title']?.toString() ??
-            widget.item.programName);
+        programInfo?['title']?.toString() ??
+        widget.item.programName);
 
     final status = submissionDetails?['current_status']?.toString() ??
         _liveDetail?['status']?.toString() ??
@@ -392,13 +393,22 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
     final registrationInstructions = programInfo?['registration_instructions']?.toString() ??
         _liveProgram?.registrationInstructions;
 
-    final rawBanner = programInfo?['banner_image_url']?.toString() ??
-        programInfo?['banner']?.toString() ??
-        programInfo?['cover_image_url']?.toString() ??
+    final rawBanner = ApiConfig.extractBannerUrl(_liveDetail) ??
+        ApiConfig.extractBannerUrl(programInfo) ??
         (_liveProgram?.imageUrl?.isNotEmpty == true ? _liveProgram!.imageUrl : null) ??
-        widget.item.banner;
+        (widget.item.banner?.trim().isNotEmpty == true ? widget.item.banner : null);
 
-    final resolvedBanner = ApiConfig.resolveMediaUrl(rawBanner);
+    final isHttpBanner = rawBanner != null && (rawBanner.startsWith('http://') || rawBanner.startsWith('https://'));
+    bool isLocalBanner = false;
+    if (rawBanner != null && rawBanner.isNotEmpty && !isHttpBanner) {
+      try {
+        isLocalBanner = File(rawBanner).existsSync();
+      } catch (_) {
+        isLocalBanner = false;
+      }
+    }
+
+    final resolvedBanner = isLocalBanner ? rawBanner : ApiConfig.resolveMediaUrl(rawBanner);
 
     final submittedDate = submissionDetails?['submitted']?.toString() ??
         widget.item.submittedDate;
@@ -417,10 +427,10 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
         '').toString().trim();
 
     final decisionStr = (submissionDetails?['decision'] ??
-            submissionDetails?['decision_text'] ??
-            _liveDetail?['decision'] ??
-            _liveDetail?['decision_text'] ??
-            '')
+        submissionDetails?['decision_text'] ??
+        _liveDetail?['decision'] ??
+        _liveDetail?['decision_text'] ??
+        '')
         .toString()
         .trim();
 
@@ -483,8 +493,8 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
     final rawAgendaList = programInfo?['program_agenda_schedule'] is List
         ? programInfo!['program_agenda_schedule'] as List
         : (_liveDetail?['agenda'] is List
-            ? _liveDetail!['agenda'] as List
-            : (_liveDetail?['schedule'] is List ? _liveDetail!['schedule'] as List : null));
+        ? _liveDetail!['agenda'] as List
+        : (_liveDetail?['schedule'] is List ? _liveDetail!['schedule'] as List : null));
 
     if (rawAgendaList != null) {
       for (final a in rawAgendaList) {
@@ -530,7 +540,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
       contactPerson: contactPerson ?? '',
       contactPhone: contactPhone ?? '',
       contactEmail: contactEmail ?? '',
-      hasBanner: resolvedBanner.isNotEmpty,
+      hasBanner: resolvedBanner != null && resolvedBanner.isNotEmpty,
       materialsCount: realMaterials.length,
       agendaCount: realAgenda.length,
       hasRegistration: hasRegistration,
@@ -597,28 +607,56 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                 ),
                 const SizedBox(height: 16),
 
-                // Program Banner Image (Fixed with resolveMediaUrl)
-                if (resolvedBanner.isNotEmpty) ...[
+                // Program Banner Image
+                if (isLocalBanner || (resolvedBanner != null && resolvedBanner.isNotEmpty)) ...[
                   ClipRRect(
                     borderRadius: BorderRadius.circular(16),
                     child: Container(
                       height: 175,
                       width: double.infinity,
                       color: const Color(0xFFE2E8F0),
-                      child: Image.network(
-                        resolvedBanner,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(
-                          color: const Color(0xFF00377B),
-                          child: const Center(
-                            child: Icon(
-                              Icons.calendar_month_rounded,
-                              size: 44,
-                              color: Colors.white54,
+                      child: isLocalBanner
+                          ? Image.file(
+                              File(rawBanner!),
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: const Color(0xFF00377B),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.calendar_month_rounded,
+                                    size: 44,
+                                    color: Colors.white54,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Image.network(
+                              resolvedBanner!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) => Container(
+                                color: const Color(0xFF00377B),
+                                child: const Center(
+                                  child: Icon(
+                                    Icons.calendar_month_rounded,
+                                    size: 44,
+                                    color: Colors.white54,
+                                  ),
+                                ),
+                              ),
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Container(
+                                  color: const Color(0xFFE2E8F0),
+                                  child: const Center(
+                                    child: SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          ),
-                        ),
-                      ),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -1020,31 +1058,31 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                   title: 'Supporting Material',
                   children: realMaterials.isNotEmpty
                       ? realMaterials.map((m) {
-                          return _buildMaterialRow(
-                            context,
-                            m['name'] ?? 'Document',
-                            m['url'] ?? '',
-                          );
-                        }).toList()
+                    return _buildMaterialRow(
+                      context,
+                      m['name'] ?? 'Document',
+                      m['url'] ?? '',
+                    );
+                  }).toList()
                       : [
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.info_outline_rounded,
-                                size: 16,
-                                color: Color(0xFF94A3B8),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'No supporting materials attached',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12.5,
-                                  color: const Color(0xFF64748B),
-                                ),
-                              ),
-                            ],
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.info_outline_rounded,
+                          size: 16,
+                          color: Color(0xFF94A3B8),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'No supporting materials attached',
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            color: const Color(0xFF64748B),
                           ),
-                        ],
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 14),
 
@@ -1054,128 +1092,128 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                   children: [
                     ...((timelineList != null && timelineList.isNotEmpty)
                         ? timelineList.asMap().entries.map((entry) {
-                            final idx = entry.key;
-                            final t = entry.value is Map ? entry.value as Map : {};
-                            final stage = (t['stage'] ?? '').toString().toLowerCase();
-                            final stageLabel = (t['label'] ?? (stage.isNotEmpty ? stage.replaceAll('_', ' ').toUpperCase() : 'Stage')).toString();
-                            final stageState = (t['state'] ?? 'pending').toString().toLowerCase();
-                            final note = (t['note'] ?? '').toString().trim();
-                            final occurredAt = t['occurred_at'] != null ? _formatDateString(t['occurred_at'].toString()) : null;
-                            final isLast = idx == timelineList.length - 1;
+                      final idx = entry.key;
+                      final t = entry.value is Map ? entry.value as Map : {};
+                      final stage = (t['stage'] ?? '').toString().toLowerCase();
+                      final stageLabel = (t['label'] ?? (stage.isNotEmpty ? stage.replaceAll('_', ' ').toUpperCase() : 'Stage')).toString();
+                      final stageState = (t['state'] ?? 'pending').toString().toLowerCase();
+                      final note = (t['note'] ?? '').toString().trim();
+                      final occurredAt = t['occurred_at'] != null ? _formatDateString(t['occurred_at'].toString()) : null;
+                      final isLast = idx == timelineList.length - 1;
 
-                            final isDecisionStage = stage == 'decision' || stageLabel.toLowerCase().contains('decision') || isLast;
-                            final isManualReviewStage = stage == 'manual_review' || stageLabel.toLowerCase().contains('manual review');
+                      final isDecisionStage = stage == 'decision' || stageLabel.toLowerCase().contains('decision') || isLast;
+                      final isManualReviewStage = stage == 'manual_review' || stageLabel.toLowerCase().contains('manual review');
 
-                            final isDecisionApproved = (isDecisionStage && (
-                                  t['decision']?.toString().toLowerCase() == 'approved' ||
-                                  t['decision_text']?.toString().toLowerCase() == 'approved' ||
-                                  isApproved));
+                      final isDecisionApproved = (isDecisionStage && (
+                          t['decision']?.toString().toLowerCase() == 'approved' ||
+                              t['decision_text']?.toString().toLowerCase() == 'approved' ||
+                              isApproved));
 
-                            final isDecisionChangesRequired = (isDecisionStage && (
-                                  t['decision']?.toString().toLowerCase().contains('changes') == true ||
-                                  t['decision_text']?.toString().toLowerCase().contains('changes') == true ||
-                                  isChangesRequired));
+                      final isDecisionChangesRequired = (isDecisionStage && (
+                          t['decision']?.toString().toLowerCase().contains('changes') == true ||
+                              t['decision_text']?.toString().toLowerCase().contains('changes') == true ||
+                              isChangesRequired));
 
-                            final isDecisionRejected = (isDecisionStage && (
-                                  t['decision']?.toString().toLowerCase() == 'rejected' ||
-                                  t['decision_text']?.toString().toLowerCase() == 'rejected' ||
-                                  isRejected));
+                      final isDecisionRejected = (isDecisionStage && (
+                          t['decision']?.toString().toLowerCase() == 'rejected' ||
+                              t['decision_text']?.toString().toLowerCase() == 'rejected' ||
+                              isRejected));
 
-                            _TimelineStatus tStatus = _TimelineStatus.pending;
-                            if (isApproved || isDecisionApproved) {
-                              tStatus = _TimelineStatus.completed;
-                            } else if (isDecisionChangesRequired) {
-                              tStatus = _TimelineStatus.completed;
-                            } else if (isDecisionRejected) {
-                              tStatus = _TimelineStatus.completed;
-                            } else if (isManualReviewStage && (isChangesRequired || isRejected)) {
-                              tStatus = _TimelineStatus.completed;
-                            } else if (stageState == 'completed' || stageState == 'done') {
-                              tStatus = _TimelineStatus.completed;
-                            } else if (stageState == 'active' || stageState == 'in_progress') {
-                              tStatus = _TimelineStatus.active;
-                            } else if (stage == 'ai_validation' && (status.toLowerCase() != 'submitted')) {
-                              tStatus = _TimelineStatus.completed;
-                            }
+                      _TimelineStatus tStatus = _TimelineStatus.pending;
+                      if (isApproved || isDecisionApproved) {
+                        tStatus = _TimelineStatus.completed;
+                      } else if (isDecisionChangesRequired) {
+                        tStatus = _TimelineStatus.completed;
+                      } else if (isDecisionRejected) {
+                        tStatus = _TimelineStatus.completed;
+                      } else if (isManualReviewStage && (isChangesRequired || isRejected)) {
+                        tStatus = _TimelineStatus.completed;
+                      } else if (stageState == 'completed' || stageState == 'done') {
+                        tStatus = _TimelineStatus.completed;
+                      } else if (stageState == 'active' || stageState == 'in_progress') {
+                        tStatus = _TimelineStatus.active;
+                      } else if (stage == 'ai_validation' && (status.toLowerCase() != 'submitted')) {
+                        tStatus = _TimelineStatus.completed;
+                      }
 
-                            String? subtitle;
-                            if (isDecisionStage && isApproved) {
-                              final decText = (t['decision_text'] ?? t['decision'] ?? (decisionStr.isNotEmpty ? decisionStr : 'Approved')).toString();
-                              final timeStr = occurredAt ?? (lastUpdated.isNotEmpty ? _formatDateString(lastUpdated) : null);
-                              subtitle = timeStr != null ? '$decText: Program approved and published • $timeStr' : '$decText: Program approved and published';
-                            } else if (isDecisionStage && isDecisionChangesRequired) {
-                              final decText = (t['decision_text'] ?? t['decision'] ?? (decisionStr.isNotEmpty ? decisionStr : 'Changes Required')).toString();
-                              final timeStr = occurredAt ?? (lastUpdated.isNotEmpty ? _formatDateString(lastUpdated) : null);
-                              subtitle = timeStr != null ? '$decText • $timeStr' : decText;
-                            } else if (isManualReviewStage && (isApproved || isChangesRequired)) {
-                              final timeStr = occurredAt ?? (lastUpdated.isNotEmpty ? _formatDateString(lastUpdated) : null);
-                              subtitle = timeStr != null ? 'Manual review completed • $timeStr' : 'Manual review completed';
-                            } else if (isDecisionStage && isRejected) {
-                              final timeStr = occurredAt ?? (lastUpdated.isNotEmpty ? _formatDateString(lastUpdated) : null);
-                              subtitle = timeStr != null ? 'Application rejected • $timeStr' : 'Application rejected';
-                            } else if (isManualReviewStage && isRejected) {
-                              final timeStr = occurredAt ?? (lastUpdated.isNotEmpty ? _formatDateString(lastUpdated) : null);
-                              subtitle = timeStr != null ? 'Manual review completed • $timeStr' : 'Manual review completed';
-                            } else if (note.isNotEmpty && occurredAt != null && occurredAt.isNotEmpty) {
-                              subtitle = '$note • $occurredAt';
-                            } else if (note.isNotEmpty) {
-                              subtitle = note;
-                            } else if (occurredAt != null && occurredAt.isNotEmpty) {
-                              subtitle = occurredAt;
-                            } else if (stage == 'ai_validation' && tStatus == _TimelineStatus.completed) {
-                              subtitle = 'AI validation passed • Score: ${aiReport.overallScore}/100';
-                            } else if (isDecisionStage && tStatus == _TimelineStatus.completed) {
-                              subtitle = (t['decision_text'] ?? t['decision'] ?? 'Decision reached').toString();
-                            }
+                      String? subtitle;
+                      if (isDecisionStage && isApproved) {
+                        final decText = (t['decision_text'] ?? t['decision'] ?? (decisionStr.isNotEmpty ? decisionStr : 'Approved')).toString();
+                        final timeStr = occurredAt ?? (lastUpdated.isNotEmpty ? _formatDateString(lastUpdated) : null);
+                        subtitle = timeStr != null ? '$decText: Program approved and published • $timeStr' : '$decText: Program approved and published';
+                      } else if (isDecisionStage && isDecisionChangesRequired) {
+                        final decText = (t['decision_text'] ?? t['decision'] ?? (decisionStr.isNotEmpty ? decisionStr : 'Changes Required')).toString();
+                        final timeStr = occurredAt ?? (lastUpdated.isNotEmpty ? _formatDateString(lastUpdated) : null);
+                        subtitle = timeStr != null ? '$decText • $timeStr' : decText;
+                      } else if (isManualReviewStage && (isApproved || isChangesRequired)) {
+                        final timeStr = occurredAt ?? (lastUpdated.isNotEmpty ? _formatDateString(lastUpdated) : null);
+                        subtitle = timeStr != null ? 'Manual review completed • $timeStr' : 'Manual review completed';
+                      } else if (isDecisionStage && isRejected) {
+                        final timeStr = occurredAt ?? (lastUpdated.isNotEmpty ? _formatDateString(lastUpdated) : null);
+                        subtitle = timeStr != null ? 'Application rejected • $timeStr' : 'Application rejected';
+                      } else if (isManualReviewStage && isRejected) {
+                        final timeStr = occurredAt ?? (lastUpdated.isNotEmpty ? _formatDateString(lastUpdated) : null);
+                        subtitle = timeStr != null ? 'Manual review completed • $timeStr' : 'Manual review completed';
+                      } else if (note.isNotEmpty && occurredAt != null && occurredAt.isNotEmpty) {
+                        subtitle = '$note • $occurredAt';
+                      } else if (note.isNotEmpty) {
+                        subtitle = note;
+                      } else if (occurredAt != null && occurredAt.isNotEmpty) {
+                        subtitle = occurredAt;
+                      } else if (stage == 'ai_validation' && tStatus == _TimelineStatus.completed) {
+                        subtitle = 'AI validation passed • Score: ${aiReport.overallScore}/100';
+                      } else if (isDecisionStage && tStatus == _TimelineStatus.completed) {
+                        subtitle = (t['decision_text'] ?? t['decision'] ?? 'Decision reached').toString();
+                      }
 
-                            return _buildTimelineStep(
-                              title: stageLabel,
-                              subtitle: subtitle,
-                              status: tStatus,
-                              isLast: isLast,
-                              customColor: isDecisionApproved
-                                  ? const Color(0xFF16A34A)
-                                  : (isDecisionChangesRequired ? const Color(0xFFD97706) : (isRejected && isDecisionStage ? const Color(0xFFDC2626) : null)),
-                            );
-                          }).toList()
+                      return _buildTimelineStep(
+                        title: stageLabel,
+                        subtitle: subtitle,
+                        status: tStatus,
+                        isLast: isLast,
+                        customColor: isDecisionApproved
+                            ? const Color(0xFF16A34A)
+                            : (isDecisionChangesRequired ? const Color(0xFFD97706) : (isRejected && isDecisionStage ? const Color(0xFFDC2626) : null)),
+                      );
+                    }).toList()
                         : [
-                            _buildTimelineStep(
-                              title: 'Submitted',
-                              subtitle: submittedDate.isNotEmpty ? 'Program submitted • ${_formatDateString(submittedDate)}' : 'Program submitted',
-                              status: _TimelineStatus.completed,
-                            ),
-                            _buildTimelineStep(
-                              title: 'AI Validation',
-                              subtitle: 'AI validation passed • Score: ${aiReport.overallScore}/100',
-                              status: _TimelineStatus.completed,
-                            ),
-                            _buildTimelineStep(
-                              title: 'Manual Review',
-                              subtitle: isApproved || isChangesRequired
-                                  ? (lastUpdated.isNotEmpty ? 'Manual review completed • ${_formatDateString(lastUpdated)}' : 'Manual review completed')
-                                  : (status.toLowerCase() == 'submitted'
-                                      ? 'Pending committee evaluation'
-                                      : 'Manual review in progress'),
-                              status: isApproved || isChangesRequired || status.toLowerCase() == 'completed'
-                                  ? _TimelineStatus.completed
-                                  : (status.toLowerCase() == 'submitted' ? _TimelineStatus.pending : _TimelineStatus.active),
-                            ),
-                            _buildTimelineStep(
-                              title: 'Decision',
-                              subtitle: isApproved
-                                  ? (lastUpdated.isNotEmpty ? 'Approved: Program approved and published • ${_formatDateString(lastUpdated)}' : 'Approved: Program approved and published')
-                                  : (isChangesRequired
-                                      ? (lastUpdated.isNotEmpty ? 'Changes Required • ${_formatDateString(lastUpdated)}' : 'Changes Required')
-                                      : 'Pending committee decision'),
-                              status: isApproved || isChangesRequired || status.toLowerCase() == 'completed'
-                                  ? _TimelineStatus.completed
-                                  : _TimelineStatus.pending,
-                              isLast: true,
-                              customColor: isApproved
-                                  ? const Color(0xFF16A34A)
-                                  : (isChangesRequired ? const Color(0xFFD97706) : null),
-                            ),
-                          ]),
+                      _buildTimelineStep(
+                        title: 'Submitted',
+                        subtitle: submittedDate.isNotEmpty ? 'Program submitted • ${_formatDateString(submittedDate)}' : 'Program submitted',
+                        status: _TimelineStatus.completed,
+                      ),
+                      _buildTimelineStep(
+                        title: 'AI Validation',
+                        subtitle: 'AI validation passed • Score: ${aiReport.overallScore}/100',
+                        status: _TimelineStatus.completed,
+                      ),
+                      _buildTimelineStep(
+                        title: 'Manual Review',
+                        subtitle: isApproved || isChangesRequired
+                            ? (lastUpdated.isNotEmpty ? 'Manual review completed • ${_formatDateString(lastUpdated)}' : 'Manual review completed')
+                            : (status.toLowerCase() == 'submitted'
+                            ? 'Pending committee evaluation'
+                            : 'Manual review in progress'),
+                        status: isApproved || isChangesRequired || status.toLowerCase() == 'completed'
+                            ? _TimelineStatus.completed
+                            : (status.toLowerCase() == 'submitted' ? _TimelineStatus.pending : _TimelineStatus.active),
+                      ),
+                      _buildTimelineStep(
+                        title: 'Decision',
+                        subtitle: isApproved
+                            ? (lastUpdated.isNotEmpty ? 'Approved: Program approved and published • ${_formatDateString(lastUpdated)}' : 'Approved: Program approved and published')
+                            : (isChangesRequired
+                            ? (lastUpdated.isNotEmpty ? 'Changes Required • ${_formatDateString(lastUpdated)}' : 'Changes Required')
+                            : 'Pending committee decision'),
+                        status: isApproved || isChangesRequired || status.toLowerCase() == 'completed'
+                            ? _TimelineStatus.completed
+                            : _TimelineStatus.pending,
+                        isLast: true,
+                        customColor: isApproved
+                            ? const Color(0xFF16A34A)
+                            : (isChangesRequired ? const Color(0xFFD97706) : null),
+                      ),
+                    ]),
                     if (reviewerComment.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       Container(
@@ -1397,21 +1435,21 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
               onPressed: _isAiScanning ? null : () => _runAiScan(),
               icon: _isAiScanning
                   ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+              )
                   : Icon(
-                      isSubmitted ? Icons.send_rounded : Icons.sync_rounded,
-                      size: 16,
-                      color: Colors.white,
-                    ),
+                isSubmitted ? Icons.send_rounded : Icons.sync_rounded,
+                size: 16,
+                color: Colors.white,
+              ),
               label: Text(
                 _isAiScanning
                     ? 'Submitting AI Validation to Backend...'
                     : (isSubmitted
-                        ? 'Submit AI Validation for Review'
-                        : 'Re-send AI Validation to Server'),
+                    ? 'Submit AI Validation for Review'
+                    : 'Re-send AI Validation to Server'),
                 style: GoogleFonts.inter(
                   fontSize: 12.5,
                   fontWeight: FontWeight.w700,
@@ -1524,11 +1562,11 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
 
 
   Widget _buildMaterialRow(
-    BuildContext context,
-    String filename,
-    String fileUrl, {
-    bool isLast = false,
-  }) {
+      BuildContext context,
+      String filename,
+      String fileUrl, {
+        bool isLast = false,
+      }) {
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 8.0),
       child: Container(
@@ -2024,7 +2062,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                   ),
                   const SizedBox(height: 6),
                   ...report.recommendations.map(
-                    (rec) => Padding(
+                        (rec) => Padding(
                       padding: const EdgeInsets.only(bottom: 4.0),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2057,10 +2095,10 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                 onPressed: _isAiScanning ? null : () => _runAiScan(),
                 icon: _isAiScanning
                     ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
                     : const Icon(Icons.send_rounded, size: 16, color: Colors.white),
                 label: Text(
                   _isAiScanning

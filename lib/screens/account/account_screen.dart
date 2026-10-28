@@ -378,7 +378,20 @@ class _AccountScreenState extends State<AccountScreen> {
                                   ? Image.network(
                                       avatarUrl,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (_, error, stackTrace) => Center(
+                                      loadingBuilder: (context, child, loadingProgress) {
+                                        if (loadingProgress == null) return child;
+                                        return const Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      errorBuilder: (context, error, stackTrace) => Center(
                                         child: Text(
                                           initialLetter,
                                           style: GoogleFonts.inter(

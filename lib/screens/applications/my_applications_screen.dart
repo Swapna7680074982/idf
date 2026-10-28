@@ -34,12 +34,9 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   String _selectedProgramFilter = 'All';
   final List<String> _programFilters = [
     'All',
-    'Submitted',
-    'In Review',
+    'Manual Review',
     'Approved',
-    'Changes Required',
     'Rejected',
-    'Completed',
   ];
 
   // Certificate filters & search
@@ -48,9 +45,10 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   String _selectedCertFilter = 'All';
   final List<String> _certFilters = [
     'All',
-    'Submitted',
-    'Active',
-    'Expired',
+    'Manual Review',
+    'Approved',
+    'Rejected',
+    'Renewal',
   ];
 
   List<ProgramApplicationItem> _programs = [];
@@ -142,12 +140,32 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       if (_programQuery.isNotEmpty) {
         final q = _programQuery.toLowerCase();
         final matchesTitle = item.programName.toLowerCase().contains(q);
-        final matchesRef = item.referenceNumber.toLowerCase().contains(q);
-        final matchesLoc = item.location.toLowerCase().contains(q);
-        if (!matchesTitle && !matchesRef && !matchesLoc) return false;
+        if (!matchesTitle) return false;
       }
       if (_selectedProgramFilter != 'All') {
-        if (item.status.toLowerCase() != _selectedProgramFilter.toLowerCase()) {
+        final filter = _selectedProgramFilter.toLowerCase();
+        final stat = item.status.toLowerCase();
+        if (filter == 'manual review' || filter == 'manual_review') {
+          final isManual = stat == 'manual review' ||
+              stat == 'manual_review' ||
+              stat == 'submitted' ||
+              stat == 'in review' ||
+              stat == 'in_review' ||
+              stat == 'review' ||
+              stat == 'under_review' ||
+              stat == 'pending' ||
+              stat == 'draft';
+          if (!isManual) return false;
+        } else if (filter == 'approved') {
+          final isApproved = stat == 'approved' || stat == 'complete' || stat == 'completed';
+          if (!isApproved) return false;
+        } else if (filter == 'rejected') {
+          final isRejected = stat == 'rejected' || stat == 'cancelled' || stat == 'canceled';
+          if (!isRejected) return false;
+        } else if (filter == 'changes required' || filter == 'changes_required') {
+          final isChanges = stat.contains('changes');
+          if (!isChanges) return false;
+        } else if (stat != filter) {
           return false;
         }
       }
@@ -168,14 +186,46 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         final stat = item.status.toLowerCase();
         final rev = item.reviewStatus.toLowerCase();
         final disp = item.displayReviewStatus.toLowerCase();
-        if (filter == 'submitted') {
-          final isSub = stat == 'submitted' ||
+        if (filter == 'manual review' || filter == 'manual_review') {
+          final isManual = stat == 'manual review' ||
+              stat == 'manual_review' ||
+              stat == 'submitted' ||
               stat == 'under_review' ||
+              stat == 'in review' ||
+              stat == 'in_review' ||
+              stat == 'pending' ||
               rev == 'manual_review' ||
+              rev == 'manual review' ||
               rev == 'ai_audit' ||
               disp.contains('review') ||
               disp.contains('submitted');
-          if (!isSub) return false;
+          if (!isManual) return false;
+        } else if (filter == 'approved') {
+          final isApproved = item.isApproved ||
+              stat == 'approved' ||
+              stat == 'active' ||
+              stat == 'certified' ||
+              disp.contains('approved');
+          if (!isApproved) return false;
+        } else if (filter == 'rejected') {
+          final isRejected = stat == 'rejected' ||
+              rev == 'rejected' ||
+              disp.contains('rejected');
+          if (!isRejected) return false;
+        } else if (filter == 'changes required' || filter == 'changes_required') {
+          final isChanges = stat.contains('changes') ||
+              rev.contains('changes') ||
+              disp.contains('changes');
+          if (!isChanges) return false;
+        } else if (filter == 'renewal' || filter == 'renew' || filter == 'renew certificate') {
+          final isRenew = item.canRenew ||
+              item.isExpiredOrRenewable ||
+              stat.contains('renew') ||
+              rev.contains('renew') ||
+              disp.contains('renew') ||
+              stat == 'expired' ||
+              disp == 'expired';
+          if (!isRenew) return false;
         } else if (stat != filter && rev != filter && disp != filter) {
           return false;
         }
@@ -231,8 +281,10 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildSearchBar(),
-                  const SizedBox(height: 10),
-                  _buildFilterChips(),
+                  if (_selectedTab != 0) ...[
+                    const SizedBox(height: 10),
+                    _buildFilterChips(),
+                  ],
                 ],
               ),
             ),
@@ -661,31 +713,36 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     Color border = const Color(0xFFE2E8F0);
 
     final s = status.trim().toLowerCase();
+    String displayLabel = status;
+
     if (s == 'approved' || s == 'complete' || s == 'completed') {
       bg = const Color(0xFFDCFCE7);
       text = const Color(0xFF16A34A);
       border = const Color(0xFF86EFAC);
-    } else if (s == 'in review' || s == 'under review' || s == 'manual_review' || s == 'pending') {
+      displayLabel = 'Approved';
+    } else if (s == 'in review' ||
+        s == 'under review' ||
+        s == 'in_review' ||
+        s == 'manual_review' ||
+        s == 'manual review' ||
+        s == 'submitted' ||
+        s == 'pending' ||
+        s == 'draft') {
       bg = const Color(0xFFFEF3C7);
       text = const Color(0xFFB45309);
       border = const Color(0xFFFDE68A);
-    } else if (s == 'submitted') {
-      bg = const Color(0xFFE0F2FE);
-      text = const Color(0xFF0284C7);
-      border = const Color(0xFFBAE6FD);
+      displayLabel = 'Manual Review';
     } else if (s.contains('changes') || s == 'changes_required' || s == 'changes required') {
       bg = const Color(0xFFFFEDD5);
       text = const Color(0xFFC2410C);
       border = const Color(0xFFFDBA74);
+      displayLabel = 'Changes Required';
     } else if (s == 'rejected' || s == 'cancelled' || s == 'canceled') {
       bg = const Color(0xFFFEE2E2);
       text = const Color(0xFFDC2626);
       border = const Color(0xFFFCA5A5);
+      displayLabel = 'Rejected';
     }
-
-    final displayLabel = (s == 'manual_review' || s == 'in_review')
-        ? 'In Review'
-        : (s == 'changes_required' ? 'Changes Required' : status);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -989,10 +1046,13 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     Color border = const Color(0xFFE2E8F0);
 
     final s = status.trim().toLowerCase();
+    String displayLabel = status;
+
     if (s == 'active' || s == 'approved' || s == 'completed' || s == 'certified') {
       bg = const Color(0xFFDCFCE7);
       text = const Color(0xFF16A34A);
       border = const Color(0xFF86EFAC);
+      displayLabel = 'Approved';
     } else if (s.contains('manual') ||
         s.contains('review') ||
         s == 'pending' ||
@@ -1002,23 +1062,23 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       bg = const Color(0xFFFEF3C7);
       text = const Color(0xFFB45309);
       border = const Color(0xFFFDE68A);
-    } else if (s.contains('renew')) {
+      displayLabel = 'Manual Review';
+    } else if (s.contains('renew') || s == 'renewal') {
       bg = const Color(0xFFFFF7ED);
       text = const Color(0xFFEA580C);
       border = const Color(0xFFFDBA74);
+      displayLabel = 'Renewal';
     } else if (s.contains('changes') || s == 'changes required') {
       bg = const Color(0xFFFFEDD5);
       text = const Color(0xFFC2410C);
       border = const Color(0xFFFDBA74);
+      displayLabel = 'Changes Required';
     } else if (s == 'expired' || s == 'rejected' || s == 'cancelled') {
       bg = const Color(0xFFFEE2E2);
       text = const Color(0xFFDC2626);
       border = const Color(0xFFFCA5A5);
+      displayLabel = s == 'expired' ? 'Expired' : 'Rejected';
     }
-
-    final displayLabel = (s == 'submitted' || s == 'ai_audit' || s == 'under_review' || s == 'manual_review')
-        ? 'Manual Review'
-        : status;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

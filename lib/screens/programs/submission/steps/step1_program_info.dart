@@ -307,6 +307,14 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
       widget.model.description = _descriptionController.text.trim();
       widget.model.programDescription = widget.model.description;
       widget.onContinue();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter all required fields to continue'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 

@@ -222,19 +222,16 @@ class ProgramCard extends StatelessWidget {
     final s = rev.trim().toLowerCase();
     switch (s) {
       case 'submitted':
-        bg = const Color(0xFFE0F2FE);
-        border = const Color(0xFFBAE6FD);
-        text = const Color(0xFF0284C7);
-        label = 'Submitted';
-        break;
       case 'in_review':
       case 'in review':
       case 'manual_review':
+      case 'manual review':
+      case 'under_review':
       case 'pending':
         bg = const Color(0xFFFEF3C7);
         border = const Color(0xFFFDE68A);
         text = const Color(0xFFB45309);
-        label = 'In Review';
+        label = 'Manual Review';
         break;
       case 'approved':
       case 'complete':
@@ -277,6 +274,11 @@ class ProgramCard extends StatelessWidget {
           border = const Color(0xFFFDBA74);
           text = const Color(0xFFC2410C);
           label = 'Changes Required';
+        } else if (s.contains('review') || s.contains('manual')) {
+          bg = const Color(0xFFFEF3C7);
+          border = const Color(0xFFFDE68A);
+          text = const Color(0xFFB45309);
+          label = 'Manual Review';
         } else {
           bg = const Color(0xFFE0F2FE);
           border = const Color(0xFFBAE6FD);

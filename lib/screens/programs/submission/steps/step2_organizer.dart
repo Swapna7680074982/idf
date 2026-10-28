@@ -100,6 +100,14 @@ class _Step2OrganizerState extends State<Step2Organizer> {
       widget.model.phone = _phoneController.text.trim();
       widget.model.email = _emailController.text.trim();
       widget.onContinue();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter all required organizer fields'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 

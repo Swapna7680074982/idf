@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../core/date_time_utils.dart';
 import '../../core/theme.dart';
 import '../../models/application_item_model.dart';
 import '../../models/certification_model.dart';
@@ -235,6 +236,15 @@ class _CertificationDetailsScreenState
                     child: Image.network(
                       resolvedUrl,
                       fit: BoxFit.contain,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(32.0),
+                            child: CircularProgressIndicator(color: Colors.white),
+                          ),
+                        );
+                      },
                       errorBuilder: (context, error, stackTrace) => Container(
                         padding: const EdgeInsets.all(24),
                         color: Colors.white,
@@ -1814,12 +1824,6 @@ class _CertificationDetailsScreenState
   }
 
   String _formatDate(String? raw) {
-    if (raw == null || raw.trim().isEmpty) return '—';
-    try {
-      final dt = DateTime.parse(raw);
-      return '${dt.day}/${dt.month}/${dt.year}';
-    } catch (_) {
-      return raw;
-    }
+    return DateTimeUtils.formatDateTime(raw);
   }
 }

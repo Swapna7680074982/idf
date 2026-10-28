@@ -81,22 +81,12 @@ class WelcomeScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 22),
                           Text(
-                            "Dr. Mohan's",
+                            "MDRF Activate",
                             style: GoogleFonts.inter(
                               fontSize: 26,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
                               letterSpacing: -0.2,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Diabetes Specialities centre',
-                            textAlign: TextAlign.center,
-                            style: GoogleFonts.inter(
-                              fontSize: 14.5,
-                              fontWeight: FontWeight.w400,
-                              color: Colors.white.withAlpha(240),
                             ),
                           ),
                         ],

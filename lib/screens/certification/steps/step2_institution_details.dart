@@ -277,6 +277,14 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
       }
 
       widget.onContinue();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter all required institution details'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../../../../core/date_time_utils.dart';
 import '../../../../core/theme.dart';
 import '../../../../models/meta_models.dart';
 import '../../../../models/program_submission_model.dart';
@@ -205,7 +206,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
   }
 
   String _formatDate(DateTime dt) {
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    return DateTimeUtils.formatDateOnly(dt);
   }
 
   Future<void> _pickDate(bool isStart) async {
@@ -268,6 +269,37 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
   }
 
   void _handleContinue() {
+    if (_startDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a start date'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (_endDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select an end date'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (_selectedCountry == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a country'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     if (_formKey.currentState?.validate() ?? false) {
       widget.model.startDate = _startDate;
       widget.model.endDate = _endDate;
@@ -281,6 +313,14 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
           ? _venueController.text.trim()
           : 'To be announced';
       widget.onContinue();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter all required dates and location fields'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
     }
   }
 
@@ -299,7 +339,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
             readOnly: true,
             onTap: () => _pickDate(true),
             decoration: const InputDecoration(
-              hintText: 'YYYY-MM-DD',
+              hintText: 'DD MMM YYYY',
               suffixIcon: Icon(Icons.calendar_today_outlined, size: 18, color: Color(0xFF64748B)),
             ),
             validator: (val) => val == null || val.isEmpty ? 'Please select start date' : null,
@@ -314,7 +354,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
             readOnly: true,
             onTap: () => _pickDate(false),
             decoration: const InputDecoration(
-              hintText: 'YYYY-MM-DD',
+              hintText: 'DD MMM YYYY',
               suffixIcon: Icon(Icons.calendar_today_outlined, size: 18, color: Color(0xFF64748B)),
             ),
             validator: (val) {

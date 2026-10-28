@@ -36,6 +36,19 @@ class DateTimeUtils {
     return trimmed;
   }
 
+  /// Formats date only (e.g. DateTime -> '28 Oct 2026')
+  static String formatDateOnly(DateTime? dt) {
+    if (dt == null) return '—';
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    final day = dt.day.toString().padLeft(2, '0');
+    final month = months[dt.month - 1];
+    final year = dt.year.toString();
+    return '$day $month $year';
+  }
+
   /// Formats date and optional time (e.g. '2026-10-16' -> '16 Oct 2026', '2026-10-16 14:30:00' -> '16 Oct 2026, 02:30 PM')
   static String formatDateTime(String? dateStr) {
     if (dateStr == null || dateStr.trim().isEmpty) return '—';
@@ -51,7 +64,8 @@ class DateTimeUtils {
         final month = months[dt.month - 1];
         final year = dt.year.toString();
 
-        if (trimmed.contains(':')) {
+        // Only include time if there is an explicit non-midnight time
+        if (trimmed.contains(':') && (dt.hour != 0 || dt.minute != 0)) {
           final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
           final minute = dt.minute.toString().padLeft(2, '0');
           final amPm = dt.hour >= 12 ? 'PM' : 'AM';
@@ -75,25 +89,8 @@ class DateTimeUtils {
     return '$s - $e';
   }
 
-  /// Formats date for program cards matching the design (e.g. '2025-11-14' or '2026-10-29 to 2026-10-31')
+  /// Formats date for program cards using unified app format (e.g. '14 Nov 2025' or '29 Oct 2026 - 31 Oct 2026')
   static String formatCardDate(String? start, String? end) {
-    String cleanDate(String? d) {
-      if (d == null || d.trim().isEmpty) return '';
-      final t = d.trim();
-      final dt = DateTime.tryParse(t.replaceAll(' ', 'T'));
-      if (dt != null) {
-        final year = dt.year.toString();
-        final month = dt.month.toString().padLeft(2, '0');
-        final day = dt.day.toString().padLeft(2, '0');
-        return '$year-$month-$day';
-      }
-      return t.split(' ').first;
-    }
-
-    final s = cleanDate(start);
-    final e = cleanDate(end);
-    if (s.isEmpty) return e.isNotEmpty ? e : '—';
-    if (e.isEmpty || s == e) return s;
-    return '$s to $e';
+    return formatDateRange(start, end);
   }
 }

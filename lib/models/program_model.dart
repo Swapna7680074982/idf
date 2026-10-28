@@ -305,7 +305,9 @@ class ProgramModel {
     final regLink = (registration['registration_link'] ?? json['registration_link'])?.toString();
     final regInstructions = (registration['registration_instructions'] ?? json['registration_instructions'])?.toString();
 
-    final effectiveBanner = json['banner_image_url'] ?? json['cover_image_url'] ?? json['banner'];
+    final effectiveBanner = ApiConfig.extractBannerUrl(json) ??
+        ApiConfig.extractBannerUrl(eventDetails) ??
+        ApiConfig.extractBannerUrl(json['program_information']);
 
     return ProgramModel(
       id: (json['id'] ?? json['program_no'] ?? '').toString(),
@@ -397,7 +399,13 @@ class ProgramModel {
         isRegistered: apiItem.isRegistered && !apiItem.isOrganizer,
         canRegister: true,
         gradientColors: const [0xFF006097, 0xFF017CC2],
-        imageUrl: ApiConfig.resolveImageUrl(apiItem.coverImageUrl ?? apiItem.bannerImageUrl ?? apiItem.banner),
+        imageUrl: ApiConfig.resolveImageUrl(
+          ApiConfig.extractBannerUrl({
+            'cover_image_url': apiItem.coverImageUrl,
+            'banner_image_url': apiItem.bannerImageUrl,
+            'banner': apiItem.banner,
+          }) ?? apiItem.coverImageUrl ?? apiItem.bannerImageUrl ?? apiItem.banner,
+        ),
         category: apiItem.programType.isNotEmpty ? apiItem.programType : null,
         registrationLink: apiItem.registrationLink,
         reviewStatus: apiItem.reviewStatus ?? apiItem.status,
@@ -459,7 +467,13 @@ class ProgramModel {
         isRegistered: apiItem.isRegistered && !apiItem.isOrganizer,
         canRegister: true,
         gradientColors: const [0xFF006097, 0xFF017CC2],
-        imageUrl: ApiConfig.resolveImageUrl(apiItem.coverImageUrl ?? apiItem.bannerImageUrl ?? apiItem.banner),
+        imageUrl: ApiConfig.resolveImageUrl(
+          ApiConfig.extractBannerUrl({
+            'cover_image_url': apiItem.coverImageUrl,
+            'banner_image_url': apiItem.bannerImageUrl,
+            'banner': apiItem.banner,
+          }) ?? apiItem.coverImageUrl ?? apiItem.bannerImageUrl ?? apiItem.banner,
+        ),
         category: apiItem.programType.isNotEmpty ? apiItem.programType : null,
         registrationLink: apiItem.registrationLink,
         reviewStatus: apiItem.reviewStatus ?? apiItem.status,
@@ -552,7 +566,13 @@ class ProgramModel {
       isRegistered: rawIsReg && !isOrg,
       canRegister: true,
       gradientColors: const [0xFF006097, 0xFF017CC2],
-      imageUrl: ApiConfig.resolveImageUrl(safeProp('coverImageUrl') ?? safeProp('bannerImageUrl') ?? safeProp('banner')),
+      imageUrl: ApiConfig.resolveImageUrl(
+        ApiConfig.extractBannerUrl({
+          'cover_image_url': safeProp('coverImageUrl'),
+          'banner_image_url': safeProp('bannerImageUrl'),
+          'banner': safeProp('banner'),
+        }) ?? safeProp('coverImageUrl') ?? safeProp('bannerImageUrl') ?? safeProp('banner'),
+      ),
       category: safeProp('programType'),
       registrationLink: safeProp('registrationLink'),
       reviewStatus: safeProp('reviewStatus') ?? safeProp('status'),

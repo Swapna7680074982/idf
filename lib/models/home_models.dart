@@ -1,3 +1,5 @@
+import '../services/api_config.dart';
+
 class HomeRegisteredProgram {
   final int id;
   final String? programNo;
@@ -42,8 +44,8 @@ class HomeRegisteredProgram {
   });
 
   factory HomeRegisteredProgram.fromJson(Map<String, dynamic> json) {
-    final effectiveCover = json['cover_image_url'] ?? json['banner_image_url'] ?? json['banner'];
-    final effectiveBanner = json['banner_image_url'] ?? json['banner'] ?? json['cover_image_url'];
+    final effectiveCover = ApiConfig.extractBannerUrl(json);
+    final effectiveBanner = effectiveCover;
     final statusStr = (json['review_status'] ?? json['status'])?.toString().toLowerCase() ?? '';
     final isSubmittedOrDraft = statusStr == 'submitted' || statusStr == 'draft' || statusStr == 'in_review';
     final isOrg = json['is_organizer'] == 1 ||

@@ -22,7 +22,7 @@ class Step7ReviewSubmit extends StatelessWidget {
 
   String _formatDate(DateTime? dt) {
     if (dt == null) return '—';
-    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+    return DateTimeUtils.formatDateOnly(dt);
   }
 
   @override

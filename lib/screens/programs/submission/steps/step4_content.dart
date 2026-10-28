@@ -154,6 +154,13 @@ class _Step4ContentState extends State<Step4Content> {
           setState(() {
             _agendaError = 'Please enter a title for Session ${i + 1}';
           });
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Please enter a title for Session ${i + 1}'),
+              backgroundColor: const Color(0xFFEF4444),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
           return;
         }
         validSessions.add({
