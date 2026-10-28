@@ -49,6 +49,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     'Approved',
     'Rejected',
     'Renewal',
+    'Renew in Progress',
   ];
 
   List<ProgramApplicationItem> _programs = [];
@@ -218,14 +219,19 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
               disp.contains('changes');
           if (!isChanges) return false;
         } else if (filter == 'renewal' || filter == 'renew' || filter == 'renew certificate') {
-          final isRenew = item.canRenew ||
-              item.isExpiredOrRenewable ||
-              stat.contains('renew') ||
-              rev.contains('renew') ||
-              disp.contains('renew') ||
-              stat == 'expired' ||
-              disp == 'expired';
+          final isRenew = (item.isExpiredOrRenewable && !item.isRenewInProgress) ||
+              stat == 'renewal' ||
+              stat == 'renew certificate' ||
+              disp == 'renewal' ||
+              (stat == 'expired' && !item.isRenewInProgress) ||
+              (disp == 'expired' && !item.isRenewInProgress);
           if (!isRenew) return false;
+        } else if (filter == 'renew in progress' || filter == 'renew_in_progress') {
+          final isProgress = item.isRenewInProgress ||
+              stat.contains('renew in progress') ||
+              disp.contains('renew in progress') ||
+              rev.contains('renew in progress');
+          if (!isProgress) return false;
         } else if (stat != filter && rev != filter && disp != filter) {
           return false;
         }
@@ -274,17 +280,15 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
             // Tabs: PROGRAMS | CERTIFICATES
             _buildTabSelector(),
 
-            // Search Bar & Filter Chips
+            // Search Bar & Filter Chips (Status Bar)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildSearchBar(),
-                  if (_selectedTab != 0) ...[
-                    const SizedBox(height: 10),
-                    _buildFilterChips(),
-                  ],
+                  const SizedBox(height: 10),
+                  _buildFilterChips(),
                 ],
               ),
             ),
@@ -357,7 +361,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
 
   Widget _buildSearchBar() {
     final isPrograms = _selectedTab == 0;
-    final hint = isPrograms ? 'Search Programs' : 'Search Certificates';
+    final hint = isPrograms ? 'Search programs by name' : 'Search certificates by name';
     final controller = isPrograms ? _programSearchController : _certSearchController;
 
     return Container(
@@ -745,7 +749,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: bg,
         borderRadius: BorderRadius.circular(12),
@@ -754,7 +758,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       child: Text(
         displayLabel,
         style: GoogleFonts.inter(
-          fontSize: 11,
+          fontSize: 10,
           fontWeight: FontWeight.w700,
           color: text,
         ),
@@ -801,13 +805,22 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   }
 
   Widget _buildCertificateCard(CertificateApplicationItem item) {
-    final isExpired = item.isExpiredOrRenewable;
+    final isRenewInProgress = item.isRenewInProgress;
+    final isExpired = item.isExpiredOrRenewable && !isRenewInProgress;
     final isChangesRequired = item.status.toLowerCase() == 'changes required' ||
         item.status.toLowerCase() == 'changes_required';
-    final isApproved = item.isApproved && item.certificateId.isNotEmpty;
+    final hasCert = item.certificateId.isNotEmpty && item.certificateId != 'null';
+    final isApproved = (item.isApproved || isRenewInProgress) && hasCert;
 
     void openCert() {
-      if (isExpired) {
+      if (isRenewInProgress && hasCert) {
+        // For renew in progress with an existing certificate, show CertificateViewScreen!
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CertificateViewScreen(certificate: item),
+          ),
+        );
+      } else if (isExpired) {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => RenewalWizardScreen(certificate: item),
@@ -980,19 +993,19 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       Text(
-                                        isExpired
-                                            ? 'Renew Certificate'
-                                            : isChangesRequired
-                                                ? 'Edit Application'
-                                                : isApproved
-                                                    ? 'View Certificate'
+                                        (hasCert && (isApproved || isRenewInProgress))
+                                            ? 'View Certificate'
+                                            : isExpired
+                                                ? 'Renew Certificate'
+                                                : isChangesRequired
+                                                    ? 'Edit Application'
                                                     : 'View Details',
                                         style: GoogleFonts.inter(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w700,
                                           color: isChangesRequired
                                               ? const Color(0xFFDC2626)
-                                              : isExpired
+                                              : (isExpired && !isRenewInProgress)
                                                   ? const Color(0xFFEA580C)
                                                   : AppColors.primaryBlue,
                                         ),
@@ -1003,13 +1016,13 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                         size: 13,
                                         color: isChangesRequired
                                             ? const Color(0xFFDC2626)
-                                            : isExpired
+                                            : (isExpired && !isRenewInProgress)
                                                 ? const Color(0xFFEA580C)
                                                 : AppColors.primaryBlue,
                                       ),
                                     ],
                                   ),
-                                  if (isExpired || isChangesRequired || isApproved)
+                                  if (!isRenewInProgress && ((isExpired && !isRenewInProgress) || isChangesRequired || isApproved))
                                     InkWell(
                                       onTap: openDetailsRedirect,
                                       child: Padding(
@@ -1053,6 +1066,11 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       text = const Color(0xFF16A34A);
       border = const Color(0xFF86EFAC);
       displayLabel = 'Approved';
+    } else if (s == 'renew in progress' || s == 'renew_in_progress' || s.contains('progress')) {
+      bg = const Color(0xFFEFF6FF);
+      text = const Color(0xFF2563EB);
+      border = const Color(0xFF93C5FD);
+      displayLabel = 'Renew in Progress';
     } else if (s.contains('manual') ||
         s.contains('review') ||
         s == 'pending' ||

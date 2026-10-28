@@ -247,6 +247,11 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
       text = const Color(0xFF16A34A);
       border = const Color(0xFF86EFAC);
       displayLabel = 'Approved';
+    } else if (s == 'renew in progress' || s == 'renew_in_progress' || s.contains('progress')) {
+      bg = const Color(0xFFEFF6FF);
+      text = const Color(0xFF2563EB);
+      border = const Color(0xFF93C5FD);
+      displayLabel = 'Renew in Progress';
     } else if (s.contains('manual') ||
         s.contains('review') ||
         s == 'pending' ||
@@ -294,14 +299,23 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
 
   Widget _buildCurrentApplicationCard(
       BuildContext context, CertificateApplicationItem app) {
-    final isExpired = app.isExpiredOrRenewable;
+    final isRenewInProgress = app.isRenewInProgress;
+    final isExpired = app.isExpiredOrRenewable && !isRenewInProgress;
     final isChangesRequired = app.status.toLowerCase() == 'changes required' ||
         app.status.toLowerCase() == 'changes_required' ||
         app.displayReviewStatus.toLowerCase().contains('changes');
-    final isApproved = app.isApproved && app.certificateId.isNotEmpty;
+    final hasCert = app.certificateId.isNotEmpty && app.certificateId != 'null';
+    final isApproved = (app.isApproved || isRenewInProgress) && hasCert;
 
     void openCert() {
-      if (isExpired) {
+      if (isRenewInProgress && hasCert) {
+        // For renew in progress with an existing certificate, show CertificateViewScreen!
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => CertificateViewScreen(certificate: app),
+          ),
+        );
+      } else if (isExpired) {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => RenewalWizardScreen(certificate: app),
@@ -467,19 +481,19 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                isExpired
-                                    ? 'Renew Certificate'
-                                    : isChangesRequired
-                                        ? 'Edit Application'
-                                        : isApproved
-                                            ? 'View Certificate'
+                                (hasCert && (isApproved || isRenewInProgress))
+                                    ? 'View Certificate'
+                                    : isExpired
+                                        ? 'Renew Certificate'
+                                        : isChangesRequired
+                                            ? 'Edit Application'
                                             : 'View Details',
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                   color: isChangesRequired
                                       ? const Color(0xFFDC2626)
-                                      : isExpired
+                                      : (isExpired && !isRenewInProgress)
                                           ? const Color(0xFFEA580C)
                                           : AppColors.primaryBlue,
                                 ),
@@ -490,13 +504,13 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
                                 size: 13,
                                 color: isChangesRequired
                                     ? const Color(0xFFDC2626)
-                                    : isExpired
+                                    : (isExpired && !isRenewInProgress)
                                         ? const Color(0xFFEA580C)
                                         : AppColors.primaryBlue,
                               ),
                             ],
                           ),
-                          if (isExpired || isChangesRequired || isApproved)
+                          if (!isRenewInProgress && ((isExpired && !isRenewInProgress) || isChangesRequired || isApproved))
                             InkWell(
                               onTap: openDetailsRedirect,
                               child: Padding(

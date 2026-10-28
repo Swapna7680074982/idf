@@ -302,6 +302,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
     }
   }
 
+  /*
   /// Option A: Quick Instant Renewal Confirmation
   void _showQuickInstantRenewalDialog() {
     bool declarationChecked = true;
@@ -468,6 +469,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
       },
     );
   }
+  */
 
   /// Option B: Submit Confirmation after Reviewing / Updating
   void _showSubmitConfirmationSheet() {
@@ -824,7 +826,8 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Option A: Quick Instant Renewal Card
+        // Option A: Quick Instant Renewal Card (Commented out)
+        /*
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -918,6 +921,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
           ],
         ),
         const SizedBox(height: 18),
+        */
 
         Container(
           padding: const EdgeInsets.all(16),

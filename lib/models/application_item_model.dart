@@ -200,6 +200,7 @@ class CertificateApplicationItem {
   final bool canRenew;
   final bool isExpiredStatus;
   final String? certificateRecordId;
+  final String? renewalApplicationId;
 
   const CertificateApplicationItem({
     required this.id,
@@ -218,6 +219,7 @@ class CertificateApplicationItem {
     this.canRenew = false,
     this.isExpiredStatus = false,
     this.certificateRecordId,
+    this.renewalApplicationId,
   });
 
   /// Primary certificate identifier for the renewal endpoint /api/certification/certificates/:id/renew
@@ -236,7 +238,24 @@ class CertificateApplicationItem {
     return applicationNo;
   }
 
+  bool get isRenewInProgress {
+    final s = status.trim().toLowerCase();
+    final d = displayStatus.trim().toLowerCase();
+    final r = reviewStatus.trim().toLowerCase();
+    return s == 'renew in progress' ||
+        s == 'renew_in_progress' ||
+        d == 'renew in progress' ||
+        d == 'renew_in_progress' ||
+        r == 'renew in progress' ||
+        r == 'renew_in_progress' ||
+        (renewalApplicationId != null &&
+            renewalApplicationId!.isNotEmpty &&
+            renewalApplicationId != '0' &&
+            renewalApplicationId != 'null');
+  }
+
   bool get isExpiredOrRenewable {
+    if (isRenewInProgress) return false;
     if (canRenew || isExpiredStatus) return true;
     final s = status.trim().toLowerCase();
     final d = displayStatus.trim().toLowerCase();
@@ -246,12 +265,14 @@ class CertificateApplicationItem {
         r == 'expired' ||
         s == 'renew certificate' ||
         d == 'renew certificate' ||
+        s == 'renewal' ||
+        d == 'renewal' ||
         s.contains('renew') ||
         d.contains('renew');
   }
 
   bool get isApproved {
-    if (isExpiredOrRenewable) return false;
+    if (isExpiredOrRenewable || isRenewInProgress) return false;
     final s = status.trim().toLowerCase();
     final d = displayStatus.trim().toLowerCase();
     final r = reviewStatus.trim().toLowerCase();
@@ -265,6 +286,9 @@ class CertificateApplicationItem {
   }
 
   String get displayReviewStatus {
+    if (isRenewInProgress) {
+      return 'Renew in Progress';
+    }
     if (isExpiredOrRenewable) {
       if (status.trim().toLowerCase().contains('renew') ||
           displayStatus.trim().toLowerCase().contains('renew')) {
@@ -280,6 +304,9 @@ class CertificateApplicationItem {
 
   static String formatReviewStatus(String raw) {
     final lower = raw.trim().toLowerCase();
+    if (lower == 'renew in progress' || lower == 'renew_in_progress') {
+      return 'Renew in Progress';
+    }
     if (lower == 'manual_review' ||
         lower == 'manual review' ||
         lower == 'under_review' ||
@@ -293,7 +320,7 @@ class CertificateApplicationItem {
     if (lower == 'scoring') return 'Scoring';
     if (lower == 'rejected') return 'Rejected';
     if (lower == 'expired') return 'Expired';
-    if (lower == 'renew certificate' || lower.contains('renew') || lower == 'renewal') return 'Renewal';
+    if (lower == 'renew certificate' || lower == 'renewal' || lower == 'renew') return 'Renewal';
     if (lower == 'changes_required' || lower == 'changes required') return 'Changes Required';
     return raw.replaceAll('_', ' ').split(' ').map((word) {
       if (word.isEmpty) return '';
@@ -326,6 +353,11 @@ class CertificateApplicationItem {
         ? rawCertDbId.toString().trim()
         : null;
 
+    final rawRenewalAppId = json['renewal_application_id'];
+    final renewalAppIdStr = (rawRenewalAppId != null && rawRenewalAppId.toString() != 'null')
+        ? rawRenewalAppId.toString().trim()
+        : null;
+
     return CertificateApplicationItem(
       id: (json['id'] ?? json['application_id'] ?? '').toString(),
       institutionName: (json['institution_name'] ?? '').toString(),
@@ -343,6 +375,7 @@ class CertificateApplicationItem {
       canRenew: canRenewVal,
       isExpiredStatus: expiredVal,
       certificateRecordId: certRecordIdStr,
+      renewalApplicationId: renewalAppIdStr,
     );
   }
 

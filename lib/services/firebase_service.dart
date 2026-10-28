@@ -12,6 +12,14 @@ import '../screens/programs/program_details_screen.dart';
 import 'notification_service.dart';
 import 'token_storage.dart';
 
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  developer.log('Background FCM message received: ${message.messageId}', name: 'FirebaseService');
+}
+
 class FirebaseService {
   static String? _token;
 
@@ -25,10 +33,20 @@ class FirebaseService {
         options: DefaultFirebaseOptions.currentPlatform,
       );
 
+      // Register background messaging handler
+      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
       final messaging = FirebaseMessaging.instance;
 
       // Request notification permissions (required for iOS and Android 13+)
       await messaging.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+
+      // Enable foreground display options
+      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
         alert: true,
         badge: true,
         sound: true,
@@ -45,6 +63,12 @@ class FirebaseService {
         _token = newToken;
         developer.log('Firebase Token Refreshed: $_token', name: 'FirebaseService');
         syncTokenWithBackend();
+      });
+
+      // Handle foreground notifications (when app is actively open)
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        developer.log('Foreground notification received: ${message.notification?.title}', name: 'FirebaseService');
+        // _showForegroundNotification(message);
       });
 
       // Handle notification opened while app was in background
@@ -188,4 +212,77 @@ class FirebaseService {
       ),
     );
   }
+
+  /*
+  /// Displays an interactive top banner/snackbar when a push notification arrives while app is open
+  static void _showForegroundNotification(RemoteMessage message) {
+    final notification = message.notification;
+    final title = notification?.title ?? message.data['title']?.toString() ?? 'New Notification';
+    final body = notification?.body ?? message.data['body']?.toString() ?? message.data['message']?.toString() ?? '';
+
+    final context = rootNavigatorKey.currentContext;
+    if (context == null) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        backgroundColor: const Color(0xFF0F172A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        content: InkWell(
+          onTap: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            handleNotificationNavigation(message.data);
+          },
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(7),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF0284C7),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white),
+                    ),
+                    if (body.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        body,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        action: SnackBarAction(
+          label: 'OPEN',
+          textColor: const Color(0xFF38BDF8),
+          onPressed: () {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            handleNotificationNavigation(message.data);
+          },
+        ),
+        duration: const Duration(seconds: 5),
+      ),
+    );
+  }
+  */
 }
