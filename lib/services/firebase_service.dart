@@ -1,8 +1,11 @@
+import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../firebase_options.dart';
 import '../main.dart';
 import '../models/program_model.dart';
@@ -22,9 +25,116 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class FirebaseService {
   static String? _token;
+  static bool _localNotificationsInitialized = false;
+
+  static final FlutterLocalNotificationsPlugin _localNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+
+  static const AndroidNotificationChannel _androidChannel =
+      AndroidNotificationChannel(
+    'high_importance_channel',
+    'High Importance Notifications',
+    description: 'Used for important notifications while app is active.',
+    importance: Importance.high,
+  );
 
   /// Cached Firebase (FCM) push token
   static String? get token => _token;
+
+  /// Initializes Local Notifications for foreground notifications
+  static Future<void> _initializeLocalNotifications() async {
+    if (_localNotificationsInitialized || kIsWeb) return;
+
+    try {
+      const AndroidInitializationSettings androidInitSettings =
+          AndroidInitializationSettings('@mipmap/launcher_icon');
+      const DarwinInitializationSettings iosInitSettings =
+          DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      );
+      const InitializationSettings initSettings = InitializationSettings(
+        android: androidInitSettings,
+        iOS: iosInitSettings,
+      );
+
+      await _localNotificationsPlugin.initialize(
+        settings: initSettings,
+        onDidReceiveNotificationResponse: (NotificationResponse response) {
+          final payload = response.payload;
+          if (payload != null && payload.isNotEmpty) {
+            try {
+              final dynamic decoded = jsonDecode(payload);
+              if (decoded is Map<String, dynamic>) {
+                handleNotificationNavigation(decoded);
+              }
+            } catch (e) {
+              developer.log('Error decoding notification payload: $e', name: 'FirebaseService');
+            }
+          }
+        },
+      );
+
+      final AndroidFlutterLocalNotificationsPlugin? androidPlatform =
+          _localNotificationsPlugin.resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin>();
+      await androidPlatform?.createNotificationChannel(_androidChannel);
+      _localNotificationsInitialized = true;
+      developer.log('Local notifications channel initialized', name: 'FirebaseService');
+    } catch (e) {
+      developer.log('Failed to initialize local notifications: $e', name: 'FirebaseService');
+    }
+  }
+
+  /// Displays a heads-up notification when a push notification arrives while app is open
+  static Future<void> _showForegroundNotification(RemoteMessage message) async {
+    try {
+      final RemoteNotification? notification = message.notification;
+      final String title = notification?.title ??
+          message.data['title']?.toString() ??
+          'MDRF Activate';
+      final String body = notification?.body ??
+          message.data['body']?.toString() ??
+          message.data['message']?.toString() ??
+          '';
+
+      if (notification == null && (title.isEmpty || title == 'MDRF Activate') && body.isEmpty) {
+        return;
+      }
+
+      const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+        'high_importance_channel',
+        'High Importance Notifications',
+        channelDescription: 'Used for important notifications while app is active.',
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/launcher_icon',
+        playSound: true,
+      );
+
+      const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
+        presentAlert: true,
+        presentBadge: true,
+        presentSound: true,
+      );
+
+      const NotificationDetails details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _localNotificationsPlugin.show(
+        id: notification?.hashCode ?? message.hashCode,
+        title: title,
+        body: body,
+        notificationDetails: details,
+        payload: message.data.isNotEmpty ? jsonEncode(message.data) : null,
+      );
+    } catch (e) {
+      developer.log('Error showing foreground notification: $e', name: 'FirebaseService');
+    }
+  }
 
   /// Initializes Firebase, retrieves the FCM token, and sets up notification listeners
   static Future<String?> initializeAndGetToken() async {
@@ -36,14 +146,18 @@ class FirebaseService {
       // Register background messaging handler
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
+      // Initialize local notifications for foreground alerts
+      await _initializeLocalNotifications();
+
       final messaging = FirebaseMessaging.instance;
 
       // Request notification permissions (required for iOS and Android 13+)
-      await messaging.requestPermission(
+      final settings = await messaging.requestPermission(
         alert: true,
         badge: true,
         sound: true,
       );
+      developer.log('Firebase permissions granted: ${settings.authorizationStatus}', name: 'FirebaseService');
 
       // Enable foreground display options
       await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
@@ -66,9 +180,17 @@ class FirebaseService {
       });
 
       // Handle foreground notifications (when app is actively open)
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        developer.log('Foreground notification received: ${message.notification?.title}', name: 'FirebaseService');
-        // _showForegroundNotification(message);
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+        final RemoteNotification? notification = message.notification;
+        developer.log(
+          'Foreground message received: data=${message.data}, '
+          'title=${notification?.title}, body=${notification?.body}',
+          name: 'FirebaseService',
+        );
+        // On Android, show local notification banner; on iOS, setForegroundNotificationPresentationOptions handles it
+        if (Platform.isAndroid) {
+          await _showForegroundNotification(message);
+        }
       });
 
       // Handle notification opened while app was in background
@@ -84,6 +206,20 @@ class FirebaseService {
           handleNotificationNavigation(message.data);
         }
       });
+
+      // Check if app was opened via local notification
+      final launchDetails = await _localNotificationsPlugin.getNotificationAppLaunchDetails();
+      if (launchDetails?.didNotificationLaunchApp ?? false) {
+        final payload = launchDetails?.notificationResponse?.payload;
+        if (payload != null && payload.isNotEmpty) {
+          try {
+            final dynamic decoded = jsonDecode(payload);
+            if (decoded is Map<String, dynamic>) {
+              handleNotificationNavigation(decoded);
+            }
+          } catch (_) {}
+        }
+      }
 
       // If already logged in, automatically sync token with backend on launch
       if (TokenStorage.isAuthenticated) {
@@ -212,77 +348,4 @@ class FirebaseService {
       ),
     );
   }
-
-  /*
-  /// Displays an interactive top banner/snackbar when a push notification arrives while app is open
-  static void _showForegroundNotification(RemoteMessage message) {
-    final notification = message.notification;
-    final title = notification?.title ?? message.data['title']?.toString() ?? 'New Notification';
-    final body = notification?.body ?? message.data['body']?.toString() ?? message.data['message']?.toString() ?? '';
-
-    final context = rootNavigatorKey.currentContext;
-    if (context == null) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        backgroundColor: const Color(0xFF0F172A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        content: InkWell(
-          onTap: () {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            handleNotificationNavigation(message.data);
-          },
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(7),
-                decoration: const BoxDecoration(
-                  color: Color(0xFF0284C7),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.notifications_active_rounded, color: Colors.white, size: 18),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: Colors.white),
-                    ),
-                    if (body.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        body,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        action: SnackBarAction(
-          label: 'OPEN',
-          textColor: const Color(0xFF38BDF8),
-          onPressed: () {
-            ScaffoldMessenger.of(context).hideCurrentSnackBar();
-            handleNotificationNavigation(message.data);
-          },
-        ),
-        duration: const Duration(seconds: 5),
-      ),
-    );
-  }
-  */
 }

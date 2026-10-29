@@ -1926,6 +1926,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                         ),
                         const SizedBox(width: 6),
                         Expanded(
+                          flex: 3,
                           child: Text(
                             ev.title,
                             maxLines: 1,
@@ -1937,22 +1938,30 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                             ),
                           ),
                         ),
-                        if (hasFile)
-                          Text(
-                            ev.fileName!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 11,
-                              color: const Color(0xFF64748B),
+                        if (hasFile) ...[
+                          const SizedBox(width: 8),
+                          Flexible(
+                            flex: 2,
+                            child: Text(
+                              ev.fileName!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: const Color(0xFF64748B),
+                              ),
                             ),
                           ),
+                        ],
                       ],
                     ),
                   );
                 })
               else if (_uploadedEvidence.isNotEmpty)
                 ..._uploadedEvidence.map((ev) {
+                  final fileName = ev['fileName']?.toString() ?? '';
+                  final hasFile = fileName.isNotEmpty;
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 3.5),
                     child: Row(
@@ -1960,6 +1969,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                         const Icon(Icons.check_circle_rounded, size: 15, color: Color(0xFF16A34A)),
                         const SizedBox(width: 6),
                         Expanded(
+                          flex: 3,
                           child: Text(
                             ev['title'] ?? 'Evidence File',
                             maxLines: 1,
@@ -1971,15 +1981,22 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                             ),
                           ),
                         ),
-                        Text(
-                          ev['fileName'] ?? '',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            fontSize: 11,
-                            color: const Color(0xFF64748B),
+                        if (hasFile) ...[
+                          const SizedBox(width: 8),
+                          Flexible(
+                            flex: 2,
+                            child: Text(
+                              fileName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
+                              style: GoogleFonts.inter(
+                                fontSize: 11,
+                                color: const Color(0xFF64748B),
+                              ),
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   );
