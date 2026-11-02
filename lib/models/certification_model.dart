@@ -542,6 +542,26 @@ class EvidenceItem {
       (a.filePath != null && a.filePath!.isNotEmpty) ||
       (a.fileUrl != null && a.fileUrl!.isNotEmpty));
 
+  bool hasAttachmentMatching({String? fileName, String? fileUrl, String? filePath}) {
+    return attachments.any((a) {
+      if (fileUrl != null && fileUrl.isNotEmpty && a.fileUrl != null && a.fileUrl!.isNotEmpty) {
+        return a.fileUrl == fileUrl;
+      }
+      if (filePath != null && filePath.isNotEmpty && a.filePath != null && a.filePath!.isNotEmpty) {
+        return a.filePath == filePath;
+      }
+      if (fileName != null && fileName.isNotEmpty && a.fileName != null && a.fileName!.isNotEmpty) {
+        if ((a.fileUrl == null || a.fileUrl!.isEmpty) &&
+            (a.filePath == null || a.filePath!.isEmpty) &&
+            (fileUrl == null || fileUrl.isEmpty) &&
+            (filePath == null || filePath.isEmpty)) {
+          return a.fileName == fileName;
+        }
+      }
+      return false;
+    });
+  }
+
   void addAttachment({String? filePath, String? fileName, String? fileUrl}) {
     attachments.add(EvidenceAttachment(
       filePath: filePath,
@@ -775,6 +795,9 @@ class CertificationApplicationModel {
       applicationNo: item.applicationNo.isNotEmpty ? item.applicationNo : (item.id.isNotEmpty ? item.id : item.certificateId),
       submissionDate: DateTime.tryParse(item.issuedDate),
       status: item.status,
+      address: item.address,
+      city: item.city,
+      pincode: item.pincode,
     );
   }
 
@@ -857,25 +880,81 @@ class CertificationApplicationModel {
     }
 
     final List<EvidenceItem> evItems = [];
-    final rawEv = appMap['evidence'] ?? appMap['materials'] ?? appMap['supporting_material'];
-    if (rawEv is List) {
-      for (final ev in rawEv) {
-        if (ev is Map) {
-          final reqId = ev['requirement_id']?.toString() ?? ev['id']?.toString() ?? '1';
-          final title = ev['title']?.toString() ?? '';
-          final fileUrl = ev['url']?.toString() ?? (ev['file'] is Map ? ev['file']['url']?.toString() : null);
-          final fileName = ev['name']?.toString() ?? (ev['file'] is Map ? ev['file']['name']?.toString() : null);
-          final kind = ev['kind']?.toString() ?? 'photo';
-          evItems.add(EvidenceItem(
-            id: reqId,
-            requirementId: reqId,
-            title: title,
-            description: '',
-            fileUrl: fileUrl,
-            fileName: (fileName != null && fileName.isNotEmpty) ? fileName : (fileUrl?.split('/').last),
-            evidenceKind: kind,
-          ));
+
+    void addOrAttach(String reqId, String title, String? fileUrl, String? fileName, String kind) {
+      if ((fileUrl == null || fileUrl.isEmpty) && (fileName == null || fileName.isEmpty)) return;
+      final cleanName = (fileName != null && fileName.isNotEmpty)
+          ? fileName
+          : (fileUrl?.split('/').last ?? 'evidence.jpg');
+
+      final existingIdx = evItems.indexWhere((e) =>
+          (reqId.isNotEmpty && (e.requirementId == reqId || e.id == reqId)) ||
+          (title.isNotEmpty && e.title.trim().toLowerCase() == title.trim().toLowerCase()));
+
+      if (existingIdx >= 0) {
+        final existing = evItems[existingIdx];
+        if (!existing.hasAttachmentMatching(fileName: cleanName, fileUrl: fileUrl)) {
+          existing.addAttachment(fileName: cleanName, fileUrl: fileUrl);
         }
+      } else {
+        evItems.add(EvidenceItem(
+          id: reqId,
+          requirementId: reqId,
+          title: title.isNotEmpty ? title : cleanName,
+          description: '',
+          fileUrl: fileUrl,
+          fileName: cleanName,
+          evidenceKind: kind,
+        ));
+      }
+    }
+
+    // 1. Evidence by requirement map (e.g. { "1": [ { ... }, { ... } ] })
+    final evByReq = appMap['evidence_by_requirement'] ??
+        (appMap['application'] is Map ? (appMap['application'] as Map)['evidence_by_requirement'] : null) ??
+        (appMap['data'] is Map ? (appMap['data'] as Map)['evidence_by_requirement'] : null);
+    if (evByReq is Map) {
+      evByReq.forEach((reqKey, filesList) {
+        if (filesList is List) {
+          for (final ev in filesList) {
+            if (ev is Map) {
+              final reqId = ev['requirement_id']?.toString() ?? reqKey.toString();
+              final title = ev['title']?.toString() ?? '';
+              final fileUrl = ev['url']?.toString() ?? (ev['file'] is Map ? ev['file']['url']?.toString() : null);
+              final fileName = ev['name']?.toString() ?? (ev['file'] is Map ? ev['file']['name']?.toString() : null);
+              final kind = ev['kind']?.toString() ?? 'photo';
+              addOrAttach(reqId, title, fileUrl, fileName, kind);
+            }
+          }
+        }
+      });
+    }
+
+    // 2. Evidence / materials / supporting_material lists
+    final rawEvList = <dynamic>[];
+    if (appMap['evidence'] is List) rawEvList.addAll(appMap['evidence'] as List);
+    if (appMap['materials'] is List) rawEvList.addAll(appMap['materials'] as List);
+    if (appMap['supporting_material'] is List) rawEvList.addAll(appMap['supporting_material'] as List);
+    if (appMap['application'] is Map) {
+      final appNested = appMap['application'] as Map;
+      if (appNested['materials'] is List) rawEvList.addAll(appNested['materials'] as List);
+      if (appNested['evidence'] is List) rawEvList.addAll(appNested['evidence'] as List);
+      if (appNested['supporting_material'] is List) rawEvList.addAll(appNested['supporting_material'] as List);
+    }
+    if (appMap['data'] is Map) {
+      final dataNested = appMap['data'] as Map;
+      if (dataNested['materials'] is List) rawEvList.addAll(dataNested['materials'] as List);
+      if (dataNested['evidence'] is List) rawEvList.addAll(dataNested['evidence'] as List);
+    }
+
+    for (final ev in rawEvList) {
+      if (ev is Map) {
+        final reqId = ev['requirement_id']?.toString() ?? ev['id']?.toString() ?? '1';
+        final title = ev['title']?.toString() ?? '';
+        final fileUrl = ev['url']?.toString() ?? (ev['file'] is Map ? ev['file']['url']?.toString() : null);
+        final fileName = ev['name']?.toString() ?? (ev['file'] is Map ? ev['file']['name']?.toString() : null);
+        final kind = ev['kind']?.toString() ?? 'photo';
+        addOrAttach(reqId, title, fileUrl, fileName, kind);
       }
     }
 
@@ -981,33 +1060,45 @@ class CertificationApplicationModel {
       if (v == null) return;
       qaMap[k.toString()] = v;
       final qId = int.tryParse(k.toString()) ?? 0;
-      final item = <String, dynamic>{'question_id': qId};
+
+      bool? ansBool;
+      num? ansNum;
+      String? ansText;
+      dynamic ansOptionId;
 
       if (v is bool) {
-        item['answer_bool'] = v;
+        ansBool = v;
       } else if (v is Map) {
-        if (v.containsKey('answer_bool')) item['answer_bool'] = v['answer_bool'];
-        if (v.containsKey('answer_number')) item['answer_number'] = v['answer_number'];
-        if (v.containsKey('answer_option_id')) item['answer_option_id'] = v['answer_option_id'];
-        if (v.containsKey('answer_text')) item['answer_text'] = v['answer_text'];
-        if (v.containsKey('option_id')) item['answer_option_id'] = v['option_id'];
-        if (v.containsKey('id')) item['answer_option_id'] = v['id'];
-        if (v.containsKey('text')) item['answer_text'] = v['text'];
+        if (v.containsKey('answer_bool')) ansBool = v['answer_bool'] as bool?;
+        if (v.containsKey('answer_number')) ansNum = v['answer_number'] as num?;
+        if (v.containsKey('answer_option_id')) ansOptionId = v['answer_option_id'];
+        if (v.containsKey('answer_text')) ansText = v['answer_text']?.toString();
+        if (v.containsKey('option_id')) ansOptionId = v['option_id'];
+        if (v.containsKey('id')) ansOptionId = v['id'];
+        if (v.containsKey('text')) ansText = v['text']?.toString();
       } else if (v is num) {
-        item['answer_number'] = v;
+        ansNum = v;
       } else {
         final s = v.toString().trim();
         final sLower = s.toLowerCase();
         if (sLower == 'true' || sLower == 'yes') {
-          item['answer_bool'] = true;
+          ansBool = true;
         } else if (sLower == 'false' || sLower == 'no') {
-          item['answer_bool'] = false;
+          ansBool = false;
         } else if (num.tryParse(s) != null && !s.startsWith('+') && !s.startsWith('0')) {
-          item['answer_number'] = num.tryParse(s);
+          ansNum = num.tryParse(s);
         } else {
-          item['answer_text'] = s;
+          ansText = s;
         }
       }
+
+      final item = <String, dynamic>{
+        'question_id': qId,
+        'answer_bool': ansBool,
+        'answer_number': ansNum,
+        'answer_text': ansText,
+        'answer_option_id': ansOptionId,
+      };
       answersList.add(item);
     });
 
@@ -1024,13 +1115,17 @@ class CertificationApplicationModel {
 
         if (effectiveUrl.isNotEmpty || effectiveName.isNotEmpty) {
           validEvidence.add(<String, dynamic>{
-            'id': reqId,
             'requirement_id': reqId,
             'title': e.title,
+            'name': effectiveName,
             'file_name': effectiveName,
+            'url': effectiveUrl,
             'file_url': effectiveUrl,
-            'evidence_kind': e.evidenceKind,
+            'kind': e.evidenceKind.isNotEmpty ? e.evidenceKind : 'photo',
+            'evidence_kind': e.evidenceKind.isNotEmpty ? e.evidenceKind : 'photo',
             'source': 'upload',
+            'latitude': null,
+            'longitude': null,
           });
         }
       }

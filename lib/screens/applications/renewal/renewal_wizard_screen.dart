@@ -72,16 +72,43 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
 
           if (config.evidenceRequirements.isNotEmpty) {
             final existingEvidence = List<EvidenceItem>.from(fullModel.evidenceItems);
-            fullModel.evidenceItems = config.evidenceRequirements.map((req) {
-              final m = existingEvidence.firstWhere(
+            final matchedExisting = <EvidenceItem>{};
+
+            final newItems = config.evidenceRequirements.map((req) {
+              final matches = existingEvidence.where(
                 (e) =>
                     e.requirementId == req.id.toString() ||
                     e.id == req.id.toString() ||
                     e.title.trim().toLowerCase() == req.title.trim().toLowerCase(),
-                orElse: () => EvidenceItem.fromRequirement(req),
-              );
-              return m.copyWithRequirement(req);
+              ).toList();
+
+              if (matches.isEmpty) {
+                return EvidenceItem.fromRequirement(req);
+              }
+
+              matchedExisting.addAll(matches);
+              final base = matches.first.copyWithRequirement(req);
+              for (int i = 1; i < matches.length; i++) {
+                for (final att in matches[i].attachments) {
+                  if (!base.hasAttachmentMatching(
+                    fileName: att.fileName,
+                    fileUrl: att.fileUrl,
+                    filePath: att.filePath,
+                  )) {
+                    base.attachments.add(att);
+                  }
+                }
+              }
+              return base;
             }).toList();
+
+            for (final ex in existingEvidence) {
+              if (!matchedExisting.contains(ex) && ex.hasAttachments) {
+                newItems.add(ex);
+              }
+            }
+
+            fullModel.evidenceItems = newItems;
           }
         } catch (e) {
           debugPrint('Notice resolving category config for renewal: $e');
@@ -144,17 +171,70 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
             }
           }
         }
-        if (fullModel.evidenceItems.isEmpty && _uploadedEvidence.isNotEmpty) {
-          fullModel.evidenceItems = _uploadedEvidence.asMap().entries.map((e) {
-            return EvidenceItem(
-              id: (e.key + 1).toString(),
-              title: (e.value['title'] ?? 'Evidence File').toString(),
-              description: 'Uploaded certificate verification document',
-              fileName: e.value['fileName']?.toString(),
-              fileUrl: e.value['url']?.toString(),
-              requiresGps: e.value['gpsTagged'] == true,
-            );
-          }).toList();
+        // Synchronize all uploaded materials and evidence_by_requirement into fullModel.evidenceItems
+        void syncAttachment(String? reqId, String? title, String? name, String? url) {
+          if ((name == null || name.isEmpty) && (url == null || url.isEmpty)) return;
+          final cleanName = (name != null && name.isNotEmpty)
+              ? name
+              : (url?.split('/').last ?? 'evidence.jpg');
+
+          int itemIdx = -1;
+          if (reqId != null && reqId.isNotEmpty) {
+            itemIdx = fullModel.evidenceItems.indexWhere((e) => e.requirementId == reqId || e.id == reqId);
+          }
+          if (itemIdx < 0 && title != null && title.trim().isNotEmpty) {
+            itemIdx = fullModel.evidenceItems.indexWhere((e) =>
+                e.title.trim().toLowerCase() == title.trim().toLowerCase());
+          }
+
+          if (itemIdx >= 0) {
+            final target = fullModel.evidenceItems[itemIdx];
+            if (!target.hasAttachmentMatching(fileName: cleanName, fileUrl: url)) {
+              target.addAttachment(fileName: cleanName, fileUrl: url);
+            }
+          } else {
+            fullModel.evidenceItems.add(EvidenceItem(
+              id: reqId ?? (fullModel.evidenceItems.length + 1).toString(),
+              requirementId: reqId,
+              title: title ?? cleanName,
+              description: 'Supporting evidence document',
+              fileName: cleanName,
+              fileUrl: url,
+            ));
+          }
+        }
+
+        // 1. Sync from evidence_by_requirement map
+        final evByReq = rawData['evidence_by_requirement'] ??
+            (rawData['application'] is Map ? (rawData['application'] as Map)['evidence_by_requirement'] : null) ??
+            (rawData['data'] is Map ? (rawData['data'] as Map)['evidence_by_requirement'] : null);
+        if (evByReq is Map) {
+          evByReq.forEach((reqKey, filesList) {
+            if (filesList is List) {
+              for (final m in filesList) {
+                if (m is Map) {
+                  final reqId = m['requirement_id']?.toString() ?? reqKey.toString();
+                  final title = m['title']?.toString();
+                  final name = m['name']?.toString() ?? m['file_name']?.toString() ?? (m['file'] is Map ? m['file']['name']?.toString() : null);
+                  final url = m['url']?.toString() ?? (m['file'] is Map ? m['file']['url']?.toString() : null);
+                  syncAttachment(reqId, title, name, url);
+                }
+              }
+            }
+          });
+        }
+
+        // 2. Sync from rawMaterials (materials, evidence, supporting_material)
+        if (rawMaterials is List && rawMaterials.isNotEmpty) {
+          for (final m in rawMaterials) {
+            if (m is Map) {
+              final reqId = m['requirement_id']?.toString() ?? m['id']?.toString();
+              final title = m['title']?.toString();
+              final name = m['name']?.toString() ?? m['file_name']?.toString() ?? (m['file'] is Map ? m['file']['name']?.toString() : null);
+              final url = m['url']?.toString() ?? (m['file'] is Map ? m['file']['url']?.toString() : null);
+              syncAttachment(reqId, title, name, url);
+            }
+          }
         }
       } catch (e) {
         debugPrint('Notice reading raw materials: $e');
@@ -1777,7 +1857,13 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
               const SizedBox(height: 10),
               if (_model.evidenceItems.isNotEmpty)
                 ..._model.evidenceItems.map((ev) {
-                  final hasFile = ev.fileName != null && ev.fileName!.isNotEmpty;
+                  final attCount = ev.attachments.length;
+                  final hasFile = attCount > 0 || (ev.fileName != null && ev.fileName!.isNotEmpty);
+                  final fileLabel = attCount > 1
+                      ? '$attCount files'
+                      : (ev.attachments.isNotEmpty
+                          ? (ev.attachments.first.fileName ?? 'Uploaded')
+                          : (ev.fileName ?? ''));
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 3.5),
                     child: Row(
@@ -1806,7 +1892,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                           Flexible(
                             flex: 2,
                             child: Text(
-                              ev.fileName!,
+                              fileLabel,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.end,

@@ -260,16 +260,44 @@ class CertificationService {
 
       if (config.evidenceRequirements.isNotEmpty) {
         final existingEvidence = List<EvidenceItem>.from(model.evidenceItems);
-        model.evidenceItems = config.evidenceRequirements.map((req) {
-          final match = existingEvidence.firstWhere(
+        final matchedExisting = <EvidenceItem>{};
+
+        final newItems = config.evidenceRequirements.map((req) {
+          final matches = existingEvidence.where(
             (e) =>
                 e.requirementId == req.id.toString() ||
                 e.id == req.id.toString() ||
                 e.title.trim().toLowerCase() == req.title.trim().toLowerCase(),
-            orElse: () => EvidenceItem.fromRequirement(req),
-          );
-          return match.copyWithRequirement(req);
+          ).toList();
+
+          if (matches.isEmpty) {
+            return EvidenceItem.fromRequirement(req);
+          }
+
+          matchedExisting.addAll(matches);
+          final base = matches.first.copyWithRequirement(req);
+          for (int i = 1; i < matches.length; i++) {
+            for (final att in matches[i].attachments) {
+              if (!base.hasAttachmentMatching(
+                fileName: att.fileName,
+                fileUrl: att.fileUrl,
+                filePath: att.filePath,
+              )) {
+                base.attachments.add(att);
+              }
+            }
+          }
+          return base;
         }).toList();
+
+        // Preserve any previously uploaded evidence items that were attached but didn't match config requirements
+        for (final ex in existingEvidence) {
+          if (!matchedExisting.contains(ex) && ex.hasAttachments) {
+            newItems.add(ex);
+          }
+        }
+
+        model.evidenceItems = newItems;
       }
     } catch (e) {
       debugPrint('⚠️ Error attaching category config to edit model: $e');
@@ -537,6 +565,25 @@ class CertificationService {
           body['zip_code'] = model.pincode;
         }
 
+        if (model.country.isNotEmpty) {
+          body['country'] = model.country;
+        }
+        if (model.countryId != null) {
+          body['country_id'] = model.countryId;
+        }
+        if (model.regionState.isNotEmpty) {
+          body['region'] = model.regionState;
+        }
+        if (model.regionId != null) {
+          body['region_id'] = model.regionId;
+        }
+        if (model.cityId != null) {
+          body['city_id'] = model.cityId;
+        }
+        if (model.categoryId != null) {
+          body['category_id'] = model.categoryId;
+        }
+
         final effDetails = <String, dynamic>{};
         if (model.pincode.isNotEmpty) {
           effDetails['pincode'] = model.pincode;
@@ -560,38 +607,51 @@ class CertificationService {
         }
         if (effDetails.isNotEmpty) {
           body['details'] = effDetails;
+          body['institution_details'] = effDetails;
         }
 
         if (model.questionAnswers.isNotEmpty) {
           final list = <Map<String, dynamic>>[];
           model.questionAnswers.forEach((qId, val) {
             if (val == null) return;
-            final item = <String, dynamic>{'question_id': qId};
+            bool? ansBool;
+            num? ansNum;
+            String? ansText;
+            dynamic ansOptId;
+
             if (val is bool) {
-              item['answer_bool'] = val;
+              ansBool = val;
             } else if (val is Map) {
-              if (val.containsKey('answer_bool')) item['answer_bool'] = val['answer_bool'];
-              if (val.containsKey('answer_number')) item['answer_number'] = val['answer_number'];
-              if (val.containsKey('answer_option_id')) item['answer_option_id'] = val['answer_option_id'];
-              if (val.containsKey('answer_text')) item['answer_text'] = val['answer_text'];
-              if (val.containsKey('option_id')) item['answer_option_id'] = val['option_id'];
-              if (val.containsKey('id')) item['answer_option_id'] = val['id'];
-              if (val.containsKey('text')) item['answer_text'] = val['text'];
+              if (val.containsKey('answer_bool')) ansBool = val['answer_bool'] as bool?;
+              if (val.containsKey('answer_number')) ansNum = val['answer_number'] as num?;
+              if (val.containsKey('answer_option_id')) ansOptId = val['answer_option_id'];
+              if (val.containsKey('answer_text')) ansText = val['answer_text']?.toString();
+              if (val.containsKey('option_id')) ansOptId = val['option_id'];
+              if (val.containsKey('id')) ansOptId = val['id'];
+              if (val.containsKey('text')) ansText = val['text']?.toString();
             } else if (val is num) {
-              item['answer_number'] = val;
+              ansNum = val;
             } else {
               final s = val.toString().trim();
               final sLower = s.toLowerCase();
               if (sLower == 'true' || sLower == 'yes') {
-                item['answer_bool'] = true;
+                ansBool = true;
               } else if (sLower == 'false' || sLower == 'no') {
-                item['answer_bool'] = false;
+                ansBool = false;
               } else if (num.tryParse(s) != null && !s.startsWith('+') && !s.startsWith('0')) {
-                item['answer_number'] = num.tryParse(s);
+                ansNum = num.tryParse(s);
               } else {
-                item['answer_text'] = s;
+                ansText = s;
               }
             }
+
+            final item = <String, dynamic>{
+              'question_id': qId,
+              'answer_bool': ansBool,
+              'answer_number': ansNum,
+              'answer_text': ansText,
+              'answer_option_id': ansOptId,
+            };
             list.add(item);
           });
           if (list.isNotEmpty) {
@@ -632,13 +692,17 @@ class CertificationService {
 
               if (effectiveUrl.isNotEmpty || effectiveName.isNotEmpty) {
                 renewalEvidence.add(<String, dynamic>{
-                  'id': reqId,
                   'requirement_id': reqId,
                   'title': e.title,
+                  'name': effectiveName,
                   'file_name': effectiveName,
+                  'url': effectiveUrl,
                   'file_url': effectiveUrl,
-                  'evidence_kind': e.evidenceKind,
-                  'source': 'renewal_upload',
+                  'kind': e.evidenceKind.isNotEmpty ? e.evidenceKind : 'photo',
+                  'evidence_kind': e.evidenceKind.isNotEmpty ? e.evidenceKind : 'photo',
+                  'source': 'upload',
+                  'latitude': null,
+                  'longitude': null,
                 });
               }
             }
@@ -680,6 +744,21 @@ class CertificationService {
         alternativeCertificateId.toString().trim().isNotEmpty &&
         !candidateIds.contains(alternativeCertificateId.toString().trim())) {
       candidateIds.add(alternativeCertificateId.toString().trim());
+    }
+    if (model != null) {
+      if (model.id != null && !candidateIds.contains(model.id.toString())) {
+        candidateIds.add(model.id.toString());
+      }
+      if (model.applicationId != null &&
+          model.applicationId!.isNotEmpty &&
+          !candidateIds.contains(model.applicationId!)) {
+        candidateIds.add(model.applicationId!);
+      }
+      if (model.applicationNo != null &&
+          model.applicationNo!.isNotEmpty &&
+          !candidateIds.contains(model.applicationNo!)) {
+        candidateIds.add(model.applicationNo!);
+      }
     }
 
     dynamic lastError;

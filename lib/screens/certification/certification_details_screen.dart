@@ -1907,6 +1907,9 @@ class _CertificationDetailsScreenState
                 displayStatus: detail.displayStatus,
                 score: widget.certificateItem?.score ?? '',
                 canRenew: true,
+                address: detail.institution?.address ?? '',
+                city: detail.institution?.city ?? '',
+                pincode: detail.institution?.pincode ?? '',
               );
           Navigator.of(context).push(
             MaterialPageRoute(

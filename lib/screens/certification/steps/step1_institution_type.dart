@@ -121,16 +121,43 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
       // Populate evidence requirements dynamically from API, preserving already attached/uploaded evidence
       if (config.evidenceRequirements.isNotEmpty) {
         final existingEvidence = List<EvidenceItem>.from(widget.model.evidenceItems);
-        widget.model.evidenceItems = config.evidenceRequirements.map((req) {
-          final match = existingEvidence.firstWhere(
+        final matchedExisting = <EvidenceItem>{};
+
+        final newItems = config.evidenceRequirements.map((req) {
+          final matches = existingEvidence.where(
             (e) =>
                 e.requirementId == req.id.toString() ||
                 e.id == req.id.toString() ||
                 e.title.trim().toLowerCase() == req.title.trim().toLowerCase(),
-            orElse: () => EvidenceItem.fromRequirement(req),
-          );
-          return match.copyWithRequirement(req);
+          ).toList();
+
+          if (matches.isEmpty) {
+            return EvidenceItem.fromRequirement(req);
+          }
+
+          matchedExisting.addAll(matches);
+          final base = matches.first.copyWithRequirement(req);
+          for (int i = 1; i < matches.length; i++) {
+            for (final att in matches[i].attachments) {
+              if (!base.hasAttachmentMatching(
+                fileName: att.fileName,
+                fileUrl: att.fileUrl,
+                filePath: att.filePath,
+              )) {
+                base.attachments.add(att);
+              }
+            }
+          }
+          return base;
         }).toList();
+
+        for (final ex in existingEvidence) {
+          if (!matchedExisting.contains(ex) && ex.hasAttachments) {
+            newItems.add(ex);
+          }
+        }
+
+        widget.model.evidenceItems = newItems;
       } else {
         widget.model.evidenceItems = [];
       }
