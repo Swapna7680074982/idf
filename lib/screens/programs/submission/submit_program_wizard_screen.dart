@@ -147,6 +147,7 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
         cityText: _submissionModel.city,
         countryText: _submissionModel.country,
         regionText: _submissionModel.regionState,
+        pincode: _submissionModel.pincode,
         startDate: startDateStr,
         endDate: endDateStr,
         contactPerson: _submissionModel.contactPerson,

@@ -201,6 +201,9 @@ class CertificateApplicationItem {
   final bool isExpiredStatus;
   final String? certificateRecordId;
   final String? renewalApplicationId;
+  final String address;
+  final String city;
+  final String pincode;
 
   const CertificateApplicationItem({
     required this.id,
@@ -220,6 +223,9 @@ class CertificateApplicationItem {
     this.isExpiredStatus = false,
     this.certificateRecordId,
     this.renewalApplicationId,
+    this.address = '',
+    this.city = '',
+    this.pincode = '',
   });
 
   /// Primary certificate identifier for the renewal endpoint /api/certification/certificates/:id/renew
@@ -358,6 +364,20 @@ class CertificateApplicationItem {
         ? rawRenewalAppId.toString().trim()
         : null;
 
+    final instMap = json['institution'] is Map ? json['institution'] as Map : null;
+    final detailsMap = json['details'] is Map ? json['details'] as Map : null;
+    final rawAddress = (json['address'] ?? instMap?['address'] ?? detailsMap?['address'] ?? '').toString();
+    final rawCity = (json['city'] ?? instMap?['city'] ?? detailsMap?['city'] ?? '').toString();
+    final rawPincode = (json['pincode'] ??
+            json['postal_code'] ??
+            json['zip_code'] ??
+            instMap?['pincode'] ??
+            instMap?['postal_code'] ??
+            detailsMap?['pincode'] ??
+            detailsMap?['postal_code'] ??
+            '')
+        .toString();
+
     return CertificateApplicationItem(
       id: (json['id'] ?? json['application_id'] ?? '').toString(),
       institutionName: (json['institution_name'] ?? '').toString(),
@@ -376,6 +396,9 @@ class CertificateApplicationItem {
       isExpiredStatus: expiredVal,
       certificateRecordId: certRecordIdStr,
       renewalApplicationId: renewalAppIdStr,
+      address: rawAddress,
+      city: rawCity,
+      pincode: rawPincode,
     );
   }
 

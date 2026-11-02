@@ -32,6 +32,7 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
   late TextEditingController _emailController;
   late TextEditingController _regionTextController;
   late TextEditingController _cityTextController;
+  late TextEditingController _pincodeController;
 
   Country? _selectedCountry;
   Region? _selectedRegion;
@@ -65,6 +66,8 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
         TextEditingController(text: widget.model.regionState);
     _cityTextController =
         TextEditingController(text: widget.model.city);
+    _pincodeController =
+        TextEditingController(text: widget.model.pincode);
 
     _loadCountries();
 
@@ -213,6 +216,7 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
     _emailController.dispose();
     _regionTextController.dispose();
     _cityTextController.dispose();
+    _pincodeController.dispose();
     for (final ctrl in _dynamicControllers.values) {
       ctrl.dispose();
     }
@@ -252,6 +256,17 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
       return;
     }
 
+    final pincodeVal = _pincodeController.text.trim();
+    if (pincodeVal.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter pincode / postal code'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     if (_formKey.currentState?.validate() ?? true) {
       widget.model.institutionName = _nameController.text.trim();
       widget.model.address = _addressController.text.trim();
@@ -261,6 +276,7 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
       widget.model.regionId = _selectedRegion?.id;
       widget.model.city = cityName;
       widget.model.cityId = _selectedCity?.id;
+      widget.model.pincode = pincodeVal;
       widget.model.contactPerson = _contactPersonController.text.trim();
       widget.model.contactPhone = _phoneController.text.trim();
       widget.model.contactEmail = _emailController.text.trim();
@@ -630,6 +646,17 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
                               ? 'Please enter city'
                               : null,
                         ),
+                      const SizedBox(height: 16),
+
+                      _buildFieldLabel('Pincode / Postal Code *'),
+                      _buildTextField(
+                        controller: _pincodeController,
+                        hintText: 'e.g. 500001 or 10001',
+                        keyboardType: TextInputType.text,
+                        validator: (v) => v == null || v.trim().isEmpty
+                            ? 'Please enter pincode / postal code'
+                            : null,
+                      ),
                       const SizedBox(height: 16),
 
                       _buildFieldLabel('Contact Person *'),

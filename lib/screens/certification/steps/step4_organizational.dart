@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme.dart';
 import '../../../models/certification_model.dart';
-import '../widgets/yes_no_selector.dart';
+import '../widgets/dynamic_question_tile.dart';
 
 class Step4Organizational extends StatefulWidget {
   final CertificationApplicationModel model;
@@ -150,9 +150,9 @@ class _Step4OrganizationalState extends State<Step4Organizational> {
                 children: [
                   if (dynamicQuestions.isNotEmpty)
                     ...dynamicQuestions.map((q) {
-                      final val = widget.model.getQuestionBool(q.id);
-                      return YesNoSelector(
-                        question: q.text,
+                      final val = widget.model.questionAnswers[q.id];
+                      return DynamicQuestionTile(
+                        question: q,
                         value: val,
                         onChanged: (newVal) {
                           setState(() {

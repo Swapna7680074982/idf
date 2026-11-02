@@ -27,6 +27,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
   late TextEditingController _endDateController;
   late TextEditingController _regionController;
   late TextEditingController _cityController;
+  late TextEditingController _pincodeController;
   late TextEditingController _venueController;
 
   List<Country> _countries = [];
@@ -58,6 +59,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
     );
     _regionController = TextEditingController(text: widget.model.regionState);
     _cityController = TextEditingController(text: widget.model.city);
+    _pincodeController = TextEditingController(text: widget.model.pincode);
     _venueController = TextEditingController(text: widget.model.venueAddress);
     _loadCountries();
   }
@@ -201,6 +203,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
     _endDateController.dispose();
     _regionController.dispose();
     _cityController.dispose();
+    _pincodeController.dispose();
     _venueController.dispose();
     super.dispose();
   }
@@ -309,6 +312,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
       widget.model.regionId = _selectedRegion?.id;
       widget.model.city = _selectedCity?.name ?? _cityController.text.trim();
       widget.model.cityId = _selectedCity?.id;
+      widget.model.pincode = _pincodeController.text.trim();
       widget.model.venueAddress = _venueController.text.trim().isNotEmpty
           ? _venueController.text.trim()
           : 'To be announced';
@@ -583,6 +587,20 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
               ),
               validator: (val) => val == null || val.trim().isEmpty ? 'Please enter city' : null,
             ),
+          const SizedBox(height: 16),
+
+          // Pincode / Postal Code
+          _buildFieldLabel('Pincode / Postal Code *'),
+          const SizedBox(height: 6),
+          TextFormField(
+            controller: _pincodeController,
+            keyboardType: TextInputType.text,
+            decoration: const InputDecoration(
+              hintText: 'e.g. 400001 or W1A 1AA',
+            ),
+            validator: (val) =>
+                val == null || val.trim().isEmpty ? 'Please enter pincode / postal code' : null,
+          ),
           const SizedBox(height: 16),
 
           // Venue Address

@@ -167,6 +167,21 @@ class Step8Review extends StatelessWidget {
                         const SizedBox(height: 6),
                         _buildDetailItem(
                             'Max Score', '${model.categoryMaxScore} points'),
+                        if (model.address.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          _buildDetailItem('Address', model.address),
+                        ],
+                        if (model.city.isNotEmpty || model.regionState.isNotEmpty || model.country.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          _buildDetailItem(
+                            'City / Region / Country',
+                            [model.city, model.regionState, model.country].where((s) => s.isNotEmpty).join(', '),
+                          ),
+                        ],
+                        if (model.pincode.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          _buildDetailItem('Pincode / Postal Code', model.pincode),
+                        ],
                       ],
                     ),
                   ),

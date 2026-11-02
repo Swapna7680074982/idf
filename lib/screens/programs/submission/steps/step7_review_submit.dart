@@ -27,13 +27,14 @@ class Step7ReviewSubmit extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasBanner = model.bannerPath != null && model.bannerPath!.isNotEmpty;
-    final String descriptionText = model.description.isNotEmpty
-        ? model.description
-        : (model.programDescription.isNotEmpty ? model.programDescription : '—');
-
     final String startDateStr = _formatDate(model.startDate);
     final String endDateStr = _formatDate(model.endDate ?? model.startDate);
+    final bool hasBanner = model.bannerPath != null && model.bannerPath!.isNotEmpty;
+    final String descriptionText = model.description.trim().isNotEmpty
+        ? model.description.trim()
+        : (model.programDescription.trim().isNotEmpty
+            ? model.programDescription.trim()
+            : 'No description provided.');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,6 +207,7 @@ class Step7ReviewSubmit extends StatelessWidget {
                               [
                                 if (model.city.isNotEmpty) model.city,
                                 if (model.regionState.isNotEmpty) model.regionState,
+                                if (model.pincode.isNotEmpty) model.pincode,
                                 if (model.country.isNotEmpty) model.country,
                               ].join(', '),
                               style: GoogleFonts.inter(
@@ -311,6 +313,7 @@ class Step7ReviewSubmit extends StatelessWidget {
             _buildReviewRow('Country', model.country.isNotEmpty ? model.country : '—'),
             if (model.regionState.isNotEmpty) _buildReviewRow('Region / State', model.regionState),
             _buildReviewRow('City', model.city.isNotEmpty ? model.city : '—'),
+            if (model.pincode.isNotEmpty) _buildReviewRow('Pincode / Postal Code', model.pincode),
             _buildReviewRow(
               'Venue',
               model.venueAddress.isNotEmpty ? model.venueAddress : 'To be announced',

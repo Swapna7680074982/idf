@@ -210,9 +210,19 @@ class _ExpiredCertificateDetailsScreenState
                       if (inst != null && inst.contactPhone.isNotEmpty)
                         _buildInfoRow('Contact Phone', inst.contactPhone),
                       if (inst != null && inst.address.isNotEmpty && inst.address != '—')
-                        _buildInfoRow('Address', inst.address),
+                        _buildInfoRow('Address', inst.address)
+                      else if (cert.address.isNotEmpty)
+                        _buildInfoRow('Address', cert.address),
+                      if (inst != null && (inst.city.isNotEmpty || inst.region.isNotEmpty) && inst.city != '—')
+                        _buildInfoRow('Location', [inst.city, inst.region].where((s) => s.isNotEmpty && s != '—').join(', '))
+                      else if (cert.city.isNotEmpty)
+                        _buildInfoRow('City', cert.city),
                       if (inst != null && inst.country.isNotEmpty && inst.country != '—')
                         _buildInfoRow('Country', inst.country),
+                      if (inst != null && inst.pincode.isNotEmpty && inst.pincode != '—')
+                        _buildInfoRow('Pincode / Postal Code', inst.pincode)
+                      else if (cert.pincode.isNotEmpty)
+                        _buildInfoRow('Pincode / Postal Code', cert.pincode),
                       if (cert.score.isNotEmpty)
                         _buildInfoRow('Score', cert.score, isLast: true),
                     ],

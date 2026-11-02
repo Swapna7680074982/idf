@@ -337,6 +337,7 @@ class _CertificationDetailsScreenState
         country: model.country,
         region: model.regionState,
         city: model.city,
+        pincode: model.pincode,
         contactPerson: model.contactPerson,
         contactEmail: model.contactEmail,
         contactPhone: model.contactPhone,
@@ -396,16 +397,32 @@ class _CertificationDetailsScreenState
           details: 'Overall audit pending',
         ),
       ],
-      materials: model.evidenceItems.map((e) => CertificationMaterialItem(
-        id: e.id,
-        requirementId: e.id,
-        title: e.title,
-        name: e.fileName ?? 'evidence.pdf',
-        kind: e.evidenceKind,
-        source: 'upload',
-        aiStatus: 'pending',
-        url: e.fileUrl ?? '',
-      )).toList(),
+      materials: model.evidenceItems.expand((e) {
+        if (e.attachments.isNotEmpty) {
+          return e.attachments.asMap().entries.map((entry) => CertificationMaterialItem(
+            id: '${e.id}_${entry.key}',
+            requirementId: e.id,
+            title: e.title,
+            name: entry.value.fileName ?? 'evidence_${entry.key + 1}.jpg',
+            kind: e.evidenceKind,
+            source: 'upload',
+            aiStatus: 'pending',
+            url: entry.value.fileUrl ?? '',
+          ));
+        }
+        return [
+          CertificationMaterialItem(
+            id: e.id,
+            requirementId: e.id,
+            title: e.title,
+            name: e.fileName ?? 'evidence.pdf',
+            kind: e.evidenceKind,
+            source: 'upload',
+            aiStatus: 'pending',
+            url: e.fileUrl ?? '',
+          ),
+        ];
+      }).toList(),
     );
   }
 
@@ -457,10 +474,11 @@ class _CertificationDetailsScreenState
       institution: CertificationInstitution(
         name: item.institutionName,
         category: item.institutionType,
-        address: '—',
+        address: item.address.isNotEmpty ? item.address : '—',
         country: '—',
         region: '—',
-        city: '—',
+        city: item.city.isNotEmpty ? item.city : '—',
+        pincode: item.pincode,
         contactPerson: '—',
         contactEmail: '—',
         contactPhone: '—',
@@ -821,6 +839,8 @@ class _CertificationDetailsScreenState
           _buildInfoRow('Category', inst.category),
           _buildInfoRow('Address', inst.address),
           _buildInfoRow('Location', [inst.city, inst.region, inst.country].where((s) => s.isNotEmpty && s != '—').join(', ')),
+          if (inst.pincode.isNotEmpty)
+            _buildInfoRow('Pincode / Postal Code', inst.pincode),
           if (inst.contactPerson.isNotEmpty)
             _buildInfoRow('Contact Person', inst.contactPerson),
           if (inst.contactEmail.isNotEmpty)
@@ -1456,6 +1476,20 @@ class _CertificationDetailsScreenState
   }
 
   Widget _buildMaterialsCard(List<CertificationMaterialItem> materials) {
+    if (materials.isEmpty) return const SizedBox.shrink();
+
+    // Group materials by requirement title (case-insensitive)
+    final Map<String, List<CertificationMaterialItem>> grouped = {};
+    final Map<String, String> displayTitles = {};
+    for (final m in materials) {
+      final rawTitle = m.title.trim().isNotEmpty
+          ? m.title.trim()
+          : (m.name.trim().isNotEmpty ? m.name.trim() : 'Evidence Document');
+      final normKey = rawTitle.toLowerCase();
+      grouped.putIfAbsent(normKey, () => []).add(m);
+      displayTitles.putIfAbsent(normKey, () => rawTitle);
+    }
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -1481,13 +1515,173 @@ class _CertificationDetailsScreenState
             ],
           ),
           const SizedBox(height: 12),
-          ...materials.map((m) => _buildMaterialTile(m)),
+          ...grouped.entries.map((entry) {
+            final title = displayTitles[entry.key] ?? entry.key;
+            return _buildGroupedMaterialTile(title, entry.value);
+          }),
         ],
       ),
     );
   }
 
-  Widget _buildMaterialTile(CertificationMaterialItem mat) {
+  Widget _buildGroupedMaterialTile(String title, List<CertificationMaterialItem> items) {
+    // If only 1 file for this requirement, show the standard single tile with the requirement name
+    if (items.length == 1) {
+      return _buildMaterialTile(items.first, displayTitle: title);
+    }
+
+    // If 2 or more files exist for this requirement, group them under a single title name
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Single Requirement Name Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: const Icon(Icons.collections_rounded, size: 18, color: Color(0xFF16A34A)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1E293B),
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                  ),
+                  child: Text(
+                    '${items.length} files',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          // All files listed under this single name
+          ...items.asMap().entries.map((entry) {
+            final idx = entry.key;
+            final mat = entry.value;
+            final isLast = idx == items.length - 1;
+            return _buildSubFileRow(mat, isLast: isLast);
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubFileRow(CertificationMaterialItem mat, {bool isLast = false}) {
+    final isPdf = mat.name.toLowerCase().endsWith('.pdf') || mat.url.toLowerCase().endsWith('.pdf');
+    final isDoc = mat.name.toLowerCase().endsWith('.doc') ||
+        mat.name.toLowerCase().endsWith('.docx') ||
+        mat.url.toLowerCase().endsWith('.doc') ||
+        mat.url.toLowerCase().endsWith('.docx');
+    final iconData = isPdf
+        ? Icons.picture_as_pdf_rounded
+        : (isDoc ? Icons.description_rounded : Icons.image_rounded);
+    final iconColor = isPdf
+        ? const Color(0xFFDC2626)
+        : (isDoc ? const Color(0xFF2563EB) : const Color(0xFF16A34A));
+
+    return Column(
+      children: [
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: mat.url.isNotEmpty ? () => _openOrViewMaterial(mat) : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                    ),
+                    child: Icon(iconData, size: 16, color: iconColor),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          mat.name.isNotEmpty ? mat.name : 'Document file',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: const Color(0xFF334155),
+                          ),
+                        ),
+                        if (mat.capturedAt != null && mat.capturedAt!.isNotEmpty)
+                          Text(
+                            mat.capturedAt!,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(
+                              fontSize: 10,
+                              color: const Color(0xFF94A3B8),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (mat.url.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.open_in_new_rounded, size: 18, color: AppColors.primaryBlue),
+                      tooltip: 'View Document',
+                      constraints: const BoxConstraints(),
+                      padding: const EdgeInsets.all(4),
+                      onPressed: () => _openOrViewMaterial(mat),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (!isLast) const Divider(height: 1, indent: 12, endIndent: 12, color: Color(0xFFF1F5F9)),
+      ],
+    );
+  }
+
+  Widget _buildMaterialTile(CertificationMaterialItem mat, {String? displayTitle}) {
+    final titleText = (displayTitle != null && displayTitle.isNotEmpty)
+        ? displayTitle
+        : (mat.title.isNotEmpty ? mat.title : mat.name);
     final isPdf = mat.name.toLowerCase().endsWith('.pdf') || mat.url.toLowerCase().endsWith('.pdf');
     final isDoc = mat.name.toLowerCase().endsWith('.doc') ||
         mat.name.toLowerCase().endsWith('.docx') ||
@@ -1531,7 +1725,7 @@ class _CertificationDetailsScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        mat.title.isNotEmpty ? mat.title : mat.name,
+                        titleText,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
@@ -1666,6 +1860,7 @@ class _CertificationDetailsScreenState
                   country: detail.institution?.country ?? '',
                   regionState: detail.institution?.region ?? '',
                   city: detail.institution?.city ?? '',
+                  pincode: detail.institution?.pincode ?? '',
                   contactPerson: detail.institution?.contactPerson ?? '',
                   contactEmail: detail.institution?.contactEmail ?? '',
                   contactPhone: detail.institution?.contactPhone ?? '',

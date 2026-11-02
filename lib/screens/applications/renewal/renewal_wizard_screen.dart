@@ -6,7 +6,8 @@ import '../../../models/certification_model.dart';
 import '../../../services/api_client.dart';
 import '../../../services/certification_service.dart';
 import '../../certification/certification_wizard_screen.dart';
-import '../../certification/widgets/yes_no_selector.dart';
+import '../../certification/widgets/dynamic_question_tile.dart';
+import '../../certification/widgets/evidence_upload_tile.dart';
 import 'renewal_submitted_screen.dart';
 
 class RenewalWizardScreen extends StatefulWidget {
@@ -87,17 +88,39 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
         }
       }
 
-      // Ensure institution name and type fallback to widget.certificate if model is sparse
+      // Ensure institution name, type, and pincode fallback to widget.certificate if model is sparse
       if (fullModel.institutionName.isEmpty && widget.certificate.institutionName.isNotEmpty) {
         fullModel.institutionName = widget.certificate.institutionName;
       }
       if (fullModel.institutionTypeTitle.isEmpty && widget.certificate.institutionType.isNotEmpty) {
         fullModel.institutionTypeTitle = widget.certificate.institutionType;
       }
+      if (fullModel.pincode.isEmpty && widget.certificate.pincode.isNotEmpty) {
+        fullModel.pincode = widget.certificate.pincode;
+      }
+      if (fullModel.address.isEmpty && widget.certificate.address.isNotEmpty) {
+        fullModel.address = widget.certificate.address;
+      }
 
-      // Also parse materials / evidence if available
+      // Also parse materials / evidence and location details if available
       try {
         final rawData = await CertificationService.getApplicationRawMap(targetId);
+        final instMap = rawData['institution'] is Map ? rawData['institution'] as Map : null;
+        final detailsMap = rawData['details'] is Map ? rawData['details'] as Map : null;
+        if (fullModel.pincode.isEmpty) {
+          final pin = (rawData['pincode'] ??
+                  rawData['postal_code'] ??
+                  rawData['zip_code'] ??
+                  instMap?['pincode'] ??
+                  instMap?['postal_code'] ??
+                  instMap?['zip_code'] ??
+                  detailsMap?['pincode'] ??
+                  detailsMap?['postal_code'] ??
+                  '')
+              .toString();
+          if (pin.isNotEmpty) fullModel.pincode = pin;
+        }
+
         final rawMaterials = rawData['materials'] ??
             rawData['evidence'] ??
             rawData['supporting_material'] ??
@@ -120,6 +143,18 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
               }
             }
           }
+        }
+        if (fullModel.evidenceItems.isEmpty && _uploadedEvidence.isNotEmpty) {
+          fullModel.evidenceItems = _uploadedEvidence.asMap().entries.map((e) {
+            return EvidenceItem(
+              id: (e.key + 1).toString(),
+              title: (e.value['title'] ?? 'Evidence File').toString(),
+              description: 'Uploaded certificate verification document',
+              fileName: e.value['fileName']?.toString(),
+              fileUrl: e.value['url']?.toString(),
+              requiresGps: e.value['gpsTagged'] == true,
+            );
+          }).toList();
         }
       } catch (e) {
         debugPrint('Notice reading raw materials: $e');
@@ -567,6 +602,8 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
     final contactCtrl = TextEditingController(text: _model.contactPerson);
     final emailCtrl = TextEditingController(text: _model.contactEmail);
     final phoneCtrl = TextEditingController(text: _model.contactPhone);
+    final addressCtrl = TextEditingController(text: _model.address);
+    final pincodeCtrl = TextEditingController(text: _model.pincode);
 
     showModalBottomSheet(
       context: context,
@@ -659,6 +696,32 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
                   ),
                 ),
+                const SizedBox(height: 12),
+                Text(
+                  'Address',
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: addressCtrl,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Pincode / Postal Code',
+                  style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
+                ),
+                const SizedBox(height: 4),
+                TextField(
+                  controller: pincodeCtrl,
+                  decoration: InputDecoration(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
+                  ),
+                ),
                 const SizedBox(height: 20),
                 SizedBox(
                   width: double.infinity,
@@ -670,6 +733,8 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                         _model.contactPerson = contactCtrl.text.trim();
                         _model.contactEmail = emailCtrl.text.trim();
                         _model.contactPhone = phoneCtrl.text.trim();
+                        _model.address = addressCtrl.text.trim();
+                        _model.pincode = pincodeCtrl.text.trim();
                       });
                       Navigator.pop(ctx);
                     },
@@ -681,7 +746,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                     child: Text('Save Changes', style: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w700)),
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 12),
               ],
             ),
           ),
@@ -1017,12 +1082,16 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 const SizedBox(height: 8),
                 _buildDetailRow('Address', _model.address),
               ],
-              if (_model.city.isNotEmpty || _model.country.isNotEmpty) ...[
+              if (_model.city.isNotEmpty || _model.regionState.isNotEmpty || _model.country.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 _buildDetailRow(
                   'Location',
-                  [_model.city, _model.country].where((s) => s.isNotEmpty).join(', '),
+                  [_model.city, _model.regionState, _model.country].where((s) => s.isNotEmpty).join(', '),
                 ),
+              ],
+              if (_model.pincode.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                _buildDetailRow('Pincode / Postal Code', _model.pincode),
               ],
             ],
           ),
@@ -1161,9 +1230,9 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 ),
                 if (section.questions.isNotEmpty)
                   ...section.questions.map((q) {
-                    final val = _model.getQuestionBool(q.id);
-                    return YesNoSelector(
-                      question: q.text,
+                    final val = _model.questionAnswers[q.id];
+                    return DynamicQuestionTile(
+                      question: q,
                       value: val,
                       onChanged: (newVal) {
                         setState(() {
@@ -1233,35 +1302,6 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
-
-        // Save as Draft Button
-        SizedBox(
-          width: double.infinity,
-          height: 44,
-          child: OutlinedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Progress saved as draft.')),
-              );
-              Navigator.pop(context);
-            },
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.primaryBlue),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-            ),
-            child: Text(
-              'Save as Draft',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primaryBlue,
-              ),
-            ),
-          ),
-        ),
         const SizedBox(height: 32),
       ],
     );
@@ -1269,9 +1309,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
 
   // Step 3: Evidence Materials
   Widget _buildStep3Evidence() {
-    final evidenceItems = _model.evidenceItems.isNotEmpty
-        ? _model.evidenceItems
-        : null;
+    final evidenceItems = _model.evidenceItems;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1291,7 +1329,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Timestamped & GPS-tagged photos are verified for physical amenities. You can keep existing verified photos or replace them with recent ones.',
+                  'Timestamped & GPS-tagged photos are verified for physical amenities. You can upload multiple photos or document proofs per requirement.',
                   style: GoogleFonts.inter(
                     fontSize: 11.5,
                     color: const Color(0xFF1D4ED8),
@@ -1305,196 +1343,11 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
         const SizedBox(height: 14),
 
         // Evidence list
-        if (evidenceItems != null && evidenceItems.isNotEmpty)
+        if (evidenceItems.isNotEmpty)
           ...evidenceItems.map((evidence) {
-            final hasFile = evidence.fileName != null && evidence.fileName!.isNotEmpty;
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          evidence.title,
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      if (hasFile)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFDCFCE7),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'On File',
-                            style: GoogleFonts.inter(
-                              fontSize: 9.5,
-                              fontWeight: FontWeight.w700,
-                              color: const Color(0xFF16A34A),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  if (hasFile) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Icon(Icons.attachment_rounded, size: 16, color: Color(0xFF64748B)),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            evidence.fileName!,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.inter(
-                              fontSize: 11.5,
-                              color: const Color(0xFF0F172A),
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  if (evidence.requiresGps) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on, size: 13, color: Color(0xFF16A34A)),
-                        const SizedBox(width: 4),
-                        Text(
-                          'GPS Location metadata required / attached',
-                          style: GoogleFonts.inter(
-                            fontSize: 10.5,
-                            color: const Color(0xFF16A34A),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: InkWell(
-                      onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Replace photo for ${evidence.title}')),
-                        );
-                      },
-                      child: Text(
-                        hasFile ? 'Replace Photo / File' : 'Upload Photo / File',
-                        style: GoogleFonts.inter(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primaryBlue,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          })
-        else if (_uploadedEvidence.isNotEmpty)
-          ..._uploadedEvidence.map((evidence) {
-            final gpsTagged = evidence['gpsTagged'] == true;
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          evidence['title'] ?? 'Evidence File',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDCFCE7),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'On File',
-                          style: GoogleFonts.inter(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w700,
-                            color: const Color(0xFF16A34A),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      const Icon(Icons.attachment_rounded, size: 16, color: Color(0xFF64748B)),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          evidence['fileName'] ?? '',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.inter(
-                            fontSize: 11.5,
-                            color: const Color(0xFF0F172A),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (gpsTagged) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        const Icon(Icons.location_on, size: 13, color: Color(0xFF16A34A)),
-                        const SizedBox(width: 4),
-                        Text(
-                          'GPS Location metadata attached',
-                          style: GoogleFonts.inter(
-                            fontSize: 10.5,
-                            color: const Color(0xFF16A34A),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
+            return EvidenceUploadTile(
+              item: evidence,
+              onUpdated: () => setState(() {}),
             );
           })
         else
@@ -1508,7 +1361,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
             ),
             child: Center(
               child: Text(
-                'No prior evidence files recorded on file.',
+                'No prior evidence requirements found. Tap below to attach documents.',
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   color: const Color(0xFF64748B),
@@ -1516,6 +1369,37 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
               ),
             ),
           ),
+
+        // Add additional evidence item button
+        OutlinedButton.icon(
+          onPressed: () {
+            setState(() {
+              _model.evidenceItems.add(
+                EvidenceItem(
+                  id: (_model.evidenceItems.length + 1).toString(),
+                  title: 'Additional Supporting Document #${_model.evidenceItems.length + 1}',
+                  description: 'Any additional photo, report, or certification document.',
+                ),
+              );
+            });
+          },
+          icon: const Icon(Icons.add, size: 16, color: AppColors.primaryBlue),
+          label: Text(
+            'Add Another Evidence Document',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primaryBlue,
+            ),
+          ),
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: Color(0xFFBFDBFE)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          ),
+        ),
 
         const SizedBox(height: 16),
 
@@ -1542,35 +1426,6 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
             ),
           ),
         ),
-        const SizedBox(height: 10),
-
-        // Save as Draft Button
-        SizedBox(
-          width: double.infinity,
-          height: 44,
-          child: OutlinedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Progress saved as draft.')),
-              );
-              Navigator.pop(context);
-            },
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.primaryBlue),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-            ),
-            child: Text(
-              'Save as Draft',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primaryBlue,
-              ),
-            ),
-          ),
-        ),
         const SizedBox(height: 32),
       ],
     );
@@ -1593,7 +1448,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
       for (final s in sections) {
         totalQuestions += s.questions.length;
         for (final q in s.questions) {
-          if (_model.getQuestionBool(q.id) != null) {
+          if (_model.questionAnswers.containsKey(q.id) && _model.questionAnswers[q.id] != null) {
             answeredCount++;
           }
         }
@@ -1726,12 +1581,20 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 const SizedBox(height: 6),
                 _buildDetailItem('Primary Contact', _model.contactPerson),
               ],
-              if (_model.city.isNotEmpty || _model.country.isNotEmpty) ...[
+              if (_model.address.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _buildDetailItem('Address', _model.address),
+              ],
+              if (_model.city.isNotEmpty || _model.regionState.isNotEmpty || _model.country.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 _buildDetailItem(
                   'Location',
-                  [_model.city, _model.country].where((s) => s.isNotEmpty).join(', '),
+                  [_model.city, _model.regionState, _model.country].where((s) => s.isNotEmpty).join(', '),
                 ),
+              ],
+              if (_model.pincode.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                _buildDetailItem('Pincode / Postal Code', _model.pincode),
               ],
             ],
           ),
@@ -2061,35 +1924,6 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
               style: GoogleFonts.inter(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-
-        // Save as Draft Button
-        SizedBox(
-          width: double.infinity,
-          height: 44,
-          child: OutlinedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Renewal application saved as draft.')),
-              );
-              Navigator.pop(context);
-            },
-            style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: AppColors.primaryBlue),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-            ),
-            child: Text(
-              'Save as Draft',
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primaryBlue,
               ),
             ),
           ),

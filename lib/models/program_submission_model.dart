@@ -28,6 +28,7 @@ class ProgramSubmissionModel {
   int? regionId;
   String city;
   int? cityId;
+  String pincode;
   String venueAddress;
 
   // Step 4: Content
@@ -72,6 +73,7 @@ class ProgramSubmissionModel {
     this.regionId,
     this.city = '',
     this.cityId,
+    this.pincode = '',
     this.venueAddress = '',
     this.programDescription = '',
     this.agenda = '',
@@ -112,6 +114,7 @@ class ProgramSubmissionModel {
     int? regionId,
     String? city,
     int? cityId,
+    String? pincode,
     String? venueAddress,
     String? programDescription,
     String? agenda,
@@ -147,6 +150,7 @@ class ProgramSubmissionModel {
       regionId: regionId ?? this.regionId,
       city: city ?? this.city,
       cityId: cityId ?? this.cityId,
+      pincode: pincode ?? this.pincode,
       venueAddress: venueAddress ?? this.venueAddress,
       programDescription: programDescription ?? this.programDescription,
       agenda: agenda ?? this.agenda,

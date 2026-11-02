@@ -538,6 +538,22 @@ Download / Verify: $verifyUrl''';
                               color: Colors.white.withAlpha(210),
                             ),
                           ),
+                          if (widget.certificate.address.isNotEmpty ||
+                              widget.certificate.city.isNotEmpty ||
+                              widget.certificate.pincode.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              [
+                                if (widget.certificate.address.isNotEmpty) widget.certificate.address,
+                                if (widget.certificate.city.isNotEmpty) widget.certificate.city,
+                                if (widget.certificate.pincode.isNotEmpty) 'PIN: ${widget.certificate.pincode}',
+                              ].join(', '),
+                              style: GoogleFonts.inter(
+                                fontSize: 11.5,
+                                color: Colors.white.withAlpha(200),
+                              ),
+                            ),
+                          ],
                           const SizedBox(height: 20),
 
                           // 2x2 Stats Grid

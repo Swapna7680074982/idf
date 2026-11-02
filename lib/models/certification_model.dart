@@ -141,14 +141,47 @@ class CertificationDetailField {
   }
 }
 
+enum AnswerFormatType {
+  yesNo,
+  percentage,
+  numeric,
+  singleChoice,
+  textNarrative,
+}
+
+class CertificationQuestionOption {
+  final dynamic id;
+  final String label;
+
+  const CertificationQuestionOption({
+    required this.id,
+    required this.label,
+  });
+
+  factory CertificationQuestionOption.fromJson(dynamic json) {
+    if (json is Map) {
+      final id = json['id'] ?? json['option_id'] ?? json['value'] ?? json['code'] ?? json['key'] ?? '';
+      final label = json['label'] ?? json['name'] ?? json['title'] ?? json['text'] ?? id.toString();
+      return CertificationQuestionOption(id: id, label: label.toString());
+    }
+    return CertificationQuestionOption(id: json, label: json.toString());
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'label': label,
+  };
+}
+
 /// Dynamic question inside each section from POST /api/certification/categories/config
 class CertificationQuestion {
   final int id;
   final String text;
-  final String answerType; // 'yes_no', 'text', 'number', etc.
+  final String answerType; // 'yes_no', 'text', 'number', 'percentage', 'single_choice', etc.
   final String? placeholder;
   final bool isRequired;
   final List<String> options;
+  final List<CertificationQuestionOption> optionItems;
 
   const CertificationQuestion({
     required this.id,
@@ -157,13 +190,36 @@ class CertificationQuestion {
     this.placeholder,
     this.isRequired = true,
     this.options = const [],
+    this.optionItems = const [],
   });
 
+  AnswerFormatType get formatType {
+    final t = answerType.toLowerCase().trim();
+    if (t.contains('percent')) {
+      return AnswerFormatType.percentage;
+    }
+    if (t.contains('num') || t.contains('int') || t.contains('decimal') || t.contains('count') || t.contains('float')) {
+      return AnswerFormatType.numeric;
+    }
+    if (t.contains('choice') || t.contains('select') || t.contains('radio') || t.contains('dropdown') || (optionItems.isNotEmpty && !t.contains('yes_no') && !t.contains('bool'))) {
+      return AnswerFormatType.singleChoice;
+    }
+    if (t.contains('text') || t.contains('narrative') || t.contains('string') || t.contains('textarea')) {
+      return AnswerFormatType.textNarrative;
+    }
+    return AnswerFormatType.yesNo;
+  }
+
   factory CertificationQuestion.fromJson(Map<String, dynamic> json) {
-    final optsRaw = json['options'];
+    final optsRaw = json['options'] ?? json['choices'] ?? json['answer_options'];
     List<String> parsedOpts = [];
+    List<CertificationQuestionOption> parsedOptionItems = [];
     if (optsRaw is List) {
-      parsedOpts = optsRaw.map((e) => e.toString()).toList();
+      for (final item in optsRaw) {
+        final opt = CertificationQuestionOption.fromJson(item);
+        parsedOptionItems.add(opt);
+        parsedOpts.add(opt.label);
+      }
     }
 
     return CertificationQuestion(
@@ -175,6 +231,7 @@ class CertificationQuestion {
       placeholder: json['placeholder']?.toString(),
       isRequired: json['is_required'] == true || json['is_required'] == 1,
       options: parsedOpts,
+      optionItems: parsedOptionItems,
     );
   }
 }
@@ -375,6 +432,32 @@ class InstitutionTypeInfo {
   }
 }
 
+class EvidenceAttachment {
+  String? filePath;
+  String? fileName;
+  String? fileUrl;
+
+  EvidenceAttachment({
+    this.filePath,
+    this.fileName,
+    this.fileUrl,
+  });
+
+  factory EvidenceAttachment.fromMap(Map<String, dynamic> map) {
+    return EvidenceAttachment(
+      filePath: map['file_path']?.toString() ?? map['filePath']?.toString(),
+      fileName: map['file_name']?.toString() ?? map['fileName']?.toString() ?? map['name']?.toString(),
+      fileUrl: map['file_url']?.toString() ?? map['fileUrl']?.toString() ?? map['url']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    if (filePath != null) 'file_path': filePath,
+    if (fileName != null) 'file_name': fileName,
+    if (fileUrl != null) 'file_url': fileUrl,
+  };
+}
+
 class EvidenceItem {
   final String id;
   final String? requirementId;
@@ -384,9 +467,7 @@ class EvidenceItem {
   final String evidenceKind; // 'photo', 'document', 'either'
   final bool requiresGps;
   final int? sectionId;
-  String? filePath;
-  String? fileName;
-  String? fileUrl;
+  List<EvidenceAttachment> attachments;
 
   EvidenceItem({
     required this.id,
@@ -397,10 +478,85 @@ class EvidenceItem {
     this.evidenceKind = 'photo',
     this.requiresGps = false,
     this.sectionId,
-    this.filePath,
-    this.fileName,
-    this.fileUrl,
-  });
+    String? filePath,
+    String? fileName,
+    String? fileUrl,
+    List<EvidenceAttachment>? attachments,
+  }) : attachments = attachments ?? [] {
+    if ((filePath != null && filePath.isNotEmpty) ||
+        (fileName != null && fileName.isNotEmpty) ||
+        (fileUrl != null && fileUrl.isNotEmpty)) {
+      if (this.attachments.isEmpty) {
+        this.attachments.add(EvidenceAttachment(
+          filePath: filePath,
+          fileName: (fileName != null && fileName.isNotEmpty)
+              ? fileName
+              : fileUrl?.split('/').last,
+          fileUrl: fileUrl,
+        ));
+      }
+    }
+  }
+
+  String? get filePath => attachments.isNotEmpty ? attachments.first.filePath : null;
+  set filePath(String? val) {
+    if (val == null) {
+      if (attachments.isNotEmpty) attachments.first.filePath = null;
+    } else {
+      if (attachments.isEmpty) {
+        attachments.add(EvidenceAttachment(filePath: val));
+      } else {
+        attachments.first.filePath = val;
+      }
+    }
+  }
+
+  String? get fileName => attachments.isNotEmpty ? attachments.first.fileName : null;
+  set fileName(String? val) {
+    if (val == null) {
+      if (attachments.isNotEmpty) attachments.first.fileName = null;
+    } else {
+      if (attachments.isEmpty) {
+        attachments.add(EvidenceAttachment(fileName: val));
+      } else {
+        attachments.first.fileName = val;
+      }
+    }
+  }
+
+  String? get fileUrl => attachments.isNotEmpty ? attachments.first.fileUrl : null;
+  set fileUrl(String? val) {
+    if (val == null) {
+      if (attachments.isNotEmpty) attachments.first.fileUrl = null;
+    } else {
+      if (attachments.isEmpty) {
+        attachments.add(EvidenceAttachment(fileUrl: val));
+      } else {
+        attachments.first.fileUrl = val;
+      }
+    }
+  }
+
+  bool get hasAttachments => attachments.any((a) =>
+      (a.fileName != null && a.fileName!.isNotEmpty) ||
+      (a.filePath != null && a.filePath!.isNotEmpty) ||
+      (a.fileUrl != null && a.fileUrl!.isNotEmpty));
+
+  void addAttachment({String? filePath, String? fileName, String? fileUrl}) {
+    attachments.add(EvidenceAttachment(
+      filePath: filePath,
+      fileName: (fileName != null && fileName.isNotEmpty)
+          ? fileName
+          : fileUrl?.split('/').last,
+      fileUrl: fileUrl,
+    ));
+  }
+
+  void removeAttachmentAt(int index) {
+    if (index >= 0 && index < attachments.length) {
+      attachments.removeAt(index);
+    }
+  }
 
   factory EvidenceItem.fromRequirement(CertificationEvidenceRequirement req) {
     return EvidenceItem(
@@ -416,6 +572,12 @@ class EvidenceItem {
   }
 
   EvidenceItem copyWithRequirement(CertificationEvidenceRequirement req) {
+    final copyAttachments = attachments.map((a) => EvidenceAttachment(
+      filePath: a.filePath,
+      fileName: a.fileName,
+      fileUrl: a.fileUrl,
+    )).toList();
+
     return EvidenceItem(
       id: req.id.toString(),
       requirementId: req.id.toString(),
@@ -425,6 +587,7 @@ class EvidenceItem {
       evidenceKind: req.evidenceKind,
       requiresGps: req.requiresGps,
       sectionId: req.sectionId,
+      attachments: copyAttachments,
       filePath: filePath,
       fileName: (fileName != null && fileName!.isNotEmpty) ? fileName : (fileUrl?.split('/').last),
       fileUrl: fileUrl,
@@ -452,6 +615,7 @@ class CertificationApplicationModel {
   int? regionId;
   String city;
   int? cityId;
+  String pincode;
   String contactPerson;
   String contactPhone;
   String contactEmail;
@@ -523,6 +687,7 @@ class CertificationApplicationModel {
     this.regionId,
     this.city = '',
     this.cityId,
+    this.pincode = '',
     this.contactPerson = '',
     this.contactPhone = '',
     this.contactEmail = '',
@@ -734,6 +899,14 @@ class CertificationApplicationModel {
       regionId: inst?['region_id'] is int ? inst!['region_id'] as int : int.tryParse(inst?['region_id']?.toString() ?? appMap['region_id']?.toString() ?? ''),
       city: inst?['city']?.toString() ?? appMap['city']?.toString() ?? '',
       cityId: inst?['city_id'] is int ? inst!['city_id'] as int : int.tryParse(inst?['city_id']?.toString() ?? appMap['city_id']?.toString() ?? ''),
+      pincode: inst?['pincode']?.toString() ??
+          inst?['postal_code']?.toString() ??
+          inst?['zip_code']?.toString() ??
+          appMap['pincode']?.toString() ??
+          appMap['postal_code']?.toString() ??
+          rawDetails['pincode']?.toString() ??
+          rawDetails['postal_code']?.toString() ??
+          '',
       contactPerson: inst?['contact_person']?.toString() ?? appMap['contact_person']?.toString() ?? '',
       contactPhone: inst?['contact_phone']?.toString() ?? appMap['contact_phone']?.toString() ?? '',
       contactEmail: inst?['contact_email']?.toString() ?? appMap['contact_email']?.toString() ?? '',
@@ -769,6 +942,7 @@ class CertificationApplicationModel {
     if (other.regionId != null) regionId = other.regionId;
     if (other.city.isNotEmpty) city = other.city;
     if (other.cityId != null) cityId = other.cityId;
+    if (other.pincode.isNotEmpty) pincode = other.pincode;
     if (other.contactPerson.isNotEmpty) contactPerson = other.contactPerson;
     if (other.contactPhone.isNotEmpty) contactPhone = other.contactPhone;
     if (other.contactEmail.isNotEmpty) contactEmail = other.contactEmail;
@@ -801,32 +975,66 @@ class CertificationApplicationModel {
 
   Map<String, dynamic> toSubmissionJson() {
     final Map<String, dynamic> qaMap = {};
+    final answersList = <Map<String, dynamic>>[];
+
     questionAnswers.forEach((k, v) {
+      if (v == null) return;
       qaMap[k.toString()] = v;
+      final qId = int.tryParse(k.toString()) ?? 0;
+      final item = <String, dynamic>{'question_id': qId};
+
+      if (v is bool) {
+        item['answer_bool'] = v;
+      } else if (v is Map) {
+        if (v.containsKey('answer_bool')) item['answer_bool'] = v['answer_bool'];
+        if (v.containsKey('answer_number')) item['answer_number'] = v['answer_number'];
+        if (v.containsKey('answer_option_id')) item['answer_option_id'] = v['answer_option_id'];
+        if (v.containsKey('answer_text')) item['answer_text'] = v['answer_text'];
+        if (v.containsKey('option_id')) item['answer_option_id'] = v['option_id'];
+        if (v.containsKey('id')) item['answer_option_id'] = v['id'];
+        if (v.containsKey('text')) item['answer_text'] = v['text'];
+      } else if (v is num) {
+        item['answer_number'] = v;
+      } else {
+        final s = v.toString().trim();
+        final sLower = s.toLowerCase();
+        if (sLower == 'true' || sLower == 'yes') {
+          item['answer_bool'] = true;
+        } else if (sLower == 'false' || sLower == 'no') {
+          item['answer_bool'] = false;
+        } else if (num.tryParse(s) != null && !s.startsWith('+') && !s.startsWith('0')) {
+          item['answer_number'] = num.tryParse(s);
+        } else {
+          item['answer_text'] = s;
+        }
+      }
+      answersList.add(item);
     });
 
-    final validEvidence = evidenceItems.where((e) =>
-      (e.fileUrl != null && e.fileUrl!.isNotEmpty) ||
-      (e.filePath != null && e.filePath!.isNotEmpty)
-    ).map((e) {
-      final reqId = int.tryParse(e.id) ?? 1;
-      final effectiveUrl = (e.fileUrl != null && e.fileUrl!.isNotEmpty)
-          ? e.fileUrl!
-          : (e.filePath ?? '');
-      final effectiveName = (e.fileName != null && e.fileName!.isNotEmpty)
-          ? e.fileName!
-          : 'evidence_doc';
+    final validEvidence = <Map<String, dynamic>>[];
+    for (final e in evidenceItems) {
+      final reqId = int.tryParse(e.id) ?? int.tryParse(e.requirementId ?? '1') ?? 1;
+      for (final att in e.attachments) {
+        final effectiveUrl = (att.fileUrl != null && att.fileUrl!.isNotEmpty)
+            ? att.fileUrl!
+            : (att.filePath ?? '');
+        final effectiveName = (att.fileName != null && att.fileName!.isNotEmpty)
+            ? att.fileName!
+            : (effectiveUrl.isNotEmpty ? effectiveUrl.split('/').last : 'evidence_doc');
 
-      return <String, dynamic>{
-        'id': reqId,
-        'requirement_id': reqId,
-        'title': e.title,
-        'file_name': effectiveName,
-        'file_url': effectiveUrl,
-        'evidence_kind': e.evidenceKind,
-        'source': 'upload',
-      };
-    }).toList();
+        if (effectiveUrl.isNotEmpty || effectiveName.isNotEmpty) {
+          validEvidence.add(<String, dynamic>{
+            'id': reqId,
+            'requirement_id': reqId,
+            'title': e.title,
+            'file_name': effectiveName,
+            'file_url': effectiveUrl,
+            'evidence_kind': e.evidenceKind,
+            'source': 'upload',
+          });
+        }
+      }
+    }
 
     return {
       if (id != null) 'id': id,
@@ -842,12 +1050,19 @@ class CertificationApplicationModel {
       'region': regionState,
       if (cityId != null) 'city_id': cityId,
       'city': city,
+      if (pincode.isNotEmpty) ...{
+        'pincode': pincode,
+        'postal_code': pincode,
+        'zip_code': pincode,
+      },
       'contact_person': contactPerson,
       'contact_phone': contactPhone,
       'contact_email': contactEmail,
       'detail_fields': Map<String, dynamic>.from(detailFieldValues),
       'question_answers': qaMap,
+      'answers': answersList,
       'evidence': validEvidence,
+      'materials': validEvidence,
       'declaration_accepted': declarationAccepted,
     };
   }
@@ -926,6 +1141,13 @@ class CertificationApplicationModel {
       }
       if (inst['city_id'] != null) {
         cityId = int.tryParse(inst['city_id'].toString()) ?? cityId;
+      }
+      if (inst['pincode'] != null && inst['pincode'].toString().isNotEmpty) {
+        pincode = inst['pincode'].toString();
+      } else if (inst['postal_code'] != null && inst['postal_code'].toString().isNotEmpty) {
+        pincode = inst['postal_code'].toString();
+      } else if (inst['zip_code'] != null && inst['zip_code'].toString().isNotEmpty) {
+        pincode = inst['zip_code'].toString();
       }
       if (inst['contact_person'] != null && inst['contact_person'].toString().isNotEmpty) {
         contactPerson = inst['contact_person'].toString();
@@ -1246,6 +1468,7 @@ class CertificationInstitution {
   final String region;
   final int? cityId;
   final String city;
+  final String pincode;
   final String contactPerson;
   final String contactEmail;
   final String contactPhone;
@@ -1261,6 +1484,7 @@ class CertificationInstitution {
     required this.region,
     this.cityId,
     required this.city,
+    this.pincode = '',
     required this.contactPerson,
     required this.contactEmail,
     required this.contactPhone,
@@ -1278,6 +1502,10 @@ class CertificationInstitution {
       region: json['region']?.toString() ?? '',
       cityId: json['city_id'] is int ? json['city_id'] as int : int.tryParse(json['city_id']?.toString() ?? ''),
       city: json['city']?.toString() ?? '',
+      pincode: json['pincode']?.toString() ??
+          json['postal_code']?.toString() ??
+          json['zip_code']?.toString() ??
+          '',
       contactPerson: json['contact_person']?.toString() ?? '',
       contactEmail: json['contact_email']?.toString() ?? '',
       contactPhone: json['contact_phone']?.toString() ?? '',
@@ -1295,6 +1523,11 @@ class CertificationInstitution {
     'region': region,
     'city_id': cityId,
     'city': city,
+    if (pincode.isNotEmpty) ...{
+      'pincode': pincode,
+      'postal_code': pincode,
+      'zip_code': pincode,
+    },
     'contact_person': contactPerson,
     'contact_email': contactEmail,
     'contact_phone': contactPhone,

@@ -104,17 +104,19 @@ class CertificationService {
   ) async {
     // 1. Ensure all local evidence files are uploaded to /api/files first
     for (final ev in model.evidenceItems) {
-      if (ev.filePath != null &&
-          ev.filePath!.isNotEmpty &&
-          (ev.fileUrl == null || ev.fileUrl!.isEmpty)) {
-        try {
-          final f = File(ev.filePath!);
-          if (f.existsSync()) {
-            final uploaded = await FilesService.uploadFile(f);
-            ev.fileUrl = uploaded.url.isNotEmpty ? uploaded.url : uploaded.storageUrl;
+      for (final att in ev.attachments) {
+        if (att.filePath != null &&
+            att.filePath!.isNotEmpty &&
+            (att.fileUrl == null || att.fileUrl!.isEmpty)) {
+          try {
+            final f = File(att.filePath!);
+            if (f.existsSync()) {
+              final uploaded = await FilesService.uploadFile(f);
+              att.fileUrl = uploaded.url.isNotEmpty ? uploaded.url : uploaded.storageUrl;
+            }
+          } catch (e) {
+            debugPrint('⚠️ Error uploading evidence file ${att.fileName}: $e');
           }
-        } catch (e) {
-          debugPrint('⚠️ Error uploading evidence file ${ev.fileName}: $e');
         }
       }
     }
@@ -523,8 +525,23 @@ class CertificationService {
         if (model.contactPhone.isNotEmpty) {
           body['contact_phone'] = model.contactPhone;
         }
+        if (model.address.isNotEmpty) {
+          body['address'] = model.address;
+        }
+        if (model.city.isNotEmpty) {
+          body['city'] = model.city;
+        }
+        if (model.pincode.isNotEmpty) {
+          body['pincode'] = model.pincode;
+          body['postal_code'] = model.pincode;
+          body['zip_code'] = model.pincode;
+        }
 
         final effDetails = <String, dynamic>{};
+        if (model.pincode.isNotEmpty) {
+          effDetails['pincode'] = model.pincode;
+          effDetails['postal_code'] = model.pincode;
+        }
         if (model.detailFieldValues.isNotEmpty) {
           model.detailFieldValues.forEach((k, v) {
             if (v != null && v.toString().trim().isNotEmpty) {
@@ -552,26 +569,84 @@ class CertificationService {
             final item = <String, dynamic>{'question_id': qId};
             if (val is bool) {
               item['answer_bool'] = val;
+            } else if (val is Map) {
+              if (val.containsKey('answer_bool')) item['answer_bool'] = val['answer_bool'];
+              if (val.containsKey('answer_number')) item['answer_number'] = val['answer_number'];
+              if (val.containsKey('answer_option_id')) item['answer_option_id'] = val['answer_option_id'];
+              if (val.containsKey('answer_text')) item['answer_text'] = val['answer_text'];
+              if (val.containsKey('option_id')) item['answer_option_id'] = val['option_id'];
+              if (val.containsKey('id')) item['answer_option_id'] = val['id'];
+              if (val.containsKey('text')) item['answer_text'] = val['text'];
             } else if (val is num) {
               item['answer_number'] = val;
-            } else if (int.tryParse(val.toString()) != null &&
-                !val.toString().startsWith('+') &&
-                !val.toString().startsWith('0')) {
-              item['answer_number'] = int.tryParse(val.toString());
             } else {
-              final s = val.toString().trim().toLowerCase();
-              if (s == 'true' || s == 'yes') {
+              final s = val.toString().trim();
+              final sLower = s.toLowerCase();
+              if (sLower == 'true' || sLower == 'yes') {
                 item['answer_bool'] = true;
-              } else if (s == 'false' || s == 'no') {
+              } else if (sLower == 'false' || sLower == 'no') {
                 item['answer_bool'] = false;
+              } else if (num.tryParse(s) != null && !s.startsWith('+') && !s.startsWith('0')) {
+                item['answer_number'] = num.tryParse(s);
               } else {
-                item['answer_text'] = val.toString();
+                item['answer_text'] = s;
               }
             }
             list.add(item);
           });
           if (list.isNotEmpty) {
             body['answers'] = list;
+          }
+        }
+
+        // Upload and attach evidence / materials for renewal
+        if (model.evidenceItems.isNotEmpty) {
+          for (final ev in model.evidenceItems) {
+            for (final att in ev.attachments) {
+              if (att.filePath != null &&
+                  att.filePath!.isNotEmpty &&
+                  (att.fileUrl == null || att.fileUrl!.isEmpty)) {
+                try {
+                  final f = File(att.filePath!);
+                  if (f.existsSync()) {
+                    final uploaded = await FilesService.uploadFile(f);
+                    att.fileUrl = uploaded.url.isNotEmpty ? uploaded.url : uploaded.storageUrl;
+                  }
+                } catch (e) {
+                  debugPrint('⚠️ Error uploading renewal evidence file ${att.fileName}: $e');
+                }
+              }
+            }
+          }
+
+          final renewalEvidence = <Map<String, dynamic>>[];
+          for (final e in model.evidenceItems) {
+            final reqId = int.tryParse(e.id) ?? int.tryParse(e.requirementId ?? '1') ?? 1;
+            for (final att in e.attachments) {
+              final effectiveUrl = (att.fileUrl != null && att.fileUrl!.isNotEmpty)
+                  ? att.fileUrl!
+                  : (att.filePath ?? '');
+              final effectiveName = (att.fileName != null && att.fileName!.isNotEmpty)
+                  ? att.fileName!
+                  : (effectiveUrl.isNotEmpty ? effectiveUrl.split('/').last : 'evidence_doc');
+
+              if (effectiveUrl.isNotEmpty || effectiveName.isNotEmpty) {
+                renewalEvidence.add(<String, dynamic>{
+                  'id': reqId,
+                  'requirement_id': reqId,
+                  'title': e.title,
+                  'file_name': effectiveName,
+                  'file_url': effectiveUrl,
+                  'evidence_kind': e.evidenceKind,
+                  'source': 'renewal_upload',
+                });
+              }
+            }
+          }
+
+          if (renewalEvidence.isNotEmpty) {
+            body['materials'] = renewalEvidence;
+            body['evidence'] = renewalEvidence;
           }
         }
       } else {
