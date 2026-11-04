@@ -61,12 +61,12 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
         final bool isMissingCoreData = progName.isEmpty || progDesc.isEmpty;
         final bool isMissingDocsOrData = isMissingDocs || isMissingCoreData;
 
-        final String aiStatus = isMissingDocsOrData ? 'rejected' : 'approved';
+        final String aiStatus = isMissingDocsOrData ? 'failed' : 'approved';
         final List<Map<String, dynamic>> checks = isMissingDocsOrData
             ? [
                 {
                   'check_type': 'content_review',
-                  'status': isMissingCoreData ? 'rejected' : 'approved',
+                  'status': isMissingCoreData ? 'failed' : 'approved',
                   'details': isMissingCoreData
                       ? 'Mandatory program details or description missing'
                       : 'Content parameters verified',
@@ -78,14 +78,14 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                 },
                 {
                   'check_type': 'supporting_materials',
-                  'status': isMissingDocs ? 'rejected' : 'approved',
+                  'status': isMissingDocs ? 'failed' : 'approved',
                   'details': isMissingDocs
                       ? 'Mandatory supporting documents not uploaded. AI validation rejected.'
                       : 'Materials and media verified',
                 },
                 {
                   'check_type': 'overall',
-                  'status': 'rejected',
+                  'status': 'failed',
                   'details': isMissingDocs
                       ? 'Automated review rejected: Supporting documentation missing'
                       : 'Automated review rejected: Core data incomplete',
@@ -586,11 +586,14 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
         _liveDetail?['validations'] ??
         _liveDetail?['ai_audit'];
     final bool hasFailedAiCheck = rawAiChecks is List &&
-        rawAiChecks.any((c) =>
-            (c is Map && (c['status'] ?? '').toString().toLowerCase() == 'rejected'));
+        rawAiChecks.any((c) {
+          final s = (c is Map ? (c['status'] ?? '') : '').toString().toLowerCase();
+          return s == 'rejected' || s == 'failed';
+        });
     final bool isMissingMaterials = realMaterials.isEmpty && widget.item.supportingMaterials.isEmpty;
     final bool isCoreDataMissing = title.trim().isEmpty || (description ?? '').trim().isEmpty;
     final bool isAiRejected = isRejected || hasFailedAiCheck || isMissingMaterials || isCoreDataMissing;
+    final String effectiveStatus = isAiRejected ? 'Rejected' : (status.isNotEmpty ? status : 'In Review');
 
     final aiReport = ProgramAiValidationReport.evaluate(
       title: title,
@@ -743,7 +746,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                       ),
                     ),
                     const SizedBox(width: 10),
-                    _buildStatusBadge(status),
+                    _buildStatusBadge(effectiveStatus),
                   ],
                 ),
                 if (refNo.isNotEmpty) ...[
@@ -757,7 +760,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                   ),
                 ],
                 const SizedBox(height: 6),
-                _buildAiValidationPill(status, _liveDetail?['ai_validation'], aiReport.overallScore, isAiRejected: isAiRejected),
+                _buildAiValidationPill(effectiveStatus, _liveDetail?['ai_validation'], aiReport.overallScore, isAiRejected: isAiRejected),
                 if (status.toLowerCase() == 'submitted' && !isAiRejected) ...[
                   const SizedBox(height: 12),
                   _buildSubmitAiValidationActionBar(status),
@@ -1101,7 +1104,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                       _buildInfoRow('Last Updated', _formatDateString(lastUpdated)),
                     _buildCustomInfoRow(
                       'Current Status',
-                      _buildStatusBadge(status),
+                      _buildStatusBadge(effectiveStatus),
                       isLast: decisionStr.isEmpty,
                     ),
                     if (decisionStr.isNotEmpty)
@@ -1172,6 +1175,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
 
                       final isDecisionStage = stage == 'decision' || stageLabel.toLowerCase().contains('decision') || isLast;
                       final isManualReviewStage = stage == 'manual_review' || stageLabel.toLowerCase().contains('manual review');
+                      final isSubmissionStage = stage == 'submission' || stage == 'submitted' || stage.contains('submit') || stageLabel.toLowerCase().contains('submit');
 
                       final isDecisionApproved = (isDecisionStage && (
                           t['decision']?.toString().toLowerCase() == 'approved' ||
@@ -1189,7 +1193,9 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                               isRejected));
 
                       _TimelineStatus tStatus = _TimelineStatus.pending;
-                      if (isAiRejected) {
+                      if (isSubmissionStage) {
+                        tStatus = _TimelineStatus.completed;
+                      } else if (isAiRejected) {
                         if (stage == 'ai_validation') {
                           tStatus = _TimelineStatus.completed;
                         } else if (stage == 'manual_review') {
@@ -1217,7 +1223,13 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                       final timeSuffix = occurredAt != null && occurredAt.isNotEmpty
                           ? ' • $occurredAt'
                           : (lastUpdated.isNotEmpty ? ' • ${_formatDateString(lastUpdated)}' : '');
-                      if (isAiRejected) {
+                      if (isSubmissionStage) {
+                        subtitle = occurredAt != null && occurredAt.isNotEmpty
+                            ? 'Program submitted • $occurredAt'
+                            : (submittedDate.isNotEmpty
+                                ? 'Program submitted • ${_formatDateString(submittedDate)}'
+                                : 'Program submitted');
+                      } else if (isAiRejected) {
                         if (stage == 'ai_validation') {
                           subtitle = 'AI validation rejected • Missing supporting documents$timeSuffix';
                         } else if (stage == 'manual_review') {
@@ -1255,7 +1267,9 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                       }
 
                       Color? customStageColor;
-                      if (isAiRejected) {
+                      if (isSubmissionStage) {
+                        customStageColor = const Color(0xFF16A34A);
+                      } else if (isAiRejected) {
                         if (stage == 'ai_validation' || isDecisionStage) {
                           customStageColor = const Color(0xFFDC2626);
                         } else if (stage == 'manual_review') {
@@ -1406,7 +1420,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
       bg = const Color(0xFFFFEDD5);
       text = const Color(0xFFC2410C);
       border = const Color(0xFFFDBA74);
-    } else if (s == 'rejected' || s == 'cancelled' || s == 'canceled') {
+    } else if (s == 'rejected' || s == 'failed' || s == 'cancelled' || s == 'canceled') {
       bg = const Color(0xFFFEE2E2);
       text = const Color(0xFFDC2626);
       border = const Color(0xFFFCA5A5);
@@ -1414,7 +1428,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
 
     final displayLabel = (s == 'manual_review' || s == 'in_review')
         ? 'In Review'
-        : (s == 'changes_required' ? 'Changes Required' : status);
+        : (s == 'changes_required' ? 'Changes Required' : ((s == 'failed' || s == 'rejected') ? 'Rejected' : status));
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1439,8 +1453,10 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
     final bool isRejectedVal = isAiRejected ||
         s.contains('reject') ||
         (aiVal is List &&
-            aiVal.any((c) =>
-                (c['status'] ?? '').toString().toLowerCase() == 'rejected'));
+            aiVal.any((c) {
+              final cs = (c['status'] ?? '').toString().toLowerCase();
+              return cs == 'rejected' || cs == 'failed';
+            }));
 
     if (isRejectedVal) {
       return Container(

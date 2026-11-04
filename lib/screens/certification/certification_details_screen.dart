@@ -114,7 +114,7 @@ class _CertificationDetailsScreenState
         (_detail?.reviewStatus.toLowerCase().contains('reject') ?? false) ||
         (widget.certificateItem?.status.toLowerCase().contains('reject') ?? false);
 
-    final statusToSend = isRejected ? 'rejected' : 'approved';
+    final statusToSend = isRejected ? 'failed' : 'approved';
     final commentsToSend = isMissingEvidence
         ? 'AI Validation Rejected: Required supporting evidence documents were not uploaded. Please upload evidence for AI validation.'
         : (isRejected
@@ -125,7 +125,7 @@ class _CertificationDetailsScreenState
         ? [
             {
               'check_type': 'evidence_review',
-              'status': 'rejected',
+              'status': 'failed',
               'status_label': 'FAILED',
               'score': 0,
               'max_score': 40,
@@ -133,7 +133,7 @@ class _CertificationDetailsScreenState
             },
             {
               'check_type': 'detail_evidence_match',
-              'status': 'rejected',
+              'status': 'failed',
               'status_label': 'INSUFFICIENT',
               'score': 10,
               'max_score': 30,
@@ -141,8 +141,8 @@ class _CertificationDetailsScreenState
             },
             {
               'check_type': 'overall',
-              'status': 'rejected',
-              'status_label': 'REJECTED',
+              'status': 'failed',
+              'status_label': 'FAILED',
               'score': 15,
               'max_score': 30,
               'details': 'Automated review rejected: Application does not contain required evidence files.',

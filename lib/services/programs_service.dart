@@ -423,15 +423,36 @@ class ProgramsService {
     String status = 'approved',
     List<Map<String, dynamic>>? checks,
   }) async {
-    final effectiveChecks = checks ?? [
+    // Note: The backend Zod schema requires status to be one of:
+    // 'pending' | 'in_progress' | 'completed' | 'reviewed' | 'approved' | 'failed'
+    // BUT in MySQL (program_stages table), the 'state' column has ENUM('pending', 'in_progress', 'completed').
+    // In program.controller.js:695, it runs: UPDATE program_stages SET state = req.body.status.
+    // If 'failed' or 'approved' is passed, MySQL throws: "Data truncated for column 'state' at row 1".
+    // Setting root status to 'completed' satisfies both Zod schema and MySQL state ENUM.
+    final String normalizedStatus;
+    if (status.toLowerCase() == 'pending' || status.toLowerCase() == 'in_progress') {
+      normalizedStatus = status.toLowerCase();
+    } else {
+      normalizedStatus = 'completed';
+    }
+
+    final effectiveChecks = (checks ?? [
       {'check_type': 'content_review', 'status': 'approved', 'details': null},
       {'check_type': 'program_details_match', 'status': 'approved', 'details': null},
       {'check_type': 'supporting_materials', 'status': 'approved', 'details': null},
       {'check_type': 'overall', 'status': 'approved', 'details': null},
-    ];
+    ]).map((c) {
+      final copy = Map<String, dynamic>.from(c);
+      final s = copy['status']?.toString().toLowerCase();
+      if (s == 'rejected') {
+        copy['status'] = 'failed';
+      }
+      return copy;
+    }).toList();
 
     final body = <String, dynamic>{
-      'status': status,
+      'status': normalizedStatus,
+      'state': normalizedStatus,
       'checks': effectiveChecks,
       'ai_validation': effectiveChecks,
     };

@@ -197,12 +197,12 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
 
       if (programId.isNotEmpty) {
         try {
-          final aiStatus = isMissingDocsOrData ? 'rejected' : 'approved';
+          final aiStatus = isMissingDocsOrData ? 'failed' : 'approved';
           final aiChecks = isMissingDocsOrData
               ? [
                   {
                     'check_type': 'content_review',
-                    'status': isMissingCoreData ? 'rejected' : 'approved',
+                    'status': isMissingCoreData ? 'failed' : 'approved',
                     'status_label': isMissingCoreData ? 'FAILED' : 'VERIFIED',
                     'score': isMissingCoreData ? 0 : 25,
                     'max_score': 25,
@@ -220,7 +220,7 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
                   },
                   {
                     'check_type': 'supporting_materials',
-                    'status': isMissingDocs ? 'rejected' : 'approved',
+                    'status': isMissingDocs ? 'failed' : 'approved',
                     'status_label': isMissingDocs ? 'FAILED' : 'VERIFIED',
                     'score': isMissingDocs ? 0 : 25,
                     'max_score': 25,
@@ -230,8 +230,8 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
                   },
                   {
                     'check_type': 'overall',
-                    'status': 'rejected',
-                    'status_label': 'REJECTED',
+                    'status': 'failed',
+                    'status_label': 'FAILED',
                     'score': 10,
                     'max_score': 25,
                     'details': isMissingDocs

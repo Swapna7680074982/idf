@@ -60,8 +60,18 @@ class ProgramApplicationItem {
         .map((m) => (m['name'] ?? m['file_name'] ?? 'Document').toString())
         .toList();
 
+    final rawAiChecks = json['ai_validation'] ?? json['validations'] ?? json['ai_audit'];
+    final bool hasFailedAi = rawAiChecks is List &&
+        rawAiChecks.any((c) {
+          final s = (c is Map ? (c['status'] ?? '') : '').toString().toLowerCase();
+          return s == 'rejected' || s == 'failed';
+        });
+    final decisionStr = (json['decision'] ?? json['decision_text'] ?? '').toString().toLowerCase();
+
     final statusStr = (json['display_status'] ?? json['review_status'] ?? json['status'] ?? 'Submitted').toString();
-    String normalizedStatus = _normalizeStatus(statusStr);
+    String normalizedStatus = (hasFailedAi || decisionStr == 'rejected')
+        ? 'Rejected'
+        : _normalizeStatus(statusStr);
 
     return ProgramApplicationItem(
       id: (json['id'] ?? '').toString(),

@@ -1504,7 +1504,10 @@ class CertificationAiValidationCheck {
       checkType: ct,
       label: lbl,
       status: stat,
-      statusLabel: json['status_label']?.toString() ?? (stat == 'approved' ? 'Approved' : (stat == 'rejected' ? 'Rejected' : 'Pending')),
+      statusLabel: json['status_label']?.toString() ??
+          (stat == 'approved'
+              ? 'Approved'
+              : ((stat == 'rejected' || stat == 'failed') ? 'Failed' : 'Pending')),
       details: json['details']?.toString(),
       score: parsedScore,
       maxScore: parsedMax,

@@ -326,7 +326,17 @@ class CertificationService {
     String? comments,
     List<Map<String, dynamic>>? checks,
   }) async {
-    final effectiveChecks = checks ?? [
+    // In MySQL (certificate_stages / timeline table), the 'state' column is ENUM('pending', 'in_progress', 'completed').
+    // Sending 'failed', 'approved', or 'rejected' causes: "Data truncated for column 'state' at row 1".
+    // Root status must be 'completed' for finished audits to satisfy both Zod schema and MySQL state ENUM.
+    final String normalizedStatus;
+    if (status.toLowerCase() == 'pending' || status.toLowerCase() == 'in_progress') {
+      normalizedStatus = status.toLowerCase();
+    } else {
+      normalizedStatus = 'completed';
+    }
+
+    final effectiveChecks = (checks ?? [
       {
         'check_type': 'evidence_review',
         'status': 'approved',
@@ -342,10 +352,18 @@ class CertificationService {
         'status': 'approved',
         'details': 'All automated audit criteria passed.',
       },
-    ];
+    ]).map((c) {
+      final copy = Map<String, dynamic>.from(c);
+      final s = copy['status']?.toString().toLowerCase();
+      if (s == 'rejected') {
+        copy['status'] = 'failed';
+      }
+      return copy;
+    }).toList();
 
     final body = <String, dynamic>{
-      'status': status,
+      'status': normalizedStatus,
+      'state': normalizedStatus,
       'comments': comments ?? 'Automated verification passed. All supporting documents meet MDRF criteria.',
       'checks': effectiveChecks,
     };
