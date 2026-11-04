@@ -4,9 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../bloc/app_bloc.dart';
 import '../../bloc/app_event.dart';
 import '../../core/theme.dart';
+import '../../data/countries_data.dart';
 import '../../models/meta_models.dart';
 import '../../services/account_service.dart';
 import '../../services/metadata_service.dart';
+import '../../widgets/country_phone_input_field.dart';
 
 class OrganizationDetailsScreen extends StatefulWidget {
   const OrganizationDetailsScreen({super.key});
@@ -34,6 +36,7 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
   int? _regionId;
   int? _cityId;
 
+  Country _contactCountry = CountryData.defaultCountry;
   bool _isLoading = true;
   bool _isSaving = false;
 
@@ -76,9 +79,25 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
     _contactEmailController = TextEditingController(
       text: user.contactEmail.isNotEmpty ? user.contactEmail : '',
     );
-    _contactPhoneController = TextEditingController(
-      text: user.contactPhone.isNotEmpty ? user.contactPhone : '',
-    );
+    final rawPhone = user.contactPhone;
+    if (rawPhone.startsWith('+')) {
+      final parts = rawPhone.split(' ');
+      if (parts.length > 1) {
+        _contactCountry = CountryData.findByPhoneCode(parts.first);
+        _contactPhoneController = TextEditingController(text: parts.sublist(1).join('').replaceAll(RegExp(r'\D'), ''));
+      } else {
+        final match = kAllCountries.firstWhere(
+          (c) => rawPhone.startsWith(c.phoneCode),
+          orElse: () => CountryData.defaultCountry,
+        );
+        _contactCountry = match;
+        _contactPhoneController = TextEditingController(
+          text: rawPhone.substring(match.phoneCode.length).replaceAll(RegExp(r'\D'), ''),
+        );
+      }
+    } else {
+      _contactPhoneController = TextEditingController(text: rawPhone.replaceAll(RegExp(r'\D'), ''));
+    }
 
     _fetchOrganizationDetails();
   }
@@ -183,7 +202,25 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
           if (org.address.isNotEmpty) _addressController.text = org.address;
           if (org.contactPerson.isNotEmpty) _contactPersonController.text = org.contactPerson;
           if (org.contactEmail.isNotEmpty) _contactEmailController.text = org.contactEmail;
-          if (org.contactPhone.isNotEmpty) _contactPhoneController.text = org.contactPhone;
+          if (org.contactPhone.isNotEmpty) {
+            final raw = org.contactPhone.trim();
+            if (raw.startsWith('+')) {
+              final parts = raw.split(' ');
+              if (parts.length > 1) {
+                _contactCountry = CountryData.findByPhoneCode(parts.first);
+                _contactPhoneController.text = parts.sublist(1).join('').replaceAll(RegExp(r'\D'), '');
+              } else {
+                final match = kAllCountries.firstWhere(
+                  (c) => raw.startsWith(c.phoneCode),
+                  orElse: () => CountryData.defaultCountry,
+                );
+                _contactCountry = match;
+                _contactPhoneController.text = raw.substring(match.phoneCode.length).replaceAll(RegExp(r'\D'), '');
+              }
+            } else {
+              _contactPhoneController.text = raw.replaceAll(RegExp(r'\D'), '');
+            }
+          }
 
           if (resolvedOrgType.isNotEmpty) {
             if (!_orgTypes.contains(resolvedOrgType)) {
@@ -240,7 +277,10 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
       final address = _addressController.text.trim();
       final contactPerson = _contactPersonController.text.trim();
       final contactEmail = _contactEmailController.text.trim();
-      final contactPhone = _contactPhoneController.text.trim();
+      final contactPhoneDigits = _contactPhoneController.text.trim();
+      final fullContactPhone = contactPhoneDigits.isNotEmpty
+          ? '${_contactCountry.phoneCode} $contactPhoneDigits'
+          : null;
 
       // Resolve orgTypeId if null
       int? orgTypeId = _selectedOrgTypeId;
@@ -259,7 +299,7 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
           address: address.isNotEmpty ? address : null,
           contactPerson: contactPerson.isNotEmpty ? contactPerson : null,
           contactEmail: contactEmail.isNotEmpty ? contactEmail : null,
-          contactPhone: contactPhone.isNotEmpty ? contactPhone : null,
+          contactPhone: fullContactPhone,
           organizationTypeId: orgTypeId,
           countryId: _countryId,
           regionId: _regionId,
@@ -276,7 +316,7 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                   city: _cityController.text.trim(),
                   address: address,
                   contactEmail: contactEmail,
-                  contactPhone: contactPhone,
+                  contactPhone: fullContactPhone ?? '',
                 ),
               );
 
@@ -433,10 +473,16 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                       // Contact Phone
                       _buildFieldLabel('Contact Phone'),
                       const SizedBox(height: 8),
-                      _buildTextField(
+                      CountryPhoneInputField(
+                        hintText: 'Enter contact phone',
                         controller: _contactPhoneController,
-                        hintText: '+91 9876543210',
-                        keyboardType: TextInputType.phone,
+                        initialCountry: _contactCountry,
+                        isRequired: false,
+                        onCountryChanged: (c) {
+                          setState(() {
+                            _contactCountry = c;
+                          });
+                        },
                       ),
                       const SizedBox(height: 32),
                     ],

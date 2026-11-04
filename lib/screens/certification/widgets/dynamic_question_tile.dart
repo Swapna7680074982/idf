@@ -163,6 +163,11 @@ class _DynamicQuestionTileState extends State<DynamicQuestionTile> {
         bg = const Color(0xFFF8FAFC);
         text = const Color(0xFF475569);
         break;
+      case AnswerFormatType.checkbox:
+        label = 'Checkbox';
+        bg = const Color(0xFFF0FDF4);
+        text = const Color(0xFF16A34A);
+        break;
     }
 
     return Container(
@@ -195,6 +200,8 @@ class _DynamicQuestionTileState extends State<DynamicQuestionTile> {
         return _buildSingleChoice();
       case AnswerFormatType.textNarrative:
         return _buildTextNarrative();
+      case AnswerFormatType.checkbox:
+        return _buildCheckbox();
     }
   }
 
@@ -579,6 +586,160 @@ class _DynamicQuestionTileState extends State<DynamicQuestionTile> {
       onChanged: (text) {
         widget.onChanged(text);
       },
+    );
+  }
+
+  // 6. Checkbox (Single confirmation or Multi-choice options)
+  Widget _buildCheckbox() {
+    final options = widget.question.optionItems.isNotEmpty
+        ? widget.question.optionItems
+        : widget.question.options.map((s) => CertificationQuestionOption(id: s, label: s)).toList();
+
+    // If options are configured, support multi-select checkbox list
+    if (options.isNotEmpty) {
+      List<String> selectedKeys = [];
+      if (widget.value is List) {
+        selectedKeys = (widget.value as List).map((e) {
+          if (e is Map) return (e['id'] ?? e['value'] ?? e['label'] ?? '').toString();
+          return e.toString();
+        }).toList();
+      } else if (widget.value != null && widget.value.toString().isNotEmpty) {
+        selectedKeys = widget.value.toString().split(',').map((s) => s.trim()).toList();
+      }
+
+      return Column(
+        children: options.map((opt) {
+          final optIdStr = opt.id.toString();
+          final optLabel = opt.label;
+          final isChecked = selectedKeys.contains(optIdStr) || selectedKeys.contains(optLabel);
+
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            decoration: BoxDecoration(
+              color: isChecked ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: isChecked ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                width: 1.1,
+              ),
+            ),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  final updated = List<String>.from(selectedKeys);
+                  if (isChecked) {
+                    updated.remove(optIdStr);
+                    updated.remove(optLabel);
+                  } else {
+                    updated.add(optIdStr);
+                  }
+                  widget.onChanged(updated);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: Checkbox(
+                          value: isChecked,
+                          activeColor: const Color(0xFF16A34A),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                          onChanged: (val) {
+                            final updated = List<String>.from(selectedKeys);
+                            if (val == true) {
+                              if (!updated.contains(optIdStr)) updated.add(optIdStr);
+                            } else {
+                              updated.remove(optIdStr);
+                              updated.remove(optLabel);
+                            }
+                            widget.onChanged(updated);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          opt.label,
+                          style: GoogleFonts.inter(
+                            fontSize: 13,
+                            fontWeight: isChecked ? FontWeight.w600 : FontWeight.w500,
+                            color: isChecked ? const Color(0xFF0F172A) : const Color(0xFF334155),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      );
+    }
+
+    // Single Checkbox (Boolean / Acknowledgment)
+    bool isChecked = false;
+    if (widget.value is bool) {
+      isChecked = widget.value as bool;
+    } else if (widget.value != null) {
+      final s = widget.value.toString().toLowerCase().trim();
+      isChecked = s == 'true' || s == '1' || s == 'yes' || s == 'checked';
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: isChecked ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isChecked ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+          width: 1.1,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(10),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: () {
+            widget.onChanged(!isChecked);
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: Checkbox(
+                    value: isChecked,
+                    activeColor: const Color(0xFF16A34A),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    onChanged: (val) {
+                      widget.onChanged(val ?? false);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    isChecked ? 'Confirmed / Yes' : 'Select to confirm',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: isChecked ? FontWeight.w600 : FontWeight.w500,
+                      color: isChecked ? const Color(0xFF16A34A) : const Color(0xFF475569),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

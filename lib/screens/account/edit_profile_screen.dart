@@ -6,8 +6,11 @@ import 'package:image_picker/image_picker.dart';
 import '../../bloc/app_bloc.dart';
 import '../../bloc/app_event.dart';
 import '../../core/theme.dart';
+import '../../data/countries_data.dart';
+import '../../models/meta_models.dart';
 import '../../services/account_service.dart';
 import '../../services/api_config.dart';
+import '../../widgets/country_phone_input_field.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -24,13 +27,39 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   bool _isSaving = false;
   String? _uploadedPhotoUrl;
 
+  Country _selectedCountry = CountryData.defaultCountry;
+
   @override
   void initState() {
     super.initState();
     final user = context.read<AppBloc>().state.user;
     _nameController = TextEditingController(text: user.fullName);
     _emailController = TextEditingController(text: user.email);
-    _phoneController = TextEditingController(text: user.phone);
+
+    final rawPhone = user.phone.trim();
+    if (rawPhone.startsWith('+')) {
+      final parts = rawPhone.split(' ');
+      if (parts.length > 1) {
+        _selectedCountry = CountryData.findByPhoneCode(parts.first);
+        _phoneController = TextEditingController(
+          text: parts.sublist(1).join('').replaceAll(RegExp(r'\D'), ''),
+        );
+      } else {
+        final match = kAllCountries.firstWhere(
+          (c) => rawPhone.startsWith(c.phoneCode),
+          orElse: () => CountryData.defaultCountry,
+        );
+        _selectedCountry = match;
+        _phoneController = TextEditingController(
+          text: rawPhone.substring(match.phoneCode.length).replaceAll(RegExp(r'\D'), ''),
+        );
+      }
+    } else {
+      _phoneController = TextEditingController(
+        text: rawPhone.replaceAll(RegExp(r'\D'), ''),
+      );
+    }
+
     _loadLiveProfile();
   }
 
@@ -45,9 +74,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           if (overview.email.isNotEmpty) {
             _emailController.text = overview.email;
           }
-          final fullPhone = '${overview.phoneCountryCode} ${overview.phoneNumber}'.trim();
-          if (fullPhone.isNotEmpty) {
-            _phoneController.text = fullPhone;
+          if (overview.phoneCountryCode.isNotEmpty) {
+            _selectedCountry = CountryData.findByPhoneCode(overview.phoneCountryCode);
+          }
+          if (overview.phoneNumber.isNotEmpty) {
+            _phoneController.text = overview.phoneNumber.replaceAll(RegExp(r'\D'), '');
+          } else if (overview.phoneCountryCode.isNotEmpty) {
+            final fullPhone = '${overview.phoneCountryCode} ${overview.phoneNumber}'.trim();
+            if (fullPhone.isNotEmpty) {
+              _phoneController.text = fullPhone.replaceAll(RegExp(r'\D'), '');
+            }
           }
           if (overview.profileImageUrl != null) {
             _uploadedPhotoUrl = overview.profileImageUrl;
@@ -69,21 +105,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     if (_formKey.currentState?.validate() ?? false) {
       setState(() => _isSaving = true);
       try {
-        final rawPhone = _phoneController.text.trim();
-        String countryCode = '';
-        String phoneNum = rawPhone;
-        if (rawPhone.startsWith('+')) {
-          final parts = rawPhone.split(' ');
-          if (parts.length > 1) {
-            countryCode = parts.first;
-            phoneNum = parts.sublist(1).join('');
-          }
-        }
+        final phoneNum = _phoneController.text.trim();
 
         // Live API: PATCH /api/account/profile
         await AccountService.updateProfile(
           fullName: _nameController.text.trim(),
-          phoneCountryCode: countryCode,
+          phoneCountryCode: _selectedCountry.phoneCode,
           phoneNumber: phoneNum,
         );
 
@@ -92,7 +119,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 UpdateUserProfileRequested(
                   fullName: _nameController.text.trim(),
                   email: _emailController.text.trim(),
-                  phone: _phoneController.text.trim(),
+                  phone: '${_selectedCountry.phoneCode} $phoneNum'.trim(),
                 ),
               );
 
@@ -353,15 +380,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       // Mobile Number
                       _buildFieldLabel('Mobile Number'),
                       const SizedBox(height: 8),
-                      _buildTextField(
-                        controller: _phoneController,
+                      CountryPhoneInputField(
                         hintText: 'Mobile Number',
-                        keyboardType: TextInputType.phone,
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) {
-                            return 'Please enter your mobile number';
-                          }
-                          return null;
+                        controller: _phoneController,
+                        initialCountry: _selectedCountry,
+                        onCountryChanged: (c) {
+                          setState(() {
+                            _selectedCountry = c;
+                          });
                         },
                       ),
                       const SizedBox(height: 40),

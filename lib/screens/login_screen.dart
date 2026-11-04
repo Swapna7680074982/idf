@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../bloc/app_bloc.dart';
@@ -121,7 +121,7 @@ class _LoginScreenState extends State<LoginScreen> {
             // Top Header
             AuthHeader(
               title: 'Welcome back',
-              subtitle: 'Sign in to your IDF Digital Hub account',
+              subtitle: 'Sign in to your MDRF Digital Hub account',
               onBack: () => Navigator.of(context).pop(),
             ),
 

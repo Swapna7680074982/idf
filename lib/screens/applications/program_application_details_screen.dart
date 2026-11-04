@@ -40,32 +40,87 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
           widget.item.id;
 
       if (progId.isNotEmpty) {
-        // Post AI validation results to backend: transitions status to 'manual_review' (In Review)
+        // Inspect if supporting documents or core data are missing
+        final rawMaterials = _liveDetail?['materials'] ??
+            _liveDetail?['supporting_materials'] ??
+            _liveProgram?.materials ??
+            widget.item.materials;
+        final rawFileList = _liveDetail?['uploaded_files'] ?? widget.item.supportingMaterials;
+        final int matCount = (rawMaterials is List ? rawMaterials.length : 0) +
+            (rawFileList is List ? rawFileList.length : 0);
+
+        final progName = (_liveDetail?['program_name'] ??
+            _liveDetail?['title'] ??
+            _liveProgram?.title ??
+            widget.item.programName).toString().trim();
+        final progDesc = (_liveDetail?['description'] ??
+            _liveProgram?.description ??
+            widget.item.description).toString().trim();
+
+        final bool isMissingDocs = matCount == 0;
+        final bool isMissingCoreData = progName.isEmpty || progDesc.isEmpty;
+        final bool isMissingDocsOrData = isMissingDocs || isMissingCoreData;
+
+        final String aiStatus = isMissingDocsOrData ? 'rejected' : 'approved';
+        final List<Map<String, dynamic>> checks = isMissingDocsOrData
+            ? [
+                {
+                  'check_type': 'content_review',
+                  'status': isMissingCoreData ? 'rejected' : 'approved',
+                  'details': isMissingCoreData
+                      ? 'Mandatory program details or description missing'
+                      : 'Content parameters verified',
+                },
+                {
+                  'check_type': 'program_details_match',
+                  'status': 'approved',
+                  'details': 'Program details verified',
+                },
+                {
+                  'check_type': 'supporting_materials',
+                  'status': isMissingDocs ? 'rejected' : 'approved',
+                  'details': isMissingDocs
+                      ? 'Mandatory supporting documents not uploaded. AI validation rejected.'
+                      : 'Materials and media verified',
+                },
+                {
+                  'check_type': 'overall',
+                  'status': 'rejected',
+                  'details': isMissingDocs
+                      ? 'Automated review rejected: Supporting documentation missing'
+                      : 'Automated review rejected: Core data incomplete',
+                },
+              ]
+            : [
+                {'check_type': 'content_review', 'status': 'approved', 'details': null},
+                {'check_type': 'program_details_match', 'status': 'approved', 'details': null},
+                {'check_type': 'supporting_materials', 'status': 'approved', 'details': null},
+                {'check_type': 'overall', 'status': 'approved', 'details': null},
+              ];
+
+        // Post AI validation results to backend
         final res = await ProgramsService.postAiValidationResult(
           progId,
-          status: 'approved',
-          checks: [
-            {'check_type': 'content_review', 'status': 'approved', 'details': null},
-            {'check_type': 'program_details_match', 'status': 'approved', 'details': null},
-            {'check_type': 'supporting_materials', 'status': 'approved', 'details': null},
-            {'check_type': 'overall', 'status': 'approved', 'details': null},
-          ],
+          status: aiStatus,
+          checks: checks,
         );
 
         // Optimistically update live detail if response includes data
         final data = res['data'] is Map<String, dynamic> ? res['data'] as Map<String, dynamic> : null;
-        if (data != null && mounted) {
+        if (mounted) {
           setState(() {
             if (_liveDetail != null) {
-              _liveDetail!['status'] = data['display_status'] ?? 'In Review';
-              _liveDetail!['review_status'] = data['review_status'] ?? 'manual_review';
+              _liveDetail!['status'] = isMissingDocsOrData
+                  ? 'Rejected'
+                  : (data?['display_status'] ?? 'In Review');
+              _liveDetail!['review_status'] = isMissingDocsOrData
+                  ? 'rejected'
+                  : (data?['review_status'] ?? 'manual_review');
               if (_liveDetail!['submission_details'] is Map<String, dynamic>) {
                 (_liveDetail!['submission_details'] as Map<String, dynamic>)['current_status'] =
-                    data['display_status'] ?? 'In Review';
+                    isMissingDocsOrData ? 'Rejected' : (data?['display_status'] ?? 'In Review');
               }
-              if (data['ai_validation'] != null) {
-                _liveDetail!['ai_validation'] = data['ai_validation'];
-              }
+              _liveDetail!['ai_validation'] = data?['ai_validation'] ?? checks;
             }
           });
         }
@@ -527,6 +582,16 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
     final hasRegistration = (registrationLink != null && registrationLink.isNotEmpty) ||
         (registrationInstructions != null && registrationInstructions.isNotEmpty);
 
+    final rawAiChecks = _liveDetail?['ai_validation'] ??
+        _liveDetail?['validations'] ??
+        _liveDetail?['ai_audit'];
+    final bool hasFailedAiCheck = rawAiChecks is List &&
+        rawAiChecks.any((c) =>
+            (c is Map && (c['status'] ?? '').toString().toLowerCase() == 'rejected'));
+    final bool isMissingMaterials = realMaterials.isEmpty && widget.item.supportingMaterials.isEmpty;
+    final bool isCoreDataMissing = title.trim().isEmpty || (description ?? '').trim().isEmpty;
+    final bool isAiRejected = isRejected || hasFailedAiCheck || isMissingMaterials || isCoreDataMissing;
+
     final aiReport = ProgramAiValidationReport.evaluate(
       title: title,
       programType: programType,
@@ -544,9 +609,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
       materialsCount: realMaterials.length,
       agendaCount: realAgenda.length,
       hasRegistration: hasRegistration,
-      backendValidations: _liveDetail?['ai_validation'] ??
-          _liveDetail?['validations'] ??
-          _liveDetail?['ai_audit'],
+      backendValidations: rawAiChecks,
     );
 
     return Scaffold(
@@ -694,8 +757,8 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                   ),
                 ],
                 const SizedBox(height: 6),
-                _buildAiValidationPill(status, _liveDetail?['ai_validation'], aiReport.overallScore),
-                if (status.toLowerCase() == 'submitted') ...[
+                _buildAiValidationPill(status, _liveDetail?['ai_validation'], aiReport.overallScore, isAiRejected: isAiRejected),
+                if (status.toLowerCase() == 'submitted' && !isAiRejected) ...[
                   const SizedBox(height: 12),
                   _buildSubmitAiValidationActionBar(status),
                   const SizedBox(height: 6),
@@ -745,7 +808,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                   ),
                   const SizedBox(height: 6),
                 ],
-                if (isRejected) ...[
+                if (isRejected || isAiRejected) ...[
                   const SizedBox(height: 12),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -773,9 +836,11 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                reviewerComment.isNotEmpty
-                                    ? reviewerComment
-                                    : 'This program application has been rejected by the review committee.',
+                                (isAiRejected && isMissingMaterials)
+                                    ? 'AI validation was rejected because required supporting documents were not uploaded.'
+                                    : (reviewerComment.isNotEmpty
+                                        ? reviewerComment
+                                        : 'This program application has been rejected by the review committee.'),
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   color: const Color(0xFF991B1B),
@@ -1049,8 +1114,12 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                 ),
                 const SizedBox(height: 14),
 
-                // 6. AI Validation & Scoring Card
-                _buildAiValidationCard(aiReport, isSubmitted: status.toLowerCase() == 'submitted'),
+                // 6. AI Validation Card
+                _buildAiValidationCard(
+                  aiReport,
+                  isSubmitted: status.toLowerCase() == 'submitted',
+                  isAiRejected: isAiRejected,
+                ),
                 const SizedBox(height: 14),
 
                 // 7. Supporting Material Card
@@ -1120,7 +1189,15 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                               isRejected));
 
                       _TimelineStatus tStatus = _TimelineStatus.pending;
-                      if (isApproved || isDecisionApproved) {
+                      if (isAiRejected) {
+                        if (stage == 'ai_validation') {
+                          tStatus = _TimelineStatus.completed;
+                        } else if (stage == 'manual_review') {
+                          tStatus = _TimelineStatus.pending;
+                        } else if (isDecisionStage) {
+                          tStatus = _TimelineStatus.completed;
+                        }
+                      } else if (isApproved || isDecisionApproved) {
                         tStatus = _TimelineStatus.completed;
                       } else if (isDecisionChangesRequired) {
                         tStatus = _TimelineStatus.completed;
@@ -1137,7 +1214,18 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                       }
 
                       String? subtitle;
-                      if (isDecisionStage && isApproved) {
+                      final timeSuffix = occurredAt != null && occurredAt.isNotEmpty
+                          ? ' • $occurredAt'
+                          : (lastUpdated.isNotEmpty ? ' • ${_formatDateString(lastUpdated)}' : '');
+                      if (isAiRejected) {
+                        if (stage == 'ai_validation') {
+                          subtitle = 'AI validation rejected • Missing supporting documents$timeSuffix';
+                        } else if (stage == 'manual_review') {
+                          subtitle = 'Manual review not conducted • AI validation rejected';
+                        } else if (isDecisionStage) {
+                          subtitle = 'Application rejected • Missing supporting documents$timeSuffix';
+                        }
+                      } else if (isDecisionStage && isApproved) {
                         final decText = (t['decision_text'] ?? t['decision'] ?? (decisionStr.isNotEmpty ? decisionStr : 'Approved')).toString();
                         final timeStr = occurredAt ?? (lastUpdated.isNotEmpty ? _formatDateString(lastUpdated) : null);
                         subtitle = timeStr != null ? '$decText: Program approved and published • $timeStr' : '$decText: Program approved and published';
@@ -1161,9 +1249,24 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                       } else if (occurredAt != null && occurredAt.isNotEmpty) {
                         subtitle = occurredAt;
                       } else if (stage == 'ai_validation' && tStatus == _TimelineStatus.completed) {
-                        subtitle = 'AI validation passed • Score: ${aiReport.overallScore}/100';
+                        subtitle = 'AI validation passed';
                       } else if (isDecisionStage && tStatus == _TimelineStatus.completed) {
                         subtitle = (t['decision_text'] ?? t['decision'] ?? 'Decision reached').toString();
+                      }
+
+                      Color? customStageColor;
+                      if (isAiRejected) {
+                        if (stage == 'ai_validation' || isDecisionStage) {
+                          customStageColor = const Color(0xFFDC2626);
+                        } else if (stage == 'manual_review') {
+                          customStageColor = const Color(0xFF94A3B8);
+                        }
+                      } else if (isDecisionApproved) {
+                        customStageColor = const Color(0xFF16A34A);
+                      } else if (isDecisionChangesRequired) {
+                        customStageColor = const Color(0xFFD97706);
+                      } else if (isRejected && isDecisionStage) {
+                        customStageColor = const Color(0xFFDC2626);
                       }
 
                       return _buildTimelineStep(
@@ -1171,9 +1274,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                         subtitle: subtitle,
                         status: tStatus,
                         isLast: isLast,
-                        customColor: isDecisionApproved
-                            ? const Color(0xFF16A34A)
-                            : (isDecisionChangesRequired ? const Color(0xFFD97706) : (isRejected && isDecisionStage ? const Color(0xFFDC2626) : null)),
+                        customColor: customStageColor,
                       );
                     }).toList()
                         : [
@@ -1184,37 +1285,53 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                       ),
                       _buildTimelineStep(
                         title: 'AI Validation',
-                        subtitle: 'AI validation passed • Score: ${aiReport.overallScore}/100',
+                        subtitle: isAiRejected
+                            ? (lastUpdated.isNotEmpty
+                                ? 'AI validation rejected • Missing supporting documents • ${_formatDateString(lastUpdated)}'
+                                : (submittedDate.isNotEmpty ? 'AI validation rejected • Missing supporting documents • ${_formatDateString(submittedDate)}' : 'AI validation rejected • Missing supporting documents'))
+                            : 'AI validation passed',
                         status: _TimelineStatus.completed,
+                        customColor: isAiRejected ? const Color(0xFFDC2626) : null,
                       ),
                       _buildTimelineStep(
                         title: 'Manual Review',
-                        subtitle: isApproved || isChangesRequired
-                            ? (lastUpdated.isNotEmpty ? 'Manual review completed • ${_formatDateString(lastUpdated)}' : 'Manual review completed')
-                            : (status.toLowerCase() == 'submitted'
-                            ? 'Pending committee evaluation'
-                            : 'Manual review in progress'),
-                        status: isApproved || isChangesRequired || status.toLowerCase() == 'completed'
-                            ? _TimelineStatus.completed
-                            : (status.toLowerCase() == 'submitted' ? _TimelineStatus.pending : _TimelineStatus.active),
+                        subtitle: isAiRejected
+                            ? 'Manual review not conducted • AI validation rejected'
+                            : (isApproved || isChangesRequired
+                                ? (lastUpdated.isNotEmpty ? 'Manual review completed • ${_formatDateString(lastUpdated)}' : 'Manual review completed')
+                                : (status.toLowerCase() == 'submitted'
+                                    ? 'Pending committee evaluation'
+                                    : 'Manual review in progress')),
+                        status: isAiRejected
+                            ? _TimelineStatus.pending
+                            : (isApproved || isChangesRequired || status.toLowerCase() == 'completed'
+                                ? _TimelineStatus.completed
+                                : (status.toLowerCase() == 'submitted' ? _TimelineStatus.pending : _TimelineStatus.active)),
+                        customColor: isAiRejected ? const Color(0xFF94A3B8) : null,
                       ),
                       _buildTimelineStep(
                         title: 'Decision',
-                        subtitle: isApproved
-                            ? (lastUpdated.isNotEmpty ? 'Approved: Program approved and published • ${_formatDateString(lastUpdated)}' : 'Approved: Program approved and published')
-                            : (isChangesRequired
-                            ? (lastUpdated.isNotEmpty ? 'Changes Required • ${_formatDateString(lastUpdated)}' : 'Changes Required')
-                            : 'Pending committee decision'),
-                        status: isApproved || isChangesRequired || status.toLowerCase() == 'completed'
+                        subtitle: isAiRejected
+                            ? (lastUpdated.isNotEmpty
+                                ? 'Application rejected • Missing supporting documents • ${_formatDateString(lastUpdated)}'
+                                : (submittedDate.isNotEmpty ? 'Application rejected • Missing supporting documents • ${_formatDateString(submittedDate)}' : 'Application rejected • Missing supporting documents'))
+                            : (isApproved
+                                ? (lastUpdated.isNotEmpty ? 'Approved: Program approved and published • ${_formatDateString(lastUpdated)}' : 'Approved: Program approved and published')
+                                : (isChangesRequired
+                                    ? (lastUpdated.isNotEmpty ? 'Changes Required • ${_formatDateString(lastUpdated)}' : 'Changes Required')
+                                    : 'Pending committee decision')),
+                        status: isAiRejected || isApproved || isChangesRequired || status.toLowerCase() == 'completed'
                             ? _TimelineStatus.completed
                             : _TimelineStatus.pending,
                         isLast: true,
-                        customColor: isApproved
-                            ? const Color(0xFF16A34A)
-                            : (isChangesRequired ? const Color(0xFFD97706) : null),
+                        customColor: isAiRejected
+                            ? const Color(0xFFDC2626)
+                            : (isApproved
+                                ? const Color(0xFF16A34A)
+                                : (isChangesRequired ? const Color(0xFFD97706) : null)),
                       ),
                     ]),
-                    if (reviewerComment.isNotEmpty) ...[
+                    if (reviewerComment.isNotEmpty && !isAiRejected && !isRejected) ...[
                       const SizedBox(height: 12),
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -1317,8 +1434,40 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
     );
   }
 
-  Widget _buildAiValidationPill(String status, dynamic aiVal, int score) {
+  Widget _buildAiValidationPill(String status, dynamic aiVal, int score, {bool isAiRejected = false}) {
     final s = status.toLowerCase();
+    final bool isRejectedVal = isAiRejected ||
+        s.contains('reject') ||
+        (aiVal is List &&
+            aiVal.any((c) =>
+                (c['status'] ?? '').toString().toLowerCase() == 'rejected'));
+
+    if (isRejectedVal) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFEE2E2),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: const Color(0xFFFCA5A5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cancel_rounded, size: 12, color: Color(0xFFDC2626)),
+            const SizedBox(width: 4),
+            Text(
+              'AI Validation: Rejected',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: const Color(0xFFDC2626),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     final isDone = s == 'manual_review' || s == 'in review' || s == 'approved' || s == 'completed';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -1339,7 +1488,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
           ),
           const SizedBox(width: 4),
           Text(
-            isDone ? 'AI Validation Done ($score/100)' : 'AI Validation Ready ($score/100)',
+            isDone ? 'AI Validation: Passed' : 'AI Validation: In Review',
             style: GoogleFonts.inter(
               fontSize: 11,
               fontWeight: FontWeight.w700,
@@ -1415,7 +1564,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                     Text(
                       isSubmitted
                           ? 'Click below to submit AI verification and move program to In Review.'
-                          : 'Program status is now In Review on server. Awaiting IDF approval.',
+                          : 'Program status is now In Review on server. Awaiting MDRF approval.',
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         color: const Color(0xFF64748B),
@@ -1720,7 +1869,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                 Expanded(
                   child: Container(
                     width: 2,
-                    color: status == _TimelineStatus.completed
+                    color: (status == _TimelineStatus.completed && primaryColor != const Color(0xFFDC2626))
                         ? primaryColor
                         : const Color(0xFFE2E8F0),
                     margin: const EdgeInsets.symmetric(vertical: 4),
@@ -1763,7 +1912,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
     );
   }
 
-  Widget _buildAiValidationCard(ProgramAiValidationReport report, {bool isSubmitted = false}) {
+  Widget _buildAiValidationCard(ProgramAiValidationReport report, {bool isSubmitted = false, bool isAiRejected = false}) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -1792,7 +1941,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                     const SizedBox(width: 8),
                     Flexible(
                       child: Text(
-                        'AI Validation & Scoring',
+                        'AI Validation',
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.inter(
                           fontSize: 14.5,
@@ -1808,21 +1957,25 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFDCFCE7),
+                  color: isAiRejected ? const Color(0xFFFEE2E2) : const Color(0xFFDCFCE7),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF86EFAC)),
+                  border: Border.all(color: isAiRejected ? const Color(0xFFFCA5A5) : const Color(0xFF86EFAC)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.check_circle_rounded, size: 12, color: Color(0xFF16A34A)),
+                    Icon(
+                      isAiRejected ? Icons.cancel_rounded : Icons.check_circle_rounded,
+                      size: 12,
+                      color: isAiRejected ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
+                    ),
                     const SizedBox(width: 4),
                     Text(
-                      'DONE',
+                      isAiRejected ? 'REJECTED' : 'DONE',
                       style: GoogleFonts.inter(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF16A34A),
+                        color: isAiRejected ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
                         letterSpacing: 0.3,
                       ),
                     ),
@@ -1866,7 +2019,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
             const SizedBox(height: 12),
           ],
 
-          // Score Banner Box
+          // AI Validation Result Banner
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -1886,42 +2039,28 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        Text(
-                          '${report.overallScore}',
-                          style: GoogleFonts.inter(
-                            fontSize: 32,
-                            fontWeight: FontWeight.w900,
-                            color: report.statusColor,
-                            letterSpacing: -1,
-                          ),
+                    Expanded(
+                      child: Text(
+                        isAiRejected ? 'AI Validation: Rejected' : 'AI Validation: Passed',
+                        style: GoogleFonts.inter(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w700,
+                          color: report.statusColor,
                         ),
-                        Text(
-                          ' / 100',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: const Color(0xFF64748B),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
                       decoration: BoxDecoration(
                         color: report.statusColor,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
                         report.grade,
                         style: GoogleFonts.inter(
-                          fontSize: 11,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
@@ -1929,17 +2068,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                     ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: LinearProgressIndicator(
-                    value: report.overallScore / 100.0,
-                    minHeight: 7,
-                    backgroundColor: const Color(0xFFE2E8F0),
-                    valueColor: AlwaysStoppedAnimation<Color>(report.statusColor),
-                  ),
-                ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 6),
                 Text(
                   report.summary,
                   style: GoogleFonts.inter(
@@ -1965,7 +2094,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
           ),
           const SizedBox(height: 10),
           ...report.checks.map((check) {
-            final checkColor = check.isPassed ? const Color(0xFF10B981) : const Color(0xFFF59E0B);
+            final checkColor = check.isPassed ? const Color(0xFF10B981) : const Color(0xFFDC2626);
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.all(12),
@@ -1978,38 +2107,21 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Icon(
-                            check.isPassed ? Icons.check_circle_rounded : Icons.pending_rounded,
-                            size: 16,
-                            color: checkColor,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            check.title,
-                            style: GoogleFonts.inter(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ],
+                      Icon(
+                        check.isPassed ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                        size: 16,
+                        color: checkColor,
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: checkColor.withAlpha(25),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
+                      const SizedBox(width: 8),
+                      Expanded(
                         child: Text(
-                          '${check.score}/${check.maxScore} pts',
+                          check.title,
+                          overflow: TextOverflow.ellipsis,
                           style: GoogleFonts.inter(
-                            fontSize: 10.5,
+                            fontSize: 12.5,
                             fontWeight: FontWeight.w700,
-                            color: checkColor,
+                            color: AppColors.textPrimary,
                           ),
                         ),
                       ),
@@ -2033,8 +2145,50 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
             );
           }),
 
+          // Action Required Box (when rejected)
+          if (isAiRejected) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFDC2626)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Action Required: Missing Supporting Documents',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFDC2626),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "You didn't upload required supporting documents. Please upload the required documents for AI validation to be reviewed and approved.",
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: const Color(0xFF991B1B),
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
           // Recommendations box if any improvements can be made
-          if (report.recommendations.isNotEmpty) ...[
+          if (report.recommendations.isNotEmpty && !isAiRejected) ...[
             const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.all(12),
@@ -2086,7 +2240,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
               ),
             ),
           ],
-          if (isSubmitted) ...[
+          if (isSubmitted && !isAiRejected) ...[
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -2103,7 +2257,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                 label: Text(
                   _isAiScanning
                       ? 'Submitting AI Validation to Server...'
-                      : 'Submit AI Validation (${report.overallScore}/100) to Backend',
+                      : 'Submit AI Validation to Backend',
                   style: GoogleFonts.inter(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,
@@ -2270,6 +2424,7 @@ class ProgramAiValidationReport {
     ));
 
     // 3. Media & Supporting Documentation (Max 25 pts)
+    final bool isMediaRejected = (backendMap['supporting_materials']?['status'] ?? '').toString().toLowerCase() == 'rejected' || materialsCount == 0;
     int mediaPts = 0;
     final List<String> mediaNotes = [];
     if (hasBanner) {
@@ -2281,22 +2436,20 @@ class ProgramAiValidationReport {
     if (materialsCount > 0) {
       mediaPts += 10;
       mediaNotes.add('$materialsCount supporting material(s)');
-    } else if (hasRegistration) {
-      mediaPts += 10;
-      mediaNotes.add('Registration link configured');
     } else {
-      mediaNotes.add('Standard proposal format');
-      suggestions.add('Upload supporting PDFs or add a registration link.');
+      suggestions.add('Upload supporting documents/materials for AI validation.');
     }
     checks.add(AiCheckItem(
       title: 'Media & Documentation',
       category: 'supporting_materials',
-      score: isMediaApproved ? 25 : mediaPts,
+      score: isMediaRejected ? 0 : (isMediaApproved ? 25 : mediaPts),
       maxScore: 25,
-      isPassed: isMediaApproved || mediaPts >= 15,
-      detail: isMediaApproved
-          ? 'Approved by Server • Media & attachments verified'
-          : (mediaNotes.isNotEmpty ? mediaNotes.join(' • ') : 'Pending media attachments'),
+      isPassed: !isMediaRejected && (isMediaApproved || mediaPts >= 15),
+      detail: isMediaRejected
+          ? 'Mandatory supporting documents not uploaded. AI validation rejected.'
+          : (isMediaApproved
+              ? 'Approved by Server • Media & attachments verified'
+              : (mediaNotes.isNotEmpty ? mediaNotes.join(' • ') : 'Pending media attachments')),
     ));
 
     // 4. Organizer Credibility & Contact (Max 25 pts)
@@ -2333,9 +2486,14 @@ class ProgramAiValidationReport {
           : (contactNotes.isNotEmpty ? contactNotes.join(' • ') : 'Pending organizer contacts'),
     ));
 
+    final bool isCoreDataMissing = title.trim().isEmpty || description.trim().isEmpty;
+    final bool isOverallRejected = isMediaRejected ||
+        isCoreDataMissing ||
+        (backendMap['overall']?['status'] ?? '').toString().toLowerCase() == 'rejected';
+
     final effectiveContentPts = isContentApproved ? 25 : contentPts;
     final effectiveSchedulePts = isScheduleApproved ? 25 : schedulePts;
-    final effectiveMediaPts = isMediaApproved ? 25 : mediaPts;
+    final effectiveMediaPts = isMediaRejected ? 0 : (isMediaApproved ? 25 : mediaPts);
     final effectiveContactPts = isOverallApproved ? 25 : contactPts;
 
     final total = effectiveContentPts + effectiveSchedulePts + effectiveMediaPts + effectiveContactPts;
@@ -2343,7 +2501,13 @@ class ProgramAiValidationReport {
     final Color color;
     final String summary;
 
-    if (total >= 85) {
+    if (isOverallRejected) {
+      grade = 'Rejected • Missing Documents';
+      color = const Color(0xFFDC2626);
+      summary = isMediaRejected
+          ? 'Automated review rejected: Application does not contain required supporting documents.'
+          : 'Automated review rejected: Mandatory program information incomplete.';
+    } else if (total >= 85) {
       grade = 'Excellent • Ready for Review';
       color = const Color(0xFF10B981); // Emerald
       summary = 'Proposal satisfies core parameters with comprehensive documentation.';

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/date_time_utils.dart';
 import '../../core/theme.dart';
@@ -161,8 +161,8 @@ class _ExpiredCertificateDetailsScreenState
                         const SizedBox(height: 8),
                         Text(
                           cert.expiresDate.isNotEmpty
-                              ? 'This certificate expired on ${DateTimeUtils.formatDateTime(cert.expiresDate)}. Renew to maintain your IDF Active status.'
-                              : 'Renew your certificate to maintain your IDF Active accreditation status.',
+                              ? 'This certificate expired on ${DateTimeUtils.formatDateTime(cert.expiresDate)}. Renew to maintain your MDRF Active status.'
+                              : 'Renew your certificate to maintain your MDRF Active accreditation status.',
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             color: const Color(0xFF78350F),
@@ -223,8 +223,7 @@ class _ExpiredCertificateDetailsScreenState
                         _buildInfoRow('Pincode / Postal Code', inst.pincode)
                       else if (cert.pincode.isNotEmpty)
                         _buildInfoRow('Pincode / Postal Code', cert.pincode),
-                      if (cert.score.isNotEmpty)
-                        _buildInfoRow('Score', cert.score, isLast: true),
+                      // Score removed as requested
                     ],
                   ),
                   const SizedBox(height: 14),

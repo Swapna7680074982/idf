@@ -1,13 +1,13 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/auth_models.dart';
 
 class TokenStorage {
-  static const _keyAccessToken = 'idf_access_token';
-  static const _keyRefreshToken = 'idf_refresh_token';
-  static const _keyRegistrationToken = 'idf_registration_token';
-  static const _keyResetToken = 'idf_reset_token';
-  static const _keyUserData = 'idf_user_data';
+  static const _keyAccessToken = 'mdrf_access_token';
+  static const _keyRefreshToken = 'mdrf_refresh_token';
+  static const _keyRegistrationToken = 'mdrf_registration_token';
+  static const _keyResetToken = 'mdrf_reset_token';
+  static const _keyUserData = 'mdrf_user_data';
 
   // In-memory cache for fast access
   static String? _accessToken;
@@ -28,12 +28,12 @@ class TokenStorage {
   static Future<void> init() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _accessToken = prefs.getString(_keyAccessToken);
-      _refreshToken = prefs.getString(_keyRefreshToken);
-      _registrationToken = prefs.getString(_keyRegistrationToken);
-      _resetToken = prefs.getString(_keyResetToken);
+      _accessToken = prefs.getString(_keyAccessToken) ?? prefs.getString('idf_access_token');
+      _refreshToken = prefs.getString(_keyRefreshToken) ?? prefs.getString('idf_refresh_token');
+      _registrationToken = prefs.getString(_keyRegistrationToken) ?? prefs.getString('idf_registration_token');
+      _resetToken = prefs.getString(_keyResetToken) ?? prefs.getString('idf_reset_token');
 
-      final userJson = prefs.getString(_keyUserData);
+      final userJson = prefs.getString(_keyUserData) ?? prefs.getString('idf_user_data');
       if (userJson != null && userJson.isNotEmpty) {
         _currentUser = AuthUser.fromJson(jsonDecode(userJson) as Map<String, dynamic>);
       }

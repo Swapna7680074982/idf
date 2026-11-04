@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme.dart';
+import '../../../data/countries_data.dart';
 import '../../../models/certification_model.dart';
 import '../../../models/meta_models.dart';
 import '../../../services/metadata_service.dart';
+import '../../../widgets/country_phone_input_field.dart';
+import '../../../widgets/searchable_selection_sheet.dart';
 
 class Step2InstitutionDetails extends StatefulWidget {
   final CertificationApplicationModel model;
@@ -50,6 +53,8 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
   final Map<String, TextEditingController> _dynamicControllers = {};
   final Map<String, String?> _dynamicSelects = {};
 
+  Country _contactPhoneCountry = CountryData.defaultCountry;
+
   @override
   void initState() {
     super.initState();
@@ -58,8 +63,30 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
     _addressController = TextEditingController(text: widget.model.address);
     _contactPersonController =
         TextEditingController(text: widget.model.contactPerson);
-    _phoneController =
-        TextEditingController(text: widget.model.contactPhone);
+
+    final rawPhone = widget.model.contactPhone.trim();
+    if (rawPhone.startsWith('+')) {
+      final parts = rawPhone.split(' ');
+      if (parts.length > 1) {
+        _contactPhoneCountry = CountryData.findByPhoneCode(parts.first);
+        _phoneController = TextEditingController(
+          text: parts.sublist(1).join('').replaceAll(RegExp(r'\D'), ''),
+        );
+      } else {
+        final match = kAllCountries.firstWhere(
+          (c) => rawPhone.startsWith(c.phoneCode),
+          orElse: () => CountryData.defaultCountry,
+        );
+        _contactPhoneCountry = match;
+        _phoneController = TextEditingController(
+          text: rawPhone.substring(match.phoneCode.length).replaceAll(RegExp(r'\D'), ''),
+        );
+      }
+    } else {
+      _phoneController =
+          TextEditingController(text: rawPhone.replaceAll(RegExp(r'\D'), ''));
+    }
+
     _emailController =
         TextEditingController(text: widget.model.contactEmail);
     _regionTextController =
@@ -278,7 +305,10 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
       widget.model.cityId = _selectedCity?.id;
       widget.model.pincode = pincodeVal;
       widget.model.contactPerson = _contactPersonController.text.trim();
-      widget.model.contactPhone = _phoneController.text.trim();
+      final phoneDigits = _phoneController.text.trim();
+      widget.model.contactPhone = phoneDigits.isNotEmpty
+          ? '${_contactPhoneCountry.phoneCode} $phoneDigits'
+          : '';
       widget.model.contactEmail = _emailController.text.trim();
 
       // Save dynamic fields
@@ -428,54 +458,12 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
                           ],
                         )
                       else
-                        DropdownButtonFormField<Country>(
-                          initialValue: _selectedCountry,
-                          hint: Text(
-                            'Select country...',
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFFB0BAC9),
-                              fontSize: 13.0,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white,
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.1),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.4),
-                            ),
-                            errorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Colors.redAccent, width: 1.1),
-                            ),
-                            focusedErrorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Colors.redAccent, width: 1.4),
-                            ),
-                          ),
-                          icon: const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            color: Color(0xFF64748B),
-                          ),
-                          items: _countries.map((c) {
-                            return DropdownMenuItem<Country>(
-                              value: c,
-                              child: Text(
-                                c.name,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14.0,
-                                  color: const Color(0xFF0F172A),
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                        SearchableDropdownField<Country>(
+                          value: _selectedCountry,
+                          hintText: 'Select country...',
+                          sheetTitle: 'Select Country',
+                          items: _countries,
+                          itemLabel: (c) => c.name,
                           onChanged: (val) {
                             setState(() {
                               _selectedCountry = val;
@@ -497,55 +485,13 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
                       if (_isLoadingRegions)
                         _buildLoadingBox('Loading regions...')
                       else if (_regions.isNotEmpty)
-                        DropdownButtonFormField<Region>(
+                        SearchableDropdownField<Region>(
                           key: ValueKey('region_${_selectedCountry?.id}_${_selectedRegion?.id}'),
-                          initialValue: _selectedRegion,
-                          hint: Text(
-                            'Select Region / State',
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFFB0BAC9),
-                              fontSize: 13.0,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white,
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.1),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.4),
-                            ),
-                            errorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Colors.redAccent, width: 1.1),
-                            ),
-                            focusedErrorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Colors.redAccent, width: 1.4),
-                            ),
-                          ),
-                          icon: const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            color: Color(0xFF64748B),
-                          ),
-                          items: _regions.map((r) {
-                            return DropdownMenuItem<Region>(
-                              value: r,
-                              child: Text(
-                                r.name,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14.0,
-                                  color: const Color(0xFF0F172A),
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                          value: _selectedRegion,
+                          hintText: 'Select Region / State',
+                          sheetTitle: 'Select Region / State',
+                          items: _regions,
+                          itemLabel: (r) => r.name,
                           onChanged: (val) {
                             setState(() {
                               _selectedRegion = val;
@@ -576,55 +522,13 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
                       if (_isLoadingCities)
                         _buildLoadingBox('Loading cities...')
                       else if (_cities.isNotEmpty)
-                        DropdownButtonFormField<City>(
+                        SearchableDropdownField<City>(
                           key: ValueKey('city_${_selectedRegion?.id}_${_selectedCity?.id}'),
-                          initialValue: _selectedCity,
-                          hint: Text(
-                            'Select City',
-                            style: GoogleFonts.inter(
-                              color: const Color(0xFFB0BAC9),
-                              fontSize: 13.0,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                          decoration: InputDecoration(
-                            filled: true,
-                            fillColor: Colors.white,
-                            contentPadding:
-                                const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Color(0xFFE2E8F0), width: 1.1),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: AppColors.primaryBlue, width: 1.4),
-                            ),
-                            errorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Colors.redAccent, width: 1.1),
-                            ),
-                            focusedErrorBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              borderSide: const BorderSide(color: Colors.redAccent, width: 1.4),
-                            ),
-                          ),
-                          icon: const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            color: Color(0xFF64748B),
-                          ),
-                          items: _cities.map((city) {
-                            return DropdownMenuItem<City>(
-                              value: city,
-                              child: Text(
-                                city.name,
-                                style: GoogleFonts.inter(
-                                  fontSize: 14.0,
-                                  color: const Color(0xFF0F172A),
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                          value: _selectedCity,
+                          hintText: 'Select City',
+                          sheetTitle: 'Select City',
+                          items: _cities,
+                          itemLabel: (city) => city.name,
                           onChanged: (val) {
                             setState(() {
                               _selectedCity = val;
@@ -679,12 +583,16 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
                       const SizedBox(height: 16),
 
                       _buildFieldLabel('Contact Phone *'),
-                      _buildTextField(
+                      const SizedBox(height: 6),
+                      CountryPhoneInputField(
+                        hintText: 'Enter contact phone',
                         controller: _phoneController,
-                        keyboardType: TextInputType.phone,
-                        hintText: '+1 234 567 8900',
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'Please enter contact phone' : null,
+                        initialCountry: _contactPhoneCountry,
+                        onCountryChanged: (c) {
+                          setState(() {
+                            _contactPhoneCountry = c;
+                          });
+                        },
                       ),
                       const SizedBox(height: 24),
 

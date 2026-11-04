@@ -52,8 +52,30 @@ class Country {
         'phone_code': phoneCode,
       };
 
+  String get flagEmoji {
+    if (isoCode.length != 2) return '🌐';
+    final code = isoCode.toUpperCase();
+    final first = code.codeUnitAt(0) - 0x41 + 0x1F1E6;
+    final second = code.codeUnitAt(1) - 0x41 + 0x1F1E6;
+    if (first < 0x1F1E6 || first > 0x1F1FF || second < 0x1F1E6 || second > 0x1F1FF) {
+      return '🌐';
+    }
+    return String.fromCharCode(first) + String.fromCharCode(second);
+  }
+
   @override
   String toString() => name;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Country &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          isoCode == other.isoCode;
+
+  @override
+  int get hashCode => id.hashCode ^ isoCode.hashCode;
 }
 
 class Region {

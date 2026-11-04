@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'bloc/app_bloc.dart';
@@ -30,11 +30,11 @@ void main() async {
       statusBarBrightness: Brightness.dark,
     ),
   );
-  runApp(const IDFDigitalHubApp());
+  runApp(const MDRFDigitalHubApp());
 }
 
-class IDFDigitalHubApp extends StatelessWidget {
-  const IDFDigitalHubApp({super.key});
+class MDRFDigitalHubApp extends StatelessWidget {
+  const MDRFDigitalHubApp({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -333,11 +333,6 @@ class CertificationService {
         'details': 'All mandatory documents uploaded and readable.',
       },
       {
-        'check_type': 'image_location_validation',
-        'status': 'approved',
-        'details': 'Geotag coordinates match institution address.',
-      },
-      {
         'check_type': 'detail_evidence_match',
         'status': 'approved',
         'details': 'Institution details cross-check verified.',
@@ -351,7 +346,7 @@ class CertificationService {
 
     final body = <String, dynamic>{
       'status': status,
-      'comments': comments ?? 'Automated verification passed. All supporting documents meet IDF criteria.',
+      'comments': comments ?? 'Automated verification passed. All supporting documents meet MDRF criteria.',
       'checks': effectiveChecks,
     };
 

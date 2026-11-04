@@ -36,6 +36,12 @@ class Step7ReviewSubmit extends StatelessWidget {
             ? model.programDescription.trim()
             : 'No description provided.');
 
+    final bool isMissingDocs = model.hasMissingSupportingDocuments;
+    final bool isMissingCoreData = model.programName.trim().isEmpty ||
+        (model.description.trim().isEmpty && model.programDescription.trim().isEmpty) ||
+        model.organizingEntityName.trim().isEmpty;
+    final bool isMissingDocsOrData = isMissingDocs || isMissingCoreData;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -47,7 +53,40 @@ class Step7ReviewSubmit extends StatelessWidget {
             color: const Color(0xFF64748B),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
+
+        // Missing Supporting Documents / Data Alert Notice for AI Validation
+        if (isMissingDocsOrData) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFFECACA),
+                width: 1.0,
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline_rounded, size: 20, color: Color(0xFFDC2626)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Please upload supporting documents for AI validation.',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF991B1B),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+        ],
 
         // Hero Preview Card
         Container(
@@ -458,13 +497,16 @@ class Step7ReviewSubmit extends StatelessWidget {
             else
               Row(
                 children: [
-                  const Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFF94A3B8)),
+                  const Icon(Icons.error_outline_rounded, size: 16, color: Color(0xFFDC2626)),
                   const SizedBox(width: 8),
-                  Text(
-                    'No supporting materials attached (Optional)',
-                    style: GoogleFonts.inter(
-                      fontSize: 12,
-                      color: const Color(0xFF64748B),
+                  Expanded(
+                    child: Text(
+                      'Missing supporting documents (Required for AI validation)',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: const Color(0xFFDC2626),
+                      ),
                     ),
                   ),
                 ],
@@ -503,7 +545,7 @@ class Step7ReviewSubmit extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Ready for Official IDF Review',
+                      'Ready for Official MDRF Review',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -512,7 +554,7 @@ class Step7ReviewSubmit extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Upon submitting, your proposal will undergo automated validation followed by IDF chapter evaluation. You can monitor status under Applications.',
+                      'Upon submitting, your proposal will undergo automated validation followed by MDRF chapter evaluation. You can monitor status under Applications.',
                       style: GoogleFonts.inter(
                         fontSize: 11.5,
                         height: 1.35,

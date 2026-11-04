@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme.dart';
 import '../../widgets/custom_button.dart';
@@ -78,7 +78,7 @@ class AccountCreatedScreen extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Text(
-                    'Welcome to the IDF Digital Hub. Your account has been successfully created.',
+                    'Welcome to the MDRF Digital Hub. Your account has been successfully created.',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
                       fontSize: 14,
@@ -112,7 +112,7 @@ class AccountCreatedScreen extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'You can now submit physical activity programs and apply for IDF ACTIVE certification.',
+                          'You can now submit physical activity programs and apply for MDRF ACTIVE certification.',
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w500,

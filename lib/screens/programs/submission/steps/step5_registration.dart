@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme.dart';
 import '../../../../models/program_submission_model.dart';
@@ -97,7 +97,7 @@ class _Step5RegistrationState extends State<Step5Registration> {
               color: AppColors.textPrimary,
             ),
             decoration: const InputDecoration(
-              hintText: 'https://idf.org/register or idf.org/register',
+              hintText: 'https://mdrf.org/register or mdrf.org/register',
               contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             ),
             validator: (val) {

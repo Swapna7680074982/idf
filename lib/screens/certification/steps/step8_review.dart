@@ -71,6 +71,9 @@ class Step8Review extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isMissingEvidence = model.hasMissingRequiredEvidence ||
+        (model.isEvidenceRequired && !model.hasAnyEvidenceUploaded);
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -125,7 +128,13 @@ class Step8Review extends StatelessWidget {
                           _buildStatusRow('Individual Level', isDone: true, onEdit: () => onJumpToStep?.call(5)),
                           _buildStatusRow('Scalability / Advocacy', isDone: true, onEdit: () => onJumpToStep?.call(6)),
                         ],
-                        _buildStatusRow('Evidence', isDone: true, onEdit: () => onJumpToStep?.call(7)),
+                        _buildStatusRow(
+                          'Evidence',
+                          isDone: !isMissingEvidence,
+                          isBadgeIncomplete: isMissingEvidence,
+                          incompleteLabel: 'Missing Evidence',
+                          onEdit: () => onJumpToStep?.call(7),
+                        ),
                       ],
                     ),
                   ),
@@ -187,35 +196,66 @@ class Step8Review extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
 
-                  // Warning Notice
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBEB),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: const Color(0xFFFDE68A),
-                        width: 1.0,
+                  // Missing Evidence Alert Notice for AI Validation
+                  if (isMissingEvidence)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFFFECACA),
+                          width: 1.0,
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('⚠️', style: TextStyle(fontSize: 15)),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'Some sections are incomplete. You can still submit, but missing evidence may affect your review score.',
-                            style: GoogleFonts.inter(
-                              fontSize: 12,
-                              color: const Color(0xFF92400E),
-                              height: 1.35,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.error_outline_rounded, size: 20, color: Color(0xFFDC2626)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Please upload evidence for AI validation.',
+                              style: GoogleFonts.inter(
+                                fontSize: 12.5,
+                                color: const Color(0xFF991B1B),
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDF4),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFFBBF7D0),
+                          width: 1.0,
                         ),
-                      ],
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(Icons.check_circle_outline_rounded, size: 18, color: Color(0xFF16A34A)),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'All required sections and supporting evidence have been provided. Application is ready for AI validation.',
+                              style: GoogleFonts.inter(
+                                fontSize: 12,
+                                color: const Color(0xFF15803D),
+                                height: 1.35,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
                   const SizedBox(height: 20),
                 ],
               ),
@@ -274,6 +314,7 @@ class Step8Review extends StatelessWidget {
     String title, {
     required bool isDone,
     bool isBadgeIncomplete = false,
+    String incompleteLabel = 'Incomplete',
     VoidCallback? onEdit,
   }) {
     return Padding(
@@ -295,15 +336,19 @@ class Step8Review extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEF3C7),
+                color: incompleteLabel.toLowerCase().contains('evidence')
+                    ? const Color(0xFFFEE2E2)
+                    : const Color(0xFFFEF3C7),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
-                'Incomplete',
+                incompleteLabel,
                 style: GoogleFonts.inter(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFFD97706),
+                  color: incompleteLabel.toLowerCase().contains('evidence')
+                      ? const Color(0xFFDC2626)
+                      : const Color(0xFFD97706),
                 ),
               ),
             )
@@ -339,6 +384,7 @@ class Step8Review extends StatelessWidget {
   Widget _buildDetailItem(String label, String value) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           label,
@@ -347,12 +393,16 @@ class Step8Review extends StatelessWidget {
             color: const Color(0xFF64748B),
           ),
         ),
-        Text(
-          value,
-          style: GoogleFonts.inter(
-            fontSize: 12.5,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            value,
+            textAlign: TextAlign.end,
+            style: GoogleFonts.inter(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
           ),
         ),
       ],

@@ -136,50 +136,106 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
       }
 
       // 3. Record/Trigger AI validation status to backend (Same as Programs flow)
-      // Automatically transitions application status to In Review (under_review) and starts Manual Review
+      // Automatically transitions application status to In Review (under_review) or Rejected if evidence missing
+      final isMissingEvidence = _model.hasMissingRequiredEvidence ||
+          (_model.isEvidenceRequired && !_model.hasAnyEvidenceUploaded);
+
       if (_model.id != null) {
         try {
+          final aiStatus = isMissingEvidence ? 'rejected' : 'approved';
+          final aiComments = isMissingEvidence
+              ? 'AI Validation Rejected: Required supporting evidence documents were not uploaded. Please upload evidence for AI validation.'
+              : 'Automated verification passed. All supporting documents meet MDRF criteria.';
+          final aiChecks = isMissingEvidence
+              ? [
+                  {
+                    'check_type': 'evidence_review',
+                    'status': 'rejected',
+                    'status_label': 'FAILED',
+                    'score': 0,
+                    'max_score': 40,
+                    'details': 'Mandatory evidence documents not uploaded. Supporting evidence is missing.',
+                  },
+                  {
+                    'check_type': 'detail_evidence_match',
+                    'status': 'rejected',
+                    'status_label': 'INSUFFICIENT',
+                    'score': 10,
+                    'max_score': 30,
+                    'details': 'Institution details could not be matched with supporting evidence.',
+                  },
+                  {
+                    'check_type': 'overall',
+                    'status': 'rejected',
+                    'status_label': 'REJECTED',
+                    'score': 15,
+                    'max_score': 30,
+                    'details': 'Automated review rejected: Application does not contain required evidence files.',
+                  },
+                ]
+              : [
+                  {
+                    'check_type': 'evidence_review',
+                    'status': 'approved',
+                    'status_label': 'VERIFIED',
+                    'score': 40,
+                    'max_score': 40,
+                    'details': 'All mandatory documents uploaded and readable.',
+                  },
+                  {
+                    'check_type': 'detail_evidence_match',
+                    'status': 'approved',
+                    'status_label': 'VERIFIED',
+                    'score': 28,
+                    'max_score': 30,
+                    'details': 'Institution details cross-check verified.',
+                  },
+                  {
+                    'check_type': 'overall',
+                    'status': 'approved',
+                    'status_label': 'PASSED',
+                    'score': 29,
+                    'max_score': 30,
+                    'details': 'All automated audit criteria passed.',
+                  },
+                ];
+
           final aiRes = await CertificationService.updateAiValidationStatus(
             _model.id!,
-            status: 'approved',
-            comments: 'Automated verification passed. All supporting documents meet IDF criteria.',
-            checks: [
-              {
-                'check_type': 'evidence_review',
-                'status': 'approved',
-                'details': 'All mandatory documents uploaded and readable.',
-              },
-              {
-                'check_type': 'image_location_validation',
-                'status': 'approved',
-                'details': 'Geotag coordinates match institution address.',
-              },
-              {
-                'check_type': 'detail_evidence_match',
-                'status': 'approved',
-                'details': 'Institution details cross-check verified.',
-              },
-              {
-                'check_type': 'overall',
-                'status': 'approved',
-                'details': 'All automated audit criteria passed.',
-              },
-            ],
+            status: aiStatus,
+            comments: aiComments,
+            checks: aiChecks,
           );
           _model.updateFromApiResponse(aiRes);
-          final displayStatus = aiRes['data']?['display_status']?.toString();
-          if (displayStatus != null && displayStatus.isNotEmpty) {
-            _model.displayStatus = displayStatus;
+          if (isMissingEvidence) {
+            _model.status = 'rejected';
+            _model.reviewStatus = 'rejected';
+            _model.displayStatus = 'Rejected';
+            _model.decision = 'rejected';
+            _model.decisionText = 'Rejected - Missing Evidence';
           } else {
-            _model.displayStatus = 'In Review';
+            final displayStatus = aiRes['data']?['display_status']?.toString();
+            if (displayStatus != null && displayStatus.isNotEmpty) {
+              _model.displayStatus = displayStatus;
+            } else {
+              _model.displayStatus = 'In Review';
+            }
+            _model.status = 'under_review';
+            _model.reviewStatus = 'under_review';
           }
-          _model.status = 'under_review';
-          _model.reviewStatus = 'under_review';
         } catch (e) {
           debugPrint('⚠️ Initial AI audit trigger notice: $e');
-          _model.status = 'under_review';
-          _model.reviewStatus = 'under_review';
-          _model.displayStatus = 'In Review';
+          if (isMissingEvidence) {
+            _model.status = 'rejected';
+            _model.reviewStatus = 'rejected';
+            _model.displayStatus = 'Rejected';
+            _model.decision = 'rejected';
+            _model.decisionText = 'Rejected - Missing Evidence';
+          } else {
+            _model.status = 'under_review';
+            _model.reviewStatus = 'under_review';
+            _model.displayStatus = 'In Review';
+          }
         }
       }
 

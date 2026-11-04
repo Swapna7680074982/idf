@@ -38,7 +38,7 @@ class _Step6ScalabilityState extends State<Step6Scalability> {
 
   void _onNext(List<dynamic> dynamicQuestions) {
     if (dynamicQuestions.isNotEmpty) {
-      final unanswered = dynamicQuestions.where((q) => widget.model.getQuestionBool(q.id) == null);
+      final unanswered = dynamicQuestions.where((q) => !widget.model.isQuestionAnswered(q.id));
       if (unanswered.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(

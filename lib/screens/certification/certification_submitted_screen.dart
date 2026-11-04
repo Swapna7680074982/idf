@@ -25,8 +25,16 @@ class CertificationSubmittedScreen extends StatelessWidget {
         ? application.institutionName.trim()
         : '—';
     final rev = application.reviewStatus.trim().toLowerCase();
+    final appStatus = application.status.trim().toLowerCase();
+    final dispStatus = application.displayStatus.trim().toLowerCase();
+    final isRejected = appStatus.contains('reject') ||
+        dispStatus.contains('reject') ||
+        rev.contains('reject');
+
     final String status;
-    if (rev == 'manual_review' ||
+    if (isRejected) {
+      status = 'Rejected';
+    } else if (rev == 'manual_review' ||
         rev == 'manual review' ||
         rev == 'under_review' ||
         rev == 'in_review' ||
@@ -35,9 +43,9 @@ class CertificationSubmittedScreen extends StatelessWidget {
         rev == 'submitted') {
       status = 'Manual Review';
     } else if (application.displayStatus.trim().isNotEmpty &&
-        application.displayStatus.trim().toLowerCase() != 'submitted') {
+        dispStatus != 'submitted') {
       status = application.displayStatus.trim();
-    } else if (application.status.trim().toLowerCase() == 'submitted') {
+    } else if (appStatus == 'submitted') {
       status = 'Manual Review';
     } else {
       status = application.status.trim().isNotEmpty ? application.status.trim() : 'Manual Review';
@@ -52,12 +60,12 @@ class CertificationSubmittedScreen extends StatelessWidget {
             children: [
               const Spacer(flex: 2),
 
-              // Success Icon (Exact match to uploaded mockup: green squircle in light mint circle)
+              // Status Icon
               Container(
                 width: 88,
                 height: 88,
-                decoration: const BoxDecoration(
-                  color: Color(0xFFE2F8E9),
+                decoration: BoxDecoration(
+                  color: isRejected ? const Color(0xFFFEE2E2) : const Color(0xFFE2F8E9),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
@@ -65,11 +73,11 @@ class CertificationSubmittedScreen extends StatelessWidget {
                     width: 50,
                     height: 50,
                     decoration: BoxDecoration(
-                      color: const Color(0xFF00AA13),
+                      color: isRejected ? const Color(0xFFDC2626) : const Color(0xFF00AA13),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(
-                      Icons.check_rounded,
+                    child: Icon(
+                      isRejected ? Icons.close_rounded : Icons.check_rounded,
                       color: Colors.white,
                       size: 34,
                     ),
@@ -80,7 +88,7 @@ class CertificationSubmittedScreen extends StatelessWidget {
 
               // Title
               Text(
-                'Application Submitted!',
+                isRejected ? 'Application Rejected' : 'Application Submitted!',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 22,
@@ -95,7 +103,9 @@ class CertificationSubmittedScreen extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12.0),
                 child: Text(
-                  'Your IDF Active certification application has been received.',
+                  isRejected
+                      ? 'AI validation rejected your application because required supporting evidence was not submitted.'
+                      : 'Your MDRF Active certification application has been received.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 13,
@@ -146,11 +156,13 @@ class CertificationSubmittedScreen extends StatelessWidget {
                             vertical: 3.5,
                           ),
                           decoration: BoxDecoration(
-                            color: (status == 'In Review' ||
-                                    status == 'under_review' ||
-                                    status == 'Manual Review')
-                                ? const Color(0xFFFEF3C7)
-                                : const Color(0xFFE0F2FE),
+                            color: isRejected
+                                ? const Color(0xFFFEE2E2)
+                                : ((status == 'In Review' ||
+                                        status == 'under_review' ||
+                                        status == 'Manual Review')
+                                    ? const Color(0xFFFEF3C7)
+                                    : const Color(0xFFE0F2FE)),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
@@ -158,11 +170,13 @@ class CertificationSubmittedScreen extends StatelessWidget {
                             style: GoogleFonts.inter(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: (status == 'In Review' ||
-                                      status == 'under_review' ||
-                                      status == 'Manual Review')
-                                  ? const Color(0xFFD97706)
-                                  : const Color(0xFF0284C7),
+                              color: isRejected
+                                  ? const Color(0xFFDC2626)
+                                  : ((status == 'In Review' ||
+                                          status == 'under_review' ||
+                                          status == 'Manual Review')
+                                      ? const Color(0xFFD97706)
+                                      : const Color(0xFF0284C7)),
                             ),
                           ),
                         ),
@@ -178,20 +192,26 @@ class CertificationSubmittedScreen extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE0F2FE).withAlpha(160),
+                  color: isRejected
+                      ? const Color(0xFFFEF2F2)
+                      : const Color(0xFFE0F2FE).withAlpha(160),
                   borderRadius: BorderRadius.circular(14),
+                  border: isRejected ? Border.all(color: const Color(0xFFFECACA)) : null,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('🤖', style: TextStyle(fontSize: 13)),
+                    Text(isRejected ? '⚠️' : '🤖', style: const TextStyle(fontSize: 13)),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'AI validation recorded. Application has transitioned to Manual Review.',
+                        isRejected
+                            ? 'AI validation rejected: Required supporting evidence was not uploaded. Application is marked as Rejected. Please upload required evidence in details.'
+                            : 'AI validation recorded. Application has transitioned to Manual Review.',
                         style: GoogleFonts.inter(
                           fontSize: 12,
-                          color: const Color(0xFF0284C7),
+                          color: isRejected ? const Color(0xFFDC2626) : const Color(0xFF0284C7),
+                          fontWeight: isRejected ? FontWeight.w600 : FontWeight.w400,
                           height: 1.35,
                         ),
                       ),

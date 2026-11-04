@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/date_time_utils.dart';
 import '../../core/theme.dart';
@@ -86,7 +86,7 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
           children: [
             // Header
             Text(
-              'IDF Active',
+              'MDRF Active',
               style: GoogleFonts.inter(
                 fontSize: 24,
                 fontWeight: FontWeight.w800,
@@ -179,7 +179,7 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'IDF Active Certification',
+                  'MDRF Active Certification',
                   style: GoogleFonts.inter(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/date_time_utils.dart';
 import '../../../core/theme.dart';
@@ -78,7 +78,7 @@ class RenewalSubmittedScreen extends StatelessWidget {
 
               // Subtitle
               Text(
-                'Your renewal application has been submitted and queued for AI audit and IDF review.',
+                'Your renewal application has been submitted and queued for AI audit and MDRF review.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 13,

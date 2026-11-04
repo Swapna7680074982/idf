@@ -8,10 +8,13 @@ import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
 import 'signup_step3_verify.dart';
 
+import '../../data/countries_data.dart';
+
 class SignUpStep2Screen extends StatefulWidget {
   final String fullName;
   final String email;
   final String phone;
+  final String phoneCountryCode;
   final String password;
   final String confirmPassword;
 
@@ -20,6 +23,7 @@ class SignUpStep2Screen extends StatefulWidget {
     this.fullName = '',
     this.email = '',
     this.phone = '',
+    this.phoneCountryCode = '+91',
     this.password = '',
     this.confirmPassword = '',
   });
@@ -48,9 +52,12 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
   bool _isLoading = false;
   bool _isLoadingMetadata = true;
 
+  Country? _selectedContactCountry;
+
   @override
   void initState() {
     super.initState();
+    _selectedContactCountry = CountryData.findByPhoneCode(widget.phoneCountryCode);
     _contactPersonController.text = widget.fullName;
     _contactEmailController.text = widget.email;
     _contactPhoneController.text = widget.phone;
@@ -162,6 +169,23 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
       return;
     }
 
+    final contactPhone = _contactPhoneController.text.trim();
+    final contactPhoneError = CountryData.validatePhoneNumber(
+      country: _selectedContactCountry ?? _selectedCountry,
+      phoneNumber: contactPhone,
+      isRequired: false,
+      fieldName: 'contact phone',
+    );
+    if (contactPhoneError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(contactPhoneError),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -171,7 +195,9 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
       final registerStartResult = await AuthService.registerStart(
         fullName: widget.fullName,
         email: widget.email,
-        phoneCountryCode: _selectedCountry?.phoneCode ?? '+91',
+        phoneCountryCode: widget.phoneCountryCode.isNotEmpty
+            ? widget.phoneCountryCode
+            : (_selectedCountry?.phoneCode ?? '+91'),
         phoneNumber: widget.phone,
         password: widget.password,
         confirmPassword: widget.confirmPassword.isNotEmpty
@@ -189,10 +215,10 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
         contactEmail: _contactEmailController.text.trim().isNotEmpty
             ? _contactEmailController.text.trim()
             : widget.email,
-        contactPhoneCode: _selectedCountry?.phoneCode ?? '+91',
-        contactPhone: _contactPhoneController.text.trim().isNotEmpty
-            ? _contactPhoneController.text.trim()
-            : widget.phone,
+        contactPhoneCode: _selectedContactCountry?.phoneCode ??
+            _selectedCountry?.phoneCode ??
+            widget.phoneCountryCode,
+        contactPhone: contactPhone.isNotEmpty ? contactPhone : widget.phone,
       );
 
       if (mounted) {
@@ -384,11 +410,16 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
                   ),
                   const SizedBox(height: 16),
 
-                  CustomTextField(
+                  CountryPhoneInputField(
                     label: 'Contact Phone',
                     hintText: 'Enter contact phone',
-                    keyboardType: TextInputType.phone,
                     controller: _contactPhoneController,
+                    initialCountry: _selectedContactCountry ?? _selectedCountry,
+                    onCountryChanged: (c) {
+                      setState(() {
+                        _selectedContactCountry = c;
+                      });
+                    },
                   ),
                   const SizedBox(height: 28),
 

@@ -28,6 +28,8 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
         : '—';
     final now = submission.submissionDate ?? DateTime.now();
     final dateStr = DateTimeUtils.formatDateTime(now.toIso8601String());
+    final statusLower = submission.status.trim().toLowerCase();
+    final isRejected = statusLower.contains('reject');
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -38,31 +40,47 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
             children: [
               const Spacer(flex: 1),
 
-              // Celebration Emoji / Illustration
+              // Status Icon / Celebration Illustration
               Container(
-                width: 90,
-                height: 90,
+                width: 88,
+                height: 88,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7).withAlpha(120),
+                  color: isRejected
+                      ? const Color(0xFFFEE2E2)
+                      : const Color(0xFFFEF3C7).withAlpha(120),
                   shape: BoxShape.circle,
                 ),
-                child: const Center(
-                  child: Text(
-                    '🎉',
-                    style: TextStyle(fontSize: 46),
-                  ),
+                child: Center(
+                  child: isRejected
+                      ? Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFDC2626),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            color: Colors.white,
+                            size: 34,
+                          ),
+                        )
+                      : const Text(
+                          '🎉',
+                          style: TextStyle(fontSize: 46),
+                        ),
                 ),
               ),
               const SizedBox(height: 24),
 
               // Title
               Text(
-                'Program Submitted!',
+                isRejected ? 'Application Rejected' : 'Program Submitted!',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
+                  color: isRejected ? const Color(0xFF991B1B) : AppColors.textPrimary,
                   letterSpacing: -0.3,
                 ),
               ),
@@ -70,7 +88,9 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
 
               // Subtitle
               Text(
-                'Your proposal has been received and evaluated by the AI auditing engine.',
+                isRejected
+                    ? 'AI validation was rejected due to missing supporting documents or incomplete proposal data.'
+                    : 'Your proposal has been received and evaluated by the AI auditing engine.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 13.5,
@@ -87,7 +107,10 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border, width: 1.1),
+                  border: Border.all(
+                    color: isRejected ? const Color(0xFFFECACA) : AppColors.border,
+                    width: 1.1,
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withAlpha(6),
@@ -112,18 +135,20 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
                     ),
                     const Divider(height: 20, color: AppColors.border),
                     _buildDetailRow(
-                      iconEmoji: '📊',
+                      iconEmoji: isRejected ? '⚠️' : '📊',
                       label: 'CURRENT STATUS',
-                      value: submission.status,
-                      valueColor: AppColors.primaryBlue,
+                      value: isRejected ? 'Rejected' : submission.status,
+                      valueColor: isRejected ? const Color(0xFFDC2626) : AppColors.primaryBlue,
                       isBoldValue: true,
                     ),
                     const Divider(height: 20, color: AppColors.border),
                     _buildDetailRow(
-                      iconEmoji: '🤖',
+                      iconEmoji: isRejected ? '❌' : '🤖',
                       label: 'AI VALIDATION',
-                      value: 'Automated parameter audit ready',
-                      valueColor: const Color(0xFF10B981),
+                      value: isRejected
+                          ? 'Rejected • Missing supporting documents'
+                          : 'Automated parameter audit ready',
+                      valueColor: isRejected ? const Color(0xFFDC2626) : const Color(0xFF10B981),
                       isBoldValue: true,
                     ),
                   ],
@@ -134,7 +159,7 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
 
               // Action Buttons
               CustomButton(
-                text: 'View AI Validation & Score',
+                text: 'View AI Validation Details',
                 onPressed: () {
                   final item = applicationItem ??
                       ProgramApplicationItem(

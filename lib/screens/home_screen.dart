@@ -323,7 +323,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 index: 2,
                 icon: Icons.star_outline_rounded,
                 activeIcon: Icons.star_rounded,
-                label: 'IDF Active',
+                label: 'MDRF Active',
               ),
               _buildWhatsAppNavItem(
                 index: 3,
@@ -516,40 +516,43 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildQuickActionCard(
-                    emoji: '📋',
-                    iconBg: const Color(0xFFFEF3C7),
-                    title: 'Submit a Program',
-                    subtitle: 'Share your PA initiative',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const SubmitProgramWizardScreen(),
-                        ),
-                      );
-                    },
+            IntrinsicHeight(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: _buildQuickActionCard(
+                      emoji: '📋',
+                      iconBg: const Color(0xFFFEF3C7),
+                      title: 'Submit a Program',
+                      subtitle: 'Share your Physical Activity initiative',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const SubmitProgramWizardScreen(),
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildQuickActionCard(
-                    emoji: '🏅',
-                    iconBg: const Color(0xFFE0F2FE),
-                    title: 'Apply for IDF Active',
-                    subtitle: 'Get certified today',
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => const CertificationWizardScreen(),
-                        ),
-                      );
-                    },
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _buildQuickActionCard(
+                      emoji: '🏅',
+                      iconBg: const Color(0xFFE0F2FE),
+                      title: 'Apply for MDRF Active Certificate',
+                      subtitle: 'Get certified today',
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const CertificationWizardScreen(),
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 20),
 
@@ -615,12 +618,12 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildProgramsCarousel(state),
             const SizedBox(height: 20),
 
-            // IDF Active Certification Section
+            // MDRF Active Certification Section
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'IDF Active Certification',
+                  'MDRF Active Certification',
                   style: GoogleFonts.inter(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
@@ -629,12 +632,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 GestureDetector(
                   onTap: () {
-                    setState(() {
-                      _currentTabIndex = 2;
-                    });
+                    _switchTab(3, appTabIndex: 1);
                   },
                   child: Text(
-                    'View',
+                    'View All',
                     style: GoogleFonts.inter(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -660,7 +661,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final card = _homeSummary?.idfActivateCard;
     final tag = card != null && card.tag.isNotEmpty
         ? card.tag
-        : (card != null && card.badge.isNotEmpty ? card.badge : 'IDF ACTIVATE INITIATIVE');
+        : (card != null && card.badge.isNotEmpty ? card.badge : 'MDRF ACTIVATE INITIATIVE');
     final title = card != null && card.title.isNotEmpty
         ? card.title
         : 'Promoting Physical Activity for a Healthier World';
@@ -812,7 +813,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // -------------------------------------------------------------
-  // Quick Action Card (Auto-sized, no fixed overflow height)
+  // Quick Action Card (Sleek, compact, equal height)
   // -------------------------------------------------------------
   Widget _buildQuickActionCard({
     required String emoji,
@@ -821,56 +822,65 @@ class _HomeScreenState extends State<HomeScreen> {
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    return InkWell(
-      onTap: onTap,
+    return Material(
+      color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border, width: 1.1),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: iconBg,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: Text(
-                  emoji,
-                  style: const TextStyle(fontSize: 18),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border, width: 1.1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    emoji,
+                    style: const TextStyle(fontSize: 16),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                fontSize: 13.5,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-                height: 1.2,
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 34,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      height: 1.25,
+                    ),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                color: const Color(0xFF64748B),
+              const SizedBox(height: 3),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: const Color(0xFF64748B),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -1019,7 +1029,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Explore community initiatives across IDF',
+              'Explore community initiatives across MDRF',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 12,
@@ -1223,7 +1233,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // -------------------------------------------------------------
-  // IDF Active Certification Card
+  // MDRF Active Certification Card
   // -------------------------------------------------------------
   Widget _buildCertificationCard(UserModel user) {
     CertificateApplicationItem? item = _latestCertApplication;
@@ -1261,9 +1271,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (item == null) {
       return InkWell(
         onTap: () {
-          setState(() {
-            _currentTabIndex = 2; // Switch to IDF Active tab
-          });
+          _switchTab(3, appTabIndex: 1); // Switch to My Applications -> Certifications tab
         },
         borderRadius: BorderRadius.circular(16),
         child: Container(
@@ -1299,7 +1307,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'IDF Active Certification',
+                      'MDRF Active Certification',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
@@ -1630,7 +1638,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
   // -------------------------------------------------------------
-  // IDF Active Tab
+  // MDRF Active Tab
   // -------------------------------------------------------------
   Widget _buildIDFActiveTab(AppState state) {
     return CertificationTabScreen(

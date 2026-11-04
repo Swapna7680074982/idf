@@ -164,4 +164,15 @@ class ProgramSubmissionModel {
       status: status ?? this.status,
     );
   }
+
+  /// True if no supporting materials or documents have been uploaded
+  bool get hasMissingSupportingDocuments =>
+      uploadedFileNames.isEmpty && supportingFileIds.isEmpty && materials.isEmpty;
+
+  /// True if core data or supporting documents are missing
+  bool get hasMissingDataOrDocs =>
+      hasMissingSupportingDocuments ||
+      programName.trim().isEmpty ||
+      (description.trim().isEmpty && programDescription.trim().isEmpty) ||
+      organizingEntityName.trim().isEmpty;
 }

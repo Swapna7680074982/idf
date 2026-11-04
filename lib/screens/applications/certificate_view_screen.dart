@@ -1,4 +1,4 @@
-import 'dart:io';
+﻿import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
@@ -188,14 +188,14 @@ class _CertificateViewScreenState extends State<CertificateViewScreen> {
     final verifyUrl =
         '${ApiConfig.baseUrl}/api/applications/certificates/$certId/download';
 
-    final shareText = '''🏆 *IDF ACTIVE CERTIFICATION*
+    final shareText = '''🏆 *MDRF ACTIVE CERTIFICATION*
 🏛 *Institution:* $instName
 📜 *Certificate No:* $certNo
 ⭐ *Score:* $score
 📅 *Issued On:* $issued
 ⏳ *Expires On:* $expires
 
-Verified by International Diabetes Federation (IDF) Active Accreditation Program.
+Verified by MDRF Active Accreditation Program.
 Download / Verify: $verifyUrl''';
 
     final encoded = Uri.encodeComponent(shareText);
@@ -508,7 +508,7 @@ Download / Verify: $verifyUrl''';
                               ),
                               const SizedBox(width: 10),
                               Text(
-                                'IDF ACTIVE CERTIFICATION',
+                                'MDRF ACTIVE CERTIFICATION',
                                 style: GoogleFonts.inter(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w700,
@@ -556,16 +556,9 @@ Download / Verify: $verifyUrl''';
                           ],
                           const SizedBox(height: 20),
 
-                          // 2x2 Stats Grid
+                          // Stats Grid (SCORE removed as requested)
                           Row(
                             children: [
-                              Expanded(
-                                child: _buildCertStatTile(
-                                  label: 'SCORE',
-                                  value: _formatScore(widget.certificate.score),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
                               Expanded(
                                 child: _buildCertStatTile(
                                   label: 'STATUS',

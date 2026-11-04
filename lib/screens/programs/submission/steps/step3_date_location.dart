@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/date_time_utils.dart';
 import '../../../../core/theme.dart';
@@ -6,6 +6,7 @@ import '../../../../models/meta_models.dart';
 import '../../../../models/program_submission_model.dart';
 import '../../../../services/metadata_service.dart';
 import '../../../../widgets/custom_button.dart';
+import '../../../../widgets/searchable_selection_sheet.dart';
 
 class Step3DateLocation extends StatefulWidget {
   final ProgramSubmissionModel model;
@@ -425,25 +426,12 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
               ),
             )
           else
-            DropdownButtonFormField<Country>(
-              initialValue: _selectedCountry,
-              hint: Text(
-                'Select country',
-                style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF94A3B8)),
-              ),
-              decoration: const InputDecoration(
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              ),
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-              items: _countries.map((country) {
-                return DropdownMenuItem<Country>(
-                  value: country,
-                  child: Text(
-                    country.name,
-                    style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary),
-                  ),
-                );
-              }).toList(),
+            SearchableDropdownField<Country>(
+              value: _selectedCountry,
+              hintText: 'Select country',
+              sheetTitle: 'Select Country',
+              items: _countries,
+              itemLabel: (country) => country.name,
               onChanged: (val) {
                 setState(() {
                   _selectedCountry = val;
@@ -484,25 +472,12 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
               ),
             )
           else if (_regions.isNotEmpty)
-            DropdownButtonFormField<Region>(
-              initialValue: _selectedRegion,
-              hint: Text(
-                'Select region / state',
-                style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF94A3B8)),
-              ),
-              decoration: const InputDecoration(
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              ),
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-              items: _regions.map((region) {
-                return DropdownMenuItem<Region>(
-                  value: region,
-                  child: Text(
-                    region.name,
-                    style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary),
-                  ),
-                );
-              }).toList(),
+            SearchableDropdownField<Region>(
+              value: _selectedRegion,
+              hintText: 'Select region / state',
+              sheetTitle: 'Select Region / State',
+              items: _regions,
+              itemLabel: (region) => region.name,
               onChanged: (val) {
                 setState(() {
                   _selectedRegion = val;
@@ -549,25 +524,12 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
               ),
             )
           else if (_cities.isNotEmpty)
-            DropdownButtonFormField<City>(
-              initialValue: _selectedCity,
-              hint: Text(
-                'Select city',
-                style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF94A3B8)),
-              ),
-              decoration: const InputDecoration(
-                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              ),
-              icon: const Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF64748B)),
-              items: _cities.map((city) {
-                return DropdownMenuItem<City>(
-                  value: city,
-                  child: Text(
-                    city.name,
-                    style: GoogleFonts.inter(fontSize: 14, color: AppColors.textPrimary),
-                  ),
-                );
-              }).toList(),
+            SearchableDropdownField<City>(
+              value: _selectedCity,
+              hintText: 'Select city',
+              sheetTitle: 'Select City',
+              items: _cities,
+              itemLabel: (city) => city.name,
               onChanged: (val) {
                 setState(() {
                   _selectedCity = val;

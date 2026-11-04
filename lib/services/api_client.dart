@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -168,7 +168,7 @@ class ApiClient {
       debugPrint('❌ [API NETWORK ERROR] Failed to connect to $uri: $e');
       throw const ApiException(
         code: 'NETWORK_ERROR',
-        message: 'Unable to connect to IDF server. Please check your network connection.',
+        message: 'Unable to connect to MDRF server. Please check your network connection.',
         statusCode: 0,
       );
     } on http.ClientException catch (e) {
@@ -218,7 +218,7 @@ class ApiClient {
       debugPrint('❌ [API NETWORK ERROR] Failed to connect to $uri: $e');
       throw const ApiException(
         code: 'NETWORK_ERROR',
-        message: 'Unable to connect to IDF server. Please check your network connection.',
+        message: 'Unable to connect to MDRF server. Please check your network connection.',
         statusCode: 0,
       );
     } on http.ClientException catch (e) {
@@ -268,7 +268,7 @@ class ApiClient {
       debugPrint('❌ [API NETWORK ERROR] Failed to connect to $uri: $e');
       throw const ApiException(
         code: 'NETWORK_ERROR',
-        message: 'Unable to connect to IDF server. Please check your network connection.',
+        message: 'Unable to connect to MDRF server. Please check your network connection.',
         statusCode: 0,
       );
     } on http.ClientException catch (e) {
@@ -318,7 +318,7 @@ class ApiClient {
       debugPrint('❌ [API NETWORK ERROR] Failed to connect to $uri: $e');
       throw const ApiException(
         code: 'NETWORK_ERROR',
-        message: 'Unable to connect to IDF server. Please check your network connection.',
+        message: 'Unable to connect to MDRF server. Please check your network connection.',
         statusCode: 0,
       );
     } on http.ClientException catch (e) {
@@ -373,7 +373,7 @@ class ApiClient {
       debugPrint('❌ [API NETWORK ERROR] Failed to connect to $uri: $e');
       throw const ApiException(
         code: 'NETWORK_ERROR',
-        message: 'Unable to connect to IDF server. Please check your network connection.',
+        message: 'Unable to connect to MDRF server. Please check your network connection.',
         statusCode: 0,
       );
     } on http.ClientException catch (e) {
@@ -420,7 +420,7 @@ class ApiClient {
       debugPrint('❌ [API NETWORK ERROR] Failed to connect to $uri: $e');
       throw const ApiException(
         code: 'NETWORK_ERROR',
-        message: 'Unable to connect to IDF server. Please check your network connection.',
+        message: 'Unable to connect to MDRF server. Please check your network connection.',
         statusCode: 0,
       );
     } on http.ClientException catch (e) {

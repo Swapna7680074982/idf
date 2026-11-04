@@ -3,8 +3,11 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme.dart';
 import '../../../models/application_item_model.dart';
 import '../../../models/certification_model.dart';
+import '../../../data/countries_data.dart';
+import '../../../models/meta_models.dart';
 import '../../../services/api_client.dart';
 import '../../../services/certification_service.dart';
+import '../../../widgets/country_phone_input_field.dart';
 import '../../certification/certification_wizard_screen.dart';
 import '../../certification/widgets/dynamic_question_tile.dart';
 import '../../certification/widgets/evidence_upload_tile.dart';
@@ -303,7 +306,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Validating eligibility & queuing IDF AI audit',
+                  'Validating eligibility & queuing MDRF AI audit',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 12,
@@ -513,7 +516,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                             child: Padding(
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
-                                'I accept the IDF declaration and confirm that all previous institution details, facilities, and questionnaire answers remain accurate and unchanged.',
+                                'I accept the MDRF declaration and confirm that all previous institution details, facilities, and questionnaire answers remain accurate and unchanged.',
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   color: const Color(0xFF475569),
@@ -612,7 +615,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Please review your updated application before submitting. Once submitted, it will be queued for IDF accreditation AI audit and committee review.',
+                  'Please review your updated application before submitting. Once submitted, it will be queued for MDRF accreditation AI audit and committee review.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 13,
@@ -681,7 +684,27 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
     final nameCtrl = TextEditingController(text: _model.institutionName);
     final contactCtrl = TextEditingController(text: _model.contactPerson);
     final emailCtrl = TextEditingController(text: _model.contactEmail);
-    final phoneCtrl = TextEditingController(text: _model.contactPhone);
+
+    Country renewalPhoneCountry = CountryData.defaultCountry;
+    final rawPhone = _model.contactPhone.trim();
+    final phoneCtrl = TextEditingController();
+    if (rawPhone.startsWith('+')) {
+      final parts = rawPhone.split(' ');
+      if (parts.length > 1) {
+        renewalPhoneCountry = CountryData.findByPhoneCode(parts.first);
+        phoneCtrl.text = parts.sublist(1).join('').replaceAll(RegExp(r'\D'), '');
+      } else {
+        final match = kAllCountries.firstWhere(
+          (c) => rawPhone.startsWith(c.phoneCode),
+          orElse: () => CountryData.defaultCountry,
+        );
+        renewalPhoneCountry = match;
+        phoneCtrl.text = rawPhone.substring(match.phoneCode.length).replaceAll(RegExp(r'\D'), '');
+      }
+    } else {
+      phoneCtrl.text = rawPhone.replaceAll(RegExp(r'\D'), '');
+    }
+
     final addressCtrl = TextEditingController(text: _model.address);
     final pincodeCtrl = TextEditingController(text: _model.pincode);
 
@@ -768,13 +791,12 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                   style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600, color: const Color(0xFF475569)),
                 ),
                 const SizedBox(height: 4),
-                TextField(
+                CountryPhoneInputField(
+                  hintText: 'Enter contact phone',
                   controller: phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: InputDecoration(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
-                  ),
+                  initialCountry: renewalPhoneCountry,
+                  isRequired: false,
+                  onCountryChanged: (c) => renewalPhoneCountry = c,
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -812,7 +834,8 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                         if (nameCtrl.text.trim().isNotEmpty) _model.institutionName = nameCtrl.text.trim();
                         _model.contactPerson = contactCtrl.text.trim();
                         _model.contactEmail = emailCtrl.text.trim();
-                        _model.contactPhone = phoneCtrl.text.trim();
+                        final digits = phoneCtrl.text.trim();
+                        _model.contactPhone = digits.isNotEmpty ? '${renewalPhoneCountry.phoneCode} $digits' : '';
                         _model.address = addressCtrl.text.trim();
                         _model.pincode = pincodeCtrl.text.trim();
                       });
@@ -1649,10 +1672,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
               _buildDetailItem('Institution', instName),
               const SizedBox(height: 6),
               _buildDetailItem('Category', catName),
-              if (_model.categoryMaxScore > 0) ...[
-                const SizedBox(height: 6),
-                _buildDetailItem('Max Score', '${_model.categoryMaxScore} points'),
-              ],
+              // Max Score removed as requested
               if (widget.certificate.certificateId.isNotEmpty) ...[
                 const SizedBox(height: 6),
                 _buildDetailItem('Previous Cert ID', widget.certificate.certificateId),
@@ -1978,7 +1998,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Please review your renewal submission before submitting. Once submitted, it will be transferred directly to IDF review.',
+                  'Please review your renewal submission before submitting. Once submitted, it will be transferred directly to MDRF review.',
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     color: const Color(0xFF1D4ED8),

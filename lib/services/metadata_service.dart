@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../data/countries_data.dart';
 import '../models/meta_models.dart';
 import 'api_client.dart';
 import 'api_config.dart';
@@ -65,17 +66,16 @@ class MetadataService {
   /// Get countries list
   /// GET /api/meta/countries
   static Future<List<Country>> getCountries() async {
-    final response = await ApiClient.get(ApiConfig.countries);
-    if (response is List) {
-      return response
-          .map((item) => Country.fromJson(item as Map<String, dynamic>))
-          .toList();
-    }
-    throw const ApiException(
-      code: 'INVALID_DATA',
-      message: 'Failed to load countries from server',
-      statusCode: 500,
-    );
+    try {
+      final response = await ApiClient.get(ApiConfig.countries);
+      if (response is List) {
+        final list = response
+            .map((item) => Country.fromJson(item as Map<String, dynamic>))
+            .toList();
+        if (list.isNotEmpty) return list;
+      }
+    } catch (_) {}
+    return kAllCountries;
   }
 
   /// Get regions by country ID

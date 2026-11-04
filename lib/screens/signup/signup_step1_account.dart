@@ -7,6 +7,9 @@ import '../../widgets/custom_text_field.dart';
 import '../login_screen.dart';
 import 'signup_step2_organization.dart';
 
+import '../../data/countries_data.dart';
+import '../../models/meta_models.dart';
+
 class SignUpStep1Screen extends StatefulWidget {
   const SignUpStep1Screen({super.key});
 
@@ -20,6 +23,7 @@ class _SignUpStep1ScreenState extends State<SignUpStep1Screen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  Country _selectedCountry = CountryData.defaultCountry;
 
   @override
   void dispose() {
@@ -58,6 +62,22 @@ class _SignUpStep1ScreenState extends State<SignUpStep1Screen> {
       return;
     }
 
+    final phoneError = CountryData.validatePhoneNumber(
+      country: _selectedCountry,
+      phoneNumber: phone,
+      isRequired: true,
+      fieldName: 'mobile number',
+    );
+    if (phoneError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(phoneError),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     if (password.length < 8) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -84,6 +104,7 @@ class _SignUpStep1ScreenState extends State<SignUpStep1Screen> {
           fullName: fullName,
           email: email,
           phone: phone,
+          phoneCountryCode: _selectedCountry.phoneCode,
           password: password,
           confirmPassword: confirmPassword,
         ),
@@ -101,7 +122,7 @@ class _SignUpStep1ScreenState extends State<SignUpStep1Screen> {
             // Top Header
             const AuthHeader(
               title: 'Account Details',
-              subtitle: 'Create your IDF Digital Hub account',
+              subtitle: 'Create your MDRF Digital Hub account',
               currentStep: 1,
               totalSteps: 4,
             ),
@@ -127,11 +148,16 @@ class _SignUpStep1ScreenState extends State<SignUpStep1Screen> {
                   ),
                   const SizedBox(height: 16),
 
-                  CustomTextField(
+                  CountryPhoneInputField(
                     label: 'Mobile Number',
                     hintText: 'Enter mobile number',
-                    keyboardType: TextInputType.phone,
                     controller: _phoneController,
+                    initialCountry: _selectedCountry,
+                    onCountryChanged: (c) {
+                      setState(() {
+                        _selectedCountry = c;
+                      });
+                    },
                   ),
                   const SizedBox(height: 16),
 

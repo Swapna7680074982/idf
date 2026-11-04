@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme.dart';
+import '../../../../data/countries_data.dart';
 import '../../../../models/meta_models.dart';
 import '../../../../models/program_submission_model.dart';
 import '../../../../services/metadata_service.dart';
+import '../../../../widgets/country_phone_input_field.dart';
 import '../../../../widgets/custom_button.dart';
 
 class Step2Organizer extends StatefulWidget {
@@ -33,12 +34,34 @@ class _Step2OrganizerState extends State<Step2Organizer> {
   bool _isLoadingTypes = true;
   String? _typesError;
 
+  Country _selectedCountry = CountryData.defaultCountry;
+
   @override
   void initState() {
     super.initState();
     _entityNameController = TextEditingController(text: widget.model.organizingEntityName);
     _contactPersonController = TextEditingController(text: widget.model.contactPerson);
-    _phoneController = TextEditingController(text: widget.model.phone);
+    
+    final rawPhone = widget.model.phone.trim();
+    if (rawPhone.startsWith('+')) {
+      final parts = rawPhone.split(' ');
+      if (parts.length > 1) {
+        _selectedCountry = CountryData.findByPhoneCode(parts.first);
+        _phoneController = TextEditingController(text: parts.sublist(1).join('').replaceAll(RegExp(r'\D'), ''));
+      } else {
+        final match = kAllCountries.firstWhere(
+          (c) => rawPhone.startsWith(c.phoneCode),
+          orElse: () => CountryData.defaultCountry,
+        );
+        _selectedCountry = match;
+        _phoneController = TextEditingController(
+          text: rawPhone.substring(match.phoneCode.length).replaceAll(RegExp(r'\D'), ''),
+        );
+      }
+    } else {
+      _phoneController = TextEditingController(text: rawPhone.replaceAll(RegExp(r'\D'), ''));
+    }
+
     _emailController = TextEditingController(text: widget.model.email);
     _loadOrgTypes();
   }
@@ -97,7 +120,8 @@ class _Step2OrganizerState extends State<Step2Organizer> {
       widget.model.organizationType = _selectedOrgType?.name ?? '';
       widget.model.organizationTypeId = _selectedOrgType?.id;
       widget.model.contactPerson = _contactPersonController.text.trim();
-      widget.model.phone = _phoneController.text.trim();
+      final phoneDigits = _phoneController.text.trim();
+      widget.model.phone = phoneDigits.isNotEmpty ? '${_selectedCountry.phoneCode} $phoneDigits' : '';
       widget.model.email = _emailController.text.trim();
       widget.onContinue();
     } else {
@@ -226,29 +250,14 @@ class _Step2OrganizerState extends State<Step2Organizer> {
           // Phone Number (International / Foreign supported)
           _buildFieldLabel('Contact Phone Number *'),
           const SizedBox(height: 6),
-          TextFormField(
+          CountryPhoneInputField(
+            hintText: 'Enter phone number',
             controller: _phoneController,
-            keyboardType: TextInputType.phone,
-            inputFormatters: [
-              FilteringTextInputFormatter.allow(RegExp(r'[\d\+\s\-\(\)]')),
-              LengthLimitingTextInputFormatter(22),
-            ],
-            decoration: const InputDecoration(
-              hintText: 'e.g. +1 555 123 4567 or +91 9876543210',
-              prefixIcon: Icon(Icons.phone_outlined, size: 18, color: Color(0xFF64748B)),
-            ),
-            validator: (val) {
-              if (val == null || val.trim().isEmpty) {
-                return 'Please enter contact phone number';
-              }
-              final cleanDigits = val.replaceAll(RegExp(r'\D'), '');
-              if (cleanDigits.length < 7) {
-                return 'Please enter a valid phone number (at least 7 digits)';
-              }
-              if (cleanDigits.length > 17) {
-                return 'Phone number cannot exceed 17 digits';
-              }
-              return null;
+            initialCountry: _selectedCountry,
+            onCountryChanged: (c) {
+              setState(() {
+                _selectedCountry = c;
+              });
             },
           ),
           const SizedBox(height: 16),

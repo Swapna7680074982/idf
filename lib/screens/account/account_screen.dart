@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../bloc/app_bloc.dart';
@@ -108,7 +108,7 @@ class _AccountScreenState extends State<AccountScreen> {
 
                 // Subtitle
                 Text(
-                  'Are you sure you want to log out of your IDF account?',
+                  'Are you sure you want to log out of your MDRF account?',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 13.5,
@@ -522,7 +522,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         title: 'Privacy',
                         onTap: () async {
                           String privacyContent =
-                              'Your privacy and data security are our highest priorities. All organizational, patient, and program records are processed in compliance with global health data standards (GDPR, HIPAA, and IDF data protocols).\n\nIDF Active only shares verified certification details with authorized educational and governmental entities.';
+                              'Your privacy and data security are our highest priorities. All organizational, patient, and program records are processed in compliance with global health data standards (GDPR, HIPAA, and MDRF data protocols).\n\nMDRF Active only shares verified certification details with authorized educational and governmental entities.';
                           try {
                             final docs = await MetadataService.getLegalDocuments();
                             final privacy = docs.firstWhere(
@@ -553,7 +553,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         title: 'Terms of Service',
                         onTap: () async {
                           String termsContent =
-                              'By registering for the IDF Digital Hub, you agree to use this platform solely for legitimate physical activity program submissions and IDF ACTIVE certification applications...';
+                              'By registering for the MDRF Digital Hub, you agree to use this platform solely for legitimate physical activity program submissions and MDRF ACTIVE certification applications...';
                           try {
                             final docs = await MetadataService.getLegalDocuments();
                             final terms = docs.firstWhere(

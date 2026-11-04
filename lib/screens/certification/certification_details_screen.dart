@@ -103,12 +103,84 @@ class _CertificationDetailsScreenState
       _isAiScanning = true;
     });
 
+    final hasEvidence = (_detail?.materials.isNotEmpty ?? false) ||
+        (widget.application?.hasAnyEvidenceUploaded ?? false);
+    final isApproved = (_detail?.status.toLowerCase() == 'approved') ||
+        (widget.certificateItem?.isApproved ?? false);
+    final isMissingEvidence = !hasEvidence && !isApproved;
+
+    final isRejected = isMissingEvidence ||
+        (_detail?.status.toLowerCase().contains('reject') ?? false) ||
+        (_detail?.reviewStatus.toLowerCase().contains('reject') ?? false) ||
+        (widget.certificateItem?.status.toLowerCase().contains('reject') ?? false);
+
+    final statusToSend = isRejected ? 'rejected' : 'approved';
+    final commentsToSend = isMissingEvidence
+        ? 'AI Validation Rejected: Required supporting evidence documents were not uploaded. Please upload evidence for AI validation.'
+        : (isRejected
+            ? 'AI Validation Rejected: Institution dossier does not meet certification criteria.'
+            : 'Automated verification passed. All supporting documents meet MDRF criteria.');
+
+    final checksToSend = isRejected
+        ? [
+            {
+              'check_type': 'evidence_review',
+              'status': 'rejected',
+              'status_label': 'FAILED',
+              'score': 0,
+              'max_score': 40,
+              'details': 'Mandatory evidence documents not uploaded. Supporting evidence is missing.',
+            },
+            {
+              'check_type': 'detail_evidence_match',
+              'status': 'rejected',
+              'status_label': 'INSUFFICIENT',
+              'score': 10,
+              'max_score': 30,
+              'details': 'Institution details could not be matched with supporting evidence.',
+            },
+            {
+              'check_type': 'overall',
+              'status': 'rejected',
+              'status_label': 'REJECTED',
+              'score': 15,
+              'max_score': 30,
+              'details': 'Automated review rejected: Application does not contain required evidence files.',
+            },
+          ]
+        : [
+            {
+              'check_type': 'evidence_review',
+              'status': 'approved',
+              'status_label': 'VERIFIED',
+              'score': 40,
+              'max_score': 40,
+              'details': 'All mandatory documents uploaded and readable.',
+            },
+            {
+              'check_type': 'detail_evidence_match',
+              'status': 'approved',
+              'status_label': 'VERIFIED',
+              'score': 28,
+              'max_score': 30,
+              'details': 'Institution details cross-check verified.',
+            },
+            {
+              'check_type': 'overall',
+              'status': 'approved',
+              'status_label': 'PASSED',
+              'score': 29,
+              'max_score': 30,
+              'details': 'All automated audit criteria passed.',
+            },
+          ];
+
     try {
       await CertificationService.updateAiValidationStatus(
         _effectiveId,
-        status: 'approved',
-        comments:
-            'Automated verification passed. All supporting documents meet IDF criteria.',
+        status: statusToSend,
+        comments: commentsToSend,
+        checks: checksToSend,
       );
 
       if (!mounted) return;
@@ -119,18 +191,46 @@ class _CertificationDetailsScreenState
             await CertificationService.getApplicationDetail(_effectiveId);
         if (mounted) {
           setState(() {
-            _detail = updatedDetail;
+            if (isRejected) {
+              _detail = updatedDetail.copyWith(
+                status: 'rejected',
+                reviewStatus: 'rejected',
+                displayStatus: 'Rejected',
+                decision: 'rejected',
+                decisionText: isMissingEvidence ? 'Rejected - Missing Evidence' : 'Rejected',
+                aiValidationComment: commentsToSend,
+              );
+            } else {
+              _detail = updatedDetail;
+            }
           });
         }
-      } catch (_) {}
+      } catch (_) {
+        if (mounted && _detail != null) {
+          setState(() {
+            if (isRejected) {
+              _detail = _detail!.copyWith(
+                status: 'rejected',
+                reviewStatus: 'rejected',
+                displayStatus: 'Rejected',
+                decision: 'rejected',
+                decisionText: isMissingEvidence ? 'Rejected - Missing Evidence' : 'Rejected',
+                aiValidationComment: commentsToSend,
+              );
+            }
+          });
+        }
+      }
 
       if (!mounted) return;
 
       if (!isAutomatic) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('AI Audit checks completed and recorded.'),
-            backgroundColor: Color(0xFF16A34A),
+          SnackBar(
+            content: Text(isRejected
+                ? 'AI Validation: Rejected due to missing evidence documents.'
+                : 'AI Audit checks completed and recorded.'),
+            backgroundColor: isRejected ? const Color(0xFFDC2626) : const Color(0xFF16A34A),
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -379,12 +479,6 @@ class _CertificationDetailsScreenState
           details: 'Evidence files under review',
         ),
         const CertificationAiValidationCheck(
-          checkType: 'image_location_validation',
-          label: 'Image Location Validation',
-          status: 'pending',
-          details: 'GPS & timestamp validation pending',
-        ),
-        const CertificationAiValidationCheck(
           checkType: 'detail_evidence_match',
           label: 'Detail Evidence Match',
           status: 'pending',
@@ -447,7 +541,7 @@ class _CertificationDetailsScreenState
 
     final reason = item.rejectionReason ??
         (isRejected
-            ? 'Application did not meet the IDF Active accreditation requirements.'
+            ? 'Application did not meet the MDRF Active accreditation requirements.'
             : (isChangesRequired
                 ? 'Auditor requested modifications before certification can be granted.'
                 : null));
@@ -490,11 +584,13 @@ class _CertificationDetailsScreenState
           state: 'completed',
           note: 'Application submitted successfully',
         ),
-        const CertificationTimelineStage(
+        CertificationTimelineStage(
           stage: 'ai_validation',
           label: 'AI Audit',
-          state: 'completed',
-          note: 'AI automated checks completed',
+          state: isRejected ? 'rejected' : 'completed',
+          note: isRejected
+              ? 'AI audit rejected • Missing evidence documents'
+              : 'AI automated checks completed',
         ),
         CertificationTimelineStage(
           stage: 'manual_review',
@@ -502,16 +598,16 @@ class _CertificationDetailsScreenState
           state: isApproved
               ? 'completed'
               : (isRejected
-                  ? 'rejected'
+                  ? 'blocked'
                   : (isChangesRequired ? 'changes_required' : 'in_progress')),
           note: isApproved
               ? 'Manual review completed • Approved'
               : (isRejected
-                  ? 'Manual review completed • Rejected'
+                  ? 'Manual review not conducted • AI validation rejected'
                   : (isChangesRequired
                       ? 'Auditor requested modifications'
                       : 'Manual review in progress')),
-          comment: reason,
+          comment: isRejected ? null : reason,
         ),
         CertificationTimelineStage(
           stage: 'certificate',
@@ -536,12 +632,6 @@ class _CertificationDetailsScreenState
           label: 'Evidence Review',
           status: 'approved',
           details: 'Mandatory documentation inspected.',
-        ),
-        CertificationAiValidationCheck(
-          checkType: 'image_location_validation',
-          label: 'Image Location Validation',
-          status: 'approved',
-          details: 'GPS & timestamp validation completed.',
         ),
         CertificationAiValidationCheck(
           checkType: 'detail_evidence_match',
@@ -637,6 +727,10 @@ class _CertificationDetailsScreenState
   Widget _buildContentView() {
     final detail = _detail!;
     final inst = detail.institution;
+    final isRejected = detail.status.toLowerCase().contains('reject') ||
+        detail.displayStatus.toLowerCase().contains('reject') ||
+        detail.reviewStatus.toLowerCase().contains('reject') ||
+        detail.decision.toLowerCase().contains('reject');
     final isRenewable = detail.status.toLowerCase().contains('renew') ||
         detail.displayStatus.toLowerCase().contains('renew') ||
         (widget.certificateItem != null && widget.certificateItem!.isExpiredOrRenewable);
@@ -680,18 +774,15 @@ class _CertificationDetailsScreenState
               const SizedBox(height: 14),
             ],
 
-            // 7. Actions (Renew if renewable, Edit Application if editable/changes required, or re-apply if rejected)
+            // 7. Actions (Renew if renewable, Edit Application if editable/changes required)
             if (isRenewable) ...[
               _buildRenewButton(detail),
               const SizedBox(height: 20),
-            ] else if (detail.editable ||
-                detail.status.toLowerCase().contains('change') ||
-                detail.displayStatus.toLowerCase().contains('change') ||
-                detail.reviewStatus.toLowerCase().contains('change') ||
-                detail.status.toLowerCase().contains('reject') ||
-                detail.displayStatus.toLowerCase().contains('reject') ||
-                detail.reviewStatus.toLowerCase().contains('reject') ||
-                detail.decision.toLowerCase().contains('reject')) ...[
+            ] else if (!isRejected &&
+                (detail.editable ||
+                    detail.status.toLowerCase().contains('change') ||
+                    detail.displayStatus.toLowerCase().contains('change') ||
+                    detail.reviewStatus.toLowerCase().contains('change'))) ...[
               _buildActionButtons(detail),
               const SizedBox(height: 20),
             ],
@@ -772,15 +863,22 @@ class _CertificationDetailsScreenState
           const Divider(height: 1, color: Color(0xFFF1F5F9)),
           const SizedBox(height: 12),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildMetaItem(
-                  'Review Stage',
-                  _formatReviewStatus(detail.reviewStatus.isNotEmpty
-                      ? detail.reviewStatus
-                      : detail.status)),
-              _buildMetaItem('Decision', detail.decisionText ?? detail.decision),
-              _buildMetaItem('Submitted', _formatDate(detail.submittedAt)),
+              Expanded(
+                child: _buildMetaItem(
+                    'Review Stage',
+                    _formatReviewStatus(detail.reviewStatus.isNotEmpty
+                        ? detail.reviewStatus
+                        : detail.status)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildMetaItem('Decision', detail.decisionText ?? detail.decision),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildMetaItem('Submitted', _formatDate(detail.submittedAt)),
+              ),
             ],
           ),
         ],
@@ -794,11 +892,15 @@ class _CertificationDetailsScreenState
       children: [
         Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
           style: GoogleFonts.inter(fontSize: 11, color: const Color(0xFF94A3B8)),
         ),
         const SizedBox(height: 2),
         Text(
           value,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
           style: GoogleFonts.inter(
             fontSize: 12.5,
             fontWeight: FontWeight.w600,
@@ -900,10 +1002,16 @@ class _CertificationDetailsScreenState
         revStatus == 'approved' ||
         decision == 'approved';
 
-    final isRejected = status.contains('reject') ||
+    final hasNoEvidence = (_detail?.materials.isEmpty ?? true) &&
+        (widget.application?.hasMissingRequiredEvidence ?? true) &&
+        (!isApproved);
+
+    final isRejected = hasNoEvidence ||
+        status.contains('reject') ||
         dispStatus.contains('reject') ||
         revStatus.contains('reject') ||
-        decision.contains('reject');
+        decision.contains('reject') ||
+        (widget.certificateItem?.status.toLowerCase().contains('reject') ?? false);
 
     final isChangesRequired = !isRejected &&
         (status.contains('change') ||
@@ -922,10 +1030,25 @@ class _CertificationDetailsScreenState
     final manualStage = stageMap['manual_review'] ?? stageMap['review'] ?? stageMap['audit'];
     final certStage = stageMap['certificate'] ?? stageMap['cert'];
 
+    final hasAiFailedCheck = _detail?.aiValidation.any((c) =>
+        c.status.toLowerCase().contains('fail') ||
+        c.status.toLowerCase().contains('reject')) ?? false;
+
+    final isAiRejected = isRejected &&
+        (hasNoEvidence ||
+            (aiStage?.state.toLowerCase() == 'rejected') ||
+            (aiStage?.state.toLowerCase() == 'failed') ||
+            hasAiFailedCheck ||
+            decision.contains('missing evidence') ||
+            decision.contains('evidence') ||
+            (widget.application?.hasMissingRequiredEvidence ?? false));
+
     final comment = _detail?.effectiveComment ??
         manualStage?.comment ??
         (isRejected
-            ? 'Application did not meet the IDF Active accreditation requirements.'
+            ? (hasNoEvidence
+                ? 'Application rejected: Mandatory supporting evidence was not uploaded. Please upload evidence for AI validation.'
+                : 'Application did not meet the MDRF Active accreditation requirements.')
             : (isChangesRequired
                 ? 'Auditor requested modifications before certification can be granted.'
                 : null));
@@ -941,8 +1064,12 @@ class _CertificationDetailsScreenState
       CertificationTimelineStage(
         stage: 'ai_validation',
         label: 'AI Audit',
-        state: 'completed',
-        note: aiStage?.note ?? 'AI automated checks completed',
+        state: isRejected ? 'rejected' : 'completed',
+        note: isRejected
+            ? (hasNoEvidence
+                ? 'AI audit rejected • Missing evidence documents'
+                : (aiStage?.note ?? 'AI audit rejected'))
+            : (aiStage?.note ?? 'AI automated checks completed'),
         occurredAt: aiStage?.occurredAt ?? _detail?.submittedAt,
       ),
       CertificationTimelineStage(
@@ -951,17 +1078,19 @@ class _CertificationDetailsScreenState
         state: isApproved
             ? 'completed'
             : (isRejected
-                ? 'rejected'
+                ? (isAiRejected ? 'blocked' : 'rejected')
                 : (isChangesRequired ? 'changes_required' : (manualStage?.state ?? 'in_progress'))),
         note: isApproved
             ? 'Manual review completed • Approved'
             : (isRejected
-                ? 'Manual review completed • Rejected'
+                ? (isAiRejected
+                    ? 'Manual review not conducted • AI validation rejected'
+                    : 'Manual review completed • Rejected')
                 : (isChangesRequired
                     ? 'Auditor requested modifications'
                     : (manualStage?.note ?? 'Manual review in progress'))),
-        comment: (isRejected || isChangesRequired) ? comment : manualStage?.comment,
-        occurredAt: manualStage?.occurredAt ?? _detail?.decisionAt,
+        comment: isAiRejected ? null : ((isRejected || isChangesRequired) ? comment : manualStage?.comment),
+        occurredAt: isAiRejected ? null : (manualStage?.occurredAt ?? _detail?.decisionAt),
       ),
       CertificationTimelineStage(
         stage: 'certificate',
@@ -1106,55 +1235,62 @@ class _CertificationDetailsScreenState
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            stage.label,
-                            style: GoogleFonts.inter(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w700,
-                              color: isStageChangesRequired
-                                  ? const Color(0xFFC2410C)
-                                  : (isStageRejected || isStageBlocked
-                                      ? const Color(0xFFDC2626)
-                                      : (isInProgress
-                                          ? AppColors.primaryBlue
-                                          : (isCompleted
-                                              ? const Color(0xFF0F172A)
-                                              : const Color(0xFF64748B)))),
-                            ),
-                          ),
-                          if (isStageChangesRequired || isStageRejected) ...[
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
-                              decoration: BoxDecoration(
-                                color: isStageRejected
-                                    ? const Color(0xFFFEE2E2)
-                                    : const Color(0xFFFFEDD5),
-                                borderRadius: BorderRadius.circular(6),
-                                border: Border.all(
-                                  color: isStageRejected
-                                      ? const Color(0xFFFECACA)
-                                      : const Color(0xFFFDBA74),
-                                ),
-                              ),
+                      Expanded(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
                               child: Text(
-                                isStageRejected ? 'Rejected' : 'Changes Required',
+                                stage.label,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                                 style: GoogleFonts.inter(
-                                  fontSize: 10,
+                                  fontSize: 13.5,
                                   fontWeight: FontWeight.w700,
-                                  color: isStageRejected
-                                      ? const Color(0xFFDC2626)
-                                      : const Color(0xFFC2410C),
+                                  color: isStageChangesRequired
+                                      ? const Color(0xFFC2410C)
+                                      : (isStageRejected || isStageBlocked
+                                          ? const Color(0xFFDC2626)
+                                          : (isInProgress
+                                              ? AppColors.primaryBlue
+                                              : (isCompleted
+                                                  ? const Color(0xFF0F172A)
+                                                  : const Color(0xFF64748B)))),
                                 ),
                               ),
                             ),
+                            if (isStageChangesRequired || isStageRejected) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                decoration: BoxDecoration(
+                                  color: isStageRejected
+                                      ? const Color(0xFFFEE2E2)
+                                      : const Color(0xFFFFEDD5),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                    color: isStageRejected
+                                        ? const Color(0xFFFECACA)
+                                        : const Color(0xFFFDBA74),
+                                  ),
+                                ),
+                                child: Text(
+                                  isStageRejected ? 'Rejected' : 'Changes Required',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: isStageRejected
+                                        ? const Color(0xFFDC2626)
+                                        : const Color(0xFFC2410C),
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
-                      if (stage.occurredAt != null)
+                      if (stage.occurredAt != null) ...[
+                        const SizedBox(width: 8),
                         Text(
                           _formatDate(stage.occurredAt),
                           style: GoogleFonts.inter(
@@ -1162,6 +1298,7 @@ class _CertificationDetailsScreenState
                             color: const Color(0xFF94A3B8),
                           ),
                         ),
+                      ],
                     ],
                   ),
                   if (stage.note != null && stage.note!.isNotEmpty) ...[
@@ -1296,53 +1433,104 @@ class _CertificationDetailsScreenState
 
   List<CertificationAiValidationCheck> _resolveAiValidationChecks(
       CertificationApplicationDetail detail) {
-    if (detail.aiValidation.isNotEmpty) {
-      return detail.aiValidation;
-    }
-
-    final isRejected = detail.status.toLowerCase().contains('reject') ||
+    final hasNoEvidence = detail.materials.isEmpty &&
+        (widget.application?.hasMissingRequiredEvidence ?? true) &&
+        (detail.status.toLowerCase() != 'approved');
+    final isRejected = hasNoEvidence ||
+        detail.status.toLowerCase().contains('reject') ||
         detail.reviewStatus.toLowerCase().contains('reject') ||
         detail.displayStatus.toLowerCase().contains('reject') ||
-        detail.decision.toLowerCase().contains('reject');
+        detail.decision.toLowerCase().contains('reject') ||
+        (widget.certificateItem?.status.toLowerCase().contains('reject') ?? false);
 
-    return [
-      const CertificationAiValidationCheck(
+    if (isRejected) {
+      return const [
+        CertificationAiValidationCheck(
+          checkType: 'evidence_review',
+          label: 'Evidence Review',
+          status: 'rejected',
+          statusLabel: 'FAILED',
+          score: 0,
+          maxScore: 40,
+          details: 'Mandatory supporting evidence not uploaded. Please upload evidence for AI validation.',
+        ),
+        CertificationAiValidationCheck(
+          checkType: 'detail_evidence_match',
+          label: 'Detail Evidence Match',
+          status: 'rejected',
+          statusLabel: 'INSUFFICIENT',
+          score: 10,
+          maxScore: 30,
+          details: 'Institution details could not be cross-verified with supporting documentation.',
+        ),
+        CertificationAiValidationCheck(
+          checkType: 'overall',
+          label: 'Overall AI Audit',
+          status: 'rejected',
+          statusLabel: 'REJECTED',
+          score: 15,
+          maxScore: 30,
+          details: 'Application rejected: Mandatory evidence was not uploaded for automated audit.',
+        ),
+      ];
+    }
+
+    final filtered = detail.aiValidation
+        .where((c) => c.checkType != 'image_location_validation')
+        .toList();
+    if (filtered.isNotEmpty) {
+      return filtered;
+    }
+
+    return const [
+      CertificationAiValidationCheck(
         checkType: 'evidence_review',
         label: 'Evidence Review',
         status: 'approved',
         statusLabel: 'VERIFIED',
-        details: 'Mandatory documentation inspected.',
-      ),
-      const CertificationAiValidationCheck(
-        checkType: 'image_location_validation',
-        label: 'Image Location Validation',
-        status: 'approved',
-        statusLabel: 'VERIFIED',
-        details: 'GPS & timestamp validation completed.',
+        score: 40,
+        maxScore: 40,
+        details: 'Mandatory documentation inspected and verified.',
       ),
       CertificationAiValidationCheck(
         checkType: 'detail_evidence_match',
         label: 'Detail Evidence Match',
-        status: isRejected ? 'rejected' : 'approved',
-        statusLabel: isRejected ? 'INSUFFICIENT' : 'VERIFIED',
-        details: isRejected
-            ? 'Institution documentation did not satisfy minimum score threshold.'
-            : 'Institution details verified.',
+        status: 'approved',
+        statusLabel: 'VERIFIED',
+        score: 28,
+        maxScore: 30,
+        details: 'Institution details cross-check verified.',
       ),
       CertificationAiValidationCheck(
         checkType: 'overall',
         label: 'Overall AI Audit',
-        status: isRejected ? 'rejected' : 'approved',
-        statusLabel: isRejected ? 'FAILED' : 'PASSED',
-        details: isRejected
-            ? 'Automated review flagged criteria deficiencies.'
-            : 'Automated validation completed.',
+        status: 'approved',
+        statusLabel: 'PASSED',
+        score: 29,
+        maxScore: 30,
+        details: 'All automated audit criteria passed successfully.',
       ),
     ];
   }
 
   Widget _buildAiValidationCard(CertificationApplicationDetail detail) {
     final checks = _resolveAiValidationChecks(detail);
+    final hasNoEvidence = detail.materials.isEmpty &&
+        (widget.application?.hasMissingRequiredEvidence ?? true) &&
+        (detail.status.toLowerCase() != 'approved');
+    final isRejected = hasNoEvidence ||
+        detail.status.toLowerCase().contains('reject') ||
+        detail.reviewStatus.toLowerCase().contains('reject') ||
+        detail.displayStatus.toLowerCase().contains('reject') ||
+        detail.decision.toLowerCase().contains('reject') ||
+        (widget.certificateItem?.status.toLowerCase().contains('reject') ?? false) ||
+        checks.any((c) => c.status.toLowerCase() == 'rejected');
+
+    final statusColor = isRejected ? const Color(0xFFDC2626) : const Color(0xFF16A34A);
+    final gradeText = isRejected ? 'REJECTED' : 'PASSED';
+    final summaryText = isRejected
+        ? "Automated audit failed: Mandatory supporting evidence was not uploaded. Please upload the required evidence for AI validation."
+        : "Automated verification passed. All supporting documents and details satisfy MDRF accreditation standards.";
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -1350,38 +1538,292 @@ class _CertificationDetailsScreenState
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(4),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
+              Expanded(
+                child: Row(
+                  children: [
+                    const Text('🤖', style: TextStyle(fontSize: 18)),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        'AI Validation',
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: isRejected
+                      ? const Color(0xFFFEE2E2)
+                      : (_isAiScanning ? const Color(0xFFEFF6FF) : const Color(0xFFDCFCE7)),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: isRejected
+                        ? const Color(0xFFFCA5A5)
+                        : (_isAiScanning ? const Color(0xFF93C5FD) : const Color(0xFF86EFAC)),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      isRejected
+                          ? Icons.cancel_rounded
+                          : (_isAiScanning ? Icons.sync_rounded : Icons.check_circle_rounded),
+                      size: 12,
+                      color: isRejected
+                          ? const Color(0xFFDC2626)
+                          : (_isAiScanning ? const Color(0xFF0284C7) : const Color(0xFF16A34A)),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      isRejected ? 'FAILED' : (_isAiScanning ? 'SCANNING' : 'DONE'),
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: isRejected
+                            ? const Color(0xFFDC2626)
+                            : (_isAiScanning ? const Color(0xFF0284C7) : const Color(0xFF16A34A)),
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+
+          // Scanning indicator banner
+          if (_isAiScanning) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: Row(
                 children: [
-                  const Icon(Icons.auto_awesome_rounded, size: 18, color: Color(0xFF8B5CF6)),
-                  const SizedBox(width: 8),
-                  Text(
-                    'AI Audit Checks',
-                    style: GoogleFonts.inter(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w700,
-                      color: const Color(0xFF0F172A),
+                  const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0284C7)),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'AI analyzing institutional questionnaire and uploaded evidence...',
+                      style: GoogleFonts.inter(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        color: const Color(0xFF0369A1),
+                      ),
                     ),
                   ),
                 ],
               ),
-              if (_isAiScanning)
-                const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryBlue),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          // Status Banner Box (No numerical scoring)
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: statusColor.withAlpha(20),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: statusColor.withAlpha(50)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  isRejected ? Icons.cancel_rounded : Icons.check_circle_rounded,
+                  color: statusColor,
+                  size: 22,
                 ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            isRejected ? 'Validation Rejected' : 'Validation Approved',
+                            style: GoogleFonts.inter(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w700,
+                              color: statusColor,
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                            decoration: BoxDecoration(
+                              color: statusColor,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              gradeText,
+                              style: GoogleFonts.inter(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        summaryText,
+                        style: GoogleFonts.inter(
+                          fontSize: 11.5,
+                          color: const Color(0xFF475569),
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          ...checks.map((c) => _buildCheckItem(c)),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
+
+          // Parameter Verification List
+          Text(
+            'PARAMETER VERIFICATION',
+            style: GoogleFonts.inter(
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+              color: const Color(0xFF94A3B8),
+              letterSpacing: 0.6,
+            ),
+          ),
+          const SizedBox(height: 10),
+          ...checks.map((check) {
+            final isCheckPassed = check.status.toLowerCase() == 'approved';
+            final checkColor = isCheckPassed ? const Color(0xFF10B981) : const Color(0xFFEF4444);
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        isCheckPassed ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                        size: 16,
+                        color: checkColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          check.label,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (check.details != null && check.details!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Padding(
+                      padding: const EdgeInsets.only(left: 24.0),
+                      child: Text(
+                        check.details!,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }),
+
+          // Action Required Box (when rejected)
+          if (isRejected) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF2F2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFECACA)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFDC2626)),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Action Required: Missing Evidence Upload',
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFDC2626),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "You didn't upload required supporting evidence. Please upload the required documents for AI validation to be reviewed and approved.",
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: const Color(0xFF991B1B),
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
+          const SizedBox(height: 4),
           // Trigger manual re-run/verify button
           SizedBox(
             width: double.infinity,
@@ -1391,83 +1833,23 @@ class _CertificationDetailsScreenState
                   ? const SizedBox(
                       width: 14,
                       height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryBlue),
                     )
                   : const Icon(Icons.sync_rounded, size: 16),
               label: Text(
-                _isAiScanning ? 'Running AI Verification...' : 'Run AI Audit Verification',
+                _isAiScanning
+                    ? 'Running AI Verification...'
+                    : (isRejected ? 'Re-run AI Audit Verification' : 'Re-verify with AI Audit'),
                 style: GoogleFonts.inter(fontSize: 12.5, fontWeight: FontWeight.w600),
               ),
               style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.primaryBlue,
-                side: const BorderSide(color: Color(0xFFBAE6FD)),
+                foregroundColor: isRejected ? const Color(0xFFDC2626) : AppColors.primaryBlue,
+                side: BorderSide(
+                  color: isRejected ? const Color(0xFFFECACA) : const Color(0xFFBAE6FD),
+                ),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 padding: const EdgeInsets.symmetric(vertical: 10),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCheckItem(CertificationAiValidationCheck check) {
-    final isApproved = check.status.toLowerCase() == 'approved';
-    final isPending = check.status.toLowerCase() == 'pending';
-
-    Color bg = const Color(0xFFF8FAFC);
-    Color statusColor = isApproved ? const Color(0xFF16A34A) : (isPending ? const Color(0xFFD97706) : const Color(0xFFEF4444));
-    IconData icon = isApproved ? Icons.check_circle_rounded : (isPending ? Icons.hourglass_top_rounded : Icons.error_rounded);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 18, color: statusColor),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      check.label,
-                      style: GoogleFonts.inter(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: const Color(0xFF1E293B),
-                      ),
-                    ),
-                    Text(
-                      check.statusLabel ?? check.status.toUpperCase(),
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: statusColor,
-                      ),
-                    ),
-                  ],
-                ),
-                if (check.details != null && check.details!.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    check.details!,
-                    style: GoogleFonts.inter(
-                      fontSize: 11.5,
-                      color: const Color(0xFF64748B),
-                    ),
-                  ),
-                ],
-              ],
             ),
           ),
         ],
@@ -1768,7 +2150,7 @@ class _CertificationDetailsScreenState
 
     final comment = detail.effectiveComment ??
         (isRejected
-            ? 'Application did not meet the IDF Active accreditation requirements.'
+            ? 'Application did not meet the MDRF Active accreditation requirements.'
             : '');
 
     if (comment.isEmpty) return const SizedBox.shrink();
@@ -1822,26 +2204,11 @@ class _CertificationDetailsScreenState
   }
 
   Widget _buildActionButtons(CertificationApplicationDetail detail) {
-    final isRejected = detail.status.toLowerCase().contains('reject') ||
-        detail.reviewStatus.toLowerCase().contains('reject') ||
-        detail.displayStatus.toLowerCase().contains('reject') ||
-        detail.decision.toLowerCase().contains('reject');
-
     return SizedBox(
       width: double.infinity,
       height: 48,
       child: ElevatedButton.icon(
         onPressed: () {
-          if (isRejected) {
-            // For Rejected: Start a completely fresh application without prefilled data
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const CertificationWizardScreen(),
-              ),
-            );
-            return;
-          }
-
           // For Changes Required: Prefill existing application data for editing
           final appId = detail.applicationId.isNotEmpty
               ? detail.applicationId
@@ -1870,16 +2237,13 @@ class _CertificationDetailsScreenState
             ),
           ).then((_) => _fetchApplicationDetail());
         },
-        icon: Icon(
-          isRejected ? Icons.replay_rounded : Icons.edit_note_rounded,
-          size: 20,
-        ),
+        icon: const Icon(Icons.edit_note_rounded, size: 20),
         label: Text(
-          isRejected ? 'Re-apply for Certification' : 'Edit / Resubmit Application',
+          'Edit / Resubmit Application',
           style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
         ),
         style: ElevatedButton.styleFrom(
-          backgroundColor: isRejected ? const Color(0xFFDC2626) : AppColors.primaryBlue,
+          backgroundColor: AppColors.primaryBlue,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),

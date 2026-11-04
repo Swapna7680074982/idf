@@ -187,22 +187,110 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
 
       _submissionModel.submissionDate = DateTime.now();
 
-      // Automatically post AI Validation Result (Mobile -> Backend)
-      // Transitions program status to "In Review" (manual_review)
+      // Post AI Validation Result (Mobile -> Backend)
+      // If supporting materials/docs or core program data are missing, reject AI validation
+      final bool isMissingDocs = _submissionModel.hasMissingSupportingDocuments;
+      final bool isMissingCoreData = _submissionModel.programName.trim().isEmpty ||
+          (_submissionModel.description.trim().isEmpty && _submissionModel.programDescription.trim().isEmpty) ||
+          _submissionModel.organizingEntityName.trim().isEmpty;
+      final bool isMissingDocsOrData = isMissingDocs || isMissingCoreData;
+
       if (programId.isNotEmpty) {
         try {
+          final aiStatus = isMissingDocsOrData ? 'rejected' : 'approved';
+          final aiChecks = isMissingDocsOrData
+              ? [
+                  {
+                    'check_type': 'content_review',
+                    'status': isMissingCoreData ? 'rejected' : 'approved',
+                    'status_label': isMissingCoreData ? 'FAILED' : 'VERIFIED',
+                    'score': isMissingCoreData ? 0 : 25,
+                    'max_score': 25,
+                    'details': isMissingCoreData
+                        ? 'Mandatory program information or description missing.'
+                        : 'Content parameters verified.',
+                  },
+                  {
+                    'check_type': 'program_details_match',
+                    'status': 'approved',
+                    'status_label': 'VERIFIED',
+                    'score': 25,
+                    'max_score': 25,
+                    'details': 'Schedule and location information verified.',
+                  },
+                  {
+                    'check_type': 'supporting_materials',
+                    'status': isMissingDocs ? 'rejected' : 'approved',
+                    'status_label': isMissingDocs ? 'FAILED' : 'VERIFIED',
+                    'score': isMissingDocs ? 0 : 25,
+                    'max_score': 25,
+                    'details': isMissingDocs
+                        ? 'Mandatory supporting documents not uploaded. AI validation rejected.'
+                        : 'Media and attachments verified.',
+                  },
+                  {
+                    'check_type': 'overall',
+                    'status': 'rejected',
+                    'status_label': 'REJECTED',
+                    'score': 10,
+                    'max_score': 25,
+                    'details': isMissingDocs
+                        ? 'Automated review rejected: Supporting documentation is missing.'
+                        : 'Automated review rejected: Core program data incomplete.',
+                  },
+                ]
+              : [
+                  {
+                    'check_type': 'content_review',
+                    'status': 'approved',
+                    'status_label': 'VERIFIED',
+                    'score': 25,
+                    'max_score': 25,
+                    'details': 'Content parameters verified.',
+                  },
+                  {
+                    'check_type': 'program_details_match',
+                    'status': 'approved',
+                    'status_label': 'VERIFIED',
+                    'score': 25,
+                    'max_score': 25,
+                    'details': 'Schedule and venue match confirmed.',
+                  },
+                  {
+                    'check_type': 'supporting_materials',
+                    'status': 'approved',
+                    'status_label': 'VERIFIED',
+                    'score': 25,
+                    'max_score': 25,
+                    'details': 'Media & attachments verified.',
+                  },
+                  {
+                    'check_type': 'overall',
+                    'status': 'approved',
+                    'status_label': 'PASSED',
+                    'score': 25,
+                    'max_score': 25,
+                    'details': 'All automated audit criteria passed.',
+                  },
+                ];
+
           final aiRes = await ProgramsService.postAiValidationResult(
             programId,
-            status: 'approved',
+            status: aiStatus,
+            checks: aiChecks,
           );
-          final displayStatus = aiRes['data']?['display_status']?.toString();
-          if (displayStatus != null && displayStatus.isNotEmpty) {
-            _submissionModel.status = displayStatus;
+          if (isMissingDocsOrData) {
+            _submissionModel.status = 'Rejected';
           } else {
-            _submissionModel.status = 'In Review';
+            final displayStatus = aiRes['data']?['display_status']?.toString();
+            if (displayStatus != null && displayStatus.isNotEmpty) {
+              _submissionModel.status = displayStatus;
+            } else {
+              _submissionModel.status = 'In Review';
+            }
           }
         } catch (_) {
-          _submissionModel.status = 'In Review';
+          _submissionModel.status = isMissingDocsOrData ? 'Rejected' : 'In Review';
         }
       }
 

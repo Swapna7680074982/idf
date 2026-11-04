@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/theme.dart';
+import 'country_phone_input_field.dart';
+
+export 'country_phone_input_field.dart';
 
 class CustomTextField extends StatelessWidget {
   final String label;
@@ -143,13 +146,14 @@ class _PasswordTextFieldState extends State<PasswordTextField> {
   }
 }
 
-class PhoneInputField extends StatefulWidget {
+class PhoneInputField extends StatelessWidget {
   final String label;
   final String hintText;
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
   final String initialCountryCode;
   final bool showCountryCode;
+  final String? Function(String?)? validator;
 
   const PhoneInputField({
     super.key,
@@ -157,129 +161,20 @@ class PhoneInputField extends StatefulWidget {
     required this.hintText,
     this.controller,
     this.onChanged,
-    this.initialCountryCode = '',
-    this.showCountryCode = false,
+    this.initialCountryCode = '+91',
+    this.showCountryCode = true,
+    this.validator,
   });
 
   @override
-  State<PhoneInputField> createState() => _PhoneInputFieldState();
-}
-
-class _PhoneInputFieldState extends State<PhoneInputField> {
-  late String _selectedCode;
-  final List<String> _countryCodes = ['+91', '+1', '+44', '+61', '+971', '+65'];
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedCode = widget.initialCountryCode;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          widget.label,
-          style: GoogleFonts.inter(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: const Color(0xFF334155),
-          ),
-        ),
-        const SizedBox(height: 7),
-        if (widget.showCountryCode)
-          Row(
-            children: [
-              // Country code selector container
-              Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 10),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border, width: 1.2),
-                ),
-                child: DropdownButtonHideUnderline(
-                  child: DropdownButton<String>(
-                    value: _selectedCode,
-                    icon: const Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: Color(0xFF64748B),
-                      size: 20,
-                    ),
-                    items: _countryCodes.map((code) {
-                      return DropdownMenuItem<String>(
-                        value: code,
-                        child: Text(
-                          code,
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          _selectedCode = val;
-                        });
-                      }
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Phone number text field
-              Expanded(
-                child: SizedBox(
-                  height: 48,
-                  child: TextFormField(
-                    controller: widget.controller,
-                    keyboardType: TextInputType.phone,
-                    onChanged: widget.onChanged,
-                    style: GoogleFonts.inter(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: AppColors.textPrimary,
-                    ),
-                    decoration: InputDecoration(
-                      hintText: widget.hintText,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          )
-        else
-          SizedBox(
-            height: 48,
-            child: TextFormField(
-              controller: widget.controller,
-              keyboardType: TextInputType.phone,
-              onChanged: widget.onChanged,
-              style: GoogleFonts.inter(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
-              ),
-              decoration: InputDecoration(
-                hintText: widget.hintText,
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-              ),
-            ),
-          ),
-      ],
+    return CountryPhoneInputField(
+      label: label,
+      hintText: hintText,
+      controller: controller,
+      onChanged: onChanged,
+      initialPhoneCode: initialCountryCode.isNotEmpty ? initialCountryCode : '+91',
+      validator: validator,
     );
   }
 }

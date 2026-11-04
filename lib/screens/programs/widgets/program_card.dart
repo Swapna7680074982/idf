@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/date_time_utils.dart';
 import '../../../core/theme.dart';
@@ -110,7 +110,7 @@ class ProgramCard extends StatelessWidget {
 
                     // Row 3: Organizer Subtitle
                     Text(
-                      program.organizer.isNotEmpty ? program.organizer : 'IDF Africa Region',
+                      program.organizer.isNotEmpty ? program.organizer : 'MDRF Africa Region',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(

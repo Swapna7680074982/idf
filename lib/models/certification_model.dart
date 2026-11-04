@@ -147,6 +147,7 @@ enum AnswerFormatType {
   numeric,
   singleChoice,
   textNarrative,
+  checkbox,
 }
 
 class CertificationQuestionOption {
@@ -177,7 +178,7 @@ class CertificationQuestionOption {
 class CertificationQuestion {
   final int id;
   final String text;
-  final String answerType; // 'yes_no', 'text', 'number', 'percentage', 'single_choice', etc.
+  final String answerType; // 'yes_no', 'text', 'number', 'percentage', 'single_choice', 'checkbox', etc.
   final String? placeholder;
   final bool isRequired;
   final List<String> options;
@@ -195,6 +196,9 @@ class CertificationQuestion {
 
   AnswerFormatType get formatType {
     final t = answerType.toLowerCase().trim();
+    if (t.contains('check') || t.contains('multi') || t.contains('box')) {
+      return AnswerFormatType.checkbox;
+    }
     if (t.contains('percent')) {
       return AnswerFormatType.percentage;
     }
@@ -764,12 +768,59 @@ class CertificationApplicationModel {
     return null;
   }
 
+  /// Safely checks if a question has been answered (boolean, list, string, number)
+  bool isQuestionAnswered(dynamic questionId) {
+    if (questionId == null) return false;
+    final intId = int.tryParse(questionId.toString());
+    if (intId == null || !questionAnswers.containsKey(intId)) return false;
+    final val = questionAnswers[intId];
+    if (val == null) return false;
+    if (val is bool) return true;
+    if (val is List) return val.isNotEmpty;
+    if (val is String) return val.trim().isNotEmpty;
+    if (val is num) return true;
+    return true;
+  }
+
   /// Sets a question answer
   void setQuestionAnswer(dynamic questionId, dynamic answer) {
     final intId = int.tryParse(questionId.toString());
     if (intId != null) {
       questionAnswers[intId] = answer;
     }
+  }
+
+  /// Checks if any evidence requirement exists for this certification
+  bool get isEvidenceRequired {
+    if (evidenceItems.any((e) => e.isRequired)) return true;
+    if (categoryConfig != null && categoryConfig!.evidenceRequirements.isNotEmpty) return true;
+    return evidenceItems.isNotEmpty;
+  }
+
+  /// Checks if mandatory evidence is missing (i.e. required but no files attached)
+  bool get hasMissingRequiredEvidence {
+    if (evidenceItems.isEmpty) {
+      if (categoryConfig != null && categoryConfig!.evidenceRequirements.isNotEmpty) {
+        return true;
+      }
+      return false;
+    }
+
+    final reqItems = evidenceItems.where((e) => e.isRequired).toList();
+    if (reqItems.isNotEmpty) {
+      return reqItems.any((e) => !e.hasAttachments);
+    }
+
+    if (categoryConfig != null && categoryConfig!.evidenceRequirements.isNotEmpty) {
+      return evidenceItems.any((e) => !e.hasAttachments);
+    }
+
+    return false;
+  }
+
+  /// Checks if ANY evidence has been uploaded at all
+  bool get hasAnyEvidenceUploaded {
+    return evidenceItems.any((e) => e.hasAttachments);
   }
 
   static CertificationApplicationModel prefilledForCertificate(
@@ -1427,6 +1478,8 @@ class CertificationAiValidationCheck {
   final String status; // 'pending', 'approved', 'rejected', 'changes_required'
   final String? statusLabel;
   final String? details;
+  final int score;
+  final int maxScore;
 
   const CertificationAiValidationCheck({
     this.check,
@@ -1435,20 +1488,26 @@ class CertificationAiValidationCheck {
     required this.status,
     this.statusLabel,
     this.details,
+    this.score = 25,
+    this.maxScore = 25,
   });
 
   factory CertificationAiValidationCheck.fromJson(Map<String, dynamic> json) {
     final ct = json['check_type']?.toString() ?? json['check']?.toString() ?? '';
     final lbl = json['label']?.toString() ?? _defaultLabelForType(ct);
     final stat = json['status']?.toString() ?? 'pending';
+    final parsedScore = int.tryParse(json['score']?.toString() ?? '') ?? (stat == 'approved' ? 25 : 0);
+    final parsedMax = int.tryParse(json['max_score']?.toString() ?? '') ?? 25;
 
     return CertificationAiValidationCheck(
       check: json['check']?.toString() ?? ct,
       checkType: ct,
       label: lbl,
       status: stat,
-      statusLabel: json['status_label']?.toString() ?? (stat == 'approved' ? 'Approved' : 'Pending'),
+      statusLabel: json['status_label']?.toString() ?? (stat == 'approved' ? 'Approved' : (stat == 'rejected' ? 'Rejected' : 'Pending')),
       details: json['details']?.toString(),
+      score: parsedScore,
+      maxScore: parsedMax,
     );
   }
 
@@ -1714,6 +1773,56 @@ class CertificationApplicationDetail {
     if (adminComment != null && adminComment!.isNotEmpty) return adminComment;
     if (aiValidationComment != null && aiValidationComment!.isNotEmpty) return aiValidationComment;
     return null;
+  }
+
+  CertificationApplicationDetail copyWith({
+    int? id,
+    String? applicationId,
+    String? applicationNo,
+    String? applicationType,
+    String? status,
+    String? reviewStatus,
+    String? displayStatus,
+    String? decision,
+    String? decisionText,
+    bool? editable,
+    int? currentStep,
+    int? totalSteps,
+    String? submittedAt,
+    String? decisionAt,
+    String? reviewerComment,
+    String? adminComment,
+    String? aiValidationComment,
+    CertificationInstitution? institution,
+    CertificationSubmissionDetails? submissionDetails,
+    List<CertificationTimelineStage>? timeline,
+    List<CertificationAiValidationCheck>? aiValidation,
+    List<CertificationMaterialItem>? materials,
+  }) {
+    return CertificationApplicationDetail(
+      id: id ?? this.id,
+      applicationId: applicationId ?? this.applicationId,
+      applicationNo: applicationNo ?? this.applicationNo,
+      applicationType: applicationType ?? this.applicationType,
+      status: status ?? this.status,
+      reviewStatus: reviewStatus ?? this.reviewStatus,
+      displayStatus: displayStatus ?? this.displayStatus,
+      decision: decision ?? this.decision,
+      decisionText: decisionText ?? this.decisionText,
+      editable: editable ?? this.editable,
+      currentStep: currentStep ?? this.currentStep,
+      totalSteps: totalSteps ?? this.totalSteps,
+      submittedAt: submittedAt ?? this.submittedAt,
+      decisionAt: decisionAt ?? this.decisionAt,
+      reviewerComment: reviewerComment ?? this.reviewerComment,
+      adminComment: adminComment ?? this.adminComment,
+      aiValidationComment: aiValidationComment ?? this.aiValidationComment,
+      institution: institution ?? this.institution,
+      submissionDetails: submissionDetails ?? this.submissionDetails,
+      timeline: timeline ?? this.timeline,
+      aiValidation: aiValidation ?? this.aiValidation,
+      materials: materials ?? this.materials,
+    );
   }
 
   factory CertificationApplicationDetail.fromJson(Map<String, dynamic> json) {

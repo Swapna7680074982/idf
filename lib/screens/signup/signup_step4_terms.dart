@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../bloc/app_bloc.dart';
@@ -50,7 +50,7 @@ class _SignUpStep4ScreenState extends State<SignUpStep4Screen> {
   bool _isLoading = false;
 
   String _termsText =
-      'By registering for the IDF Digital Hub, you agree to use this platform solely for legitimate physical activity program submissions and IDF ACTIVE certification applications. You warrant that all information provided is accurate and complete. The International Diabetes Federation reserves the right to verify, reject, or remove any submissions that violate these terms.';
+      'By registering for the MDRF Digital Hub, you agree to use this platform solely for legitimate physical activity program submissions and MDRF ACTIVE certification applications. You warrant that all information provided is accurate and complete. MDRF reserves the right to verify, reject, or remove any submissions that violate these terms.';
 
   @override
   void initState() {

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme.dart';
 import '../../../models/certification_model.dart';
@@ -321,7 +321,7 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Minimum 50% of category max score required for certification',
+                  'Select an institution category to proceed with certification',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 11.5,
@@ -438,24 +438,8 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE0F2FE),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              'Max Score: ${type.maxPoints}',
-                              style: GoogleFonts.inter(
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                                color: const Color(0xFF0284C7),
-                              ),
-                            ),
-                          ),
+                          // Max score display removed as requested
+                          const SizedBox.shrink(),
                         ],
                       ),
                       const SizedBox(height: 6),
@@ -470,25 +454,7 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          if (type.passScore != null) ...[
-                            Text(
-                              'Pass score: ${type.passScore} pts',
-                              style: GoogleFonts.inter(
-                                fontSize: 11.5,
-                                fontWeight: FontWeight.w600,
-                                color: const Color(0xFF16A34A),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            const Text(
-                              '•',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: Color(0xFF94A3B8),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
+                          // Pass score display removed as requested
                           Text(
                             '${type.validityMonths ?? 24} months validity',
                             style: GoogleFonts.inter(
