@@ -956,6 +956,10 @@ class _CertificationDetailsScreenState
 
   Widget _buildInfoRow(String label, String value) {
     if (value.trim().isEmpty) return const SizedBox.shrink();
+    final lowerLabel = label.toLowerCase();
+    final isEmail = lowerLabel.contains('email') || (value.contains('@') && !value.contains(' '));
+    final isPhone = lowerLabel.contains('phone');
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
@@ -972,14 +976,43 @@ class _CertificationDetailsScreenState
             ),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: GoogleFonts.inter(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: const Color(0xFF1E293B),
-              ),
-            ),
+            child: isEmail || isPhone
+                ? InkWell(
+                    onTap: () async {
+                      if (isEmail) {
+                        final uri = Uri(scheme: 'mailto', path: value.trim());
+                        try {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        } catch (_) {
+                          await launchUrl(uri, mode: LaunchMode.platformDefault);
+                        }
+                      } else if (isPhone) {
+                        final uri = Uri(scheme: 'tel', path: value.trim());
+                        try {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        } catch (_) {
+                          await launchUrl(uri, mode: LaunchMode.platformDefault);
+                        }
+                      }
+                    },
+                    child: Text(
+                      value,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primaryBlue,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  )
+                : Text(
+                    value,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF1E293B),
+                    ),
+                  ),
           ),
         ],
       ),

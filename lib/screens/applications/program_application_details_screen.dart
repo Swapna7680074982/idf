@@ -1674,6 +1674,10 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
   }
 
   Widget _buildInfoRow(String label, String value, {bool isLast = false}) {
+    final lowerLabel = label.toLowerCase();
+    final isEmail = lowerLabel.contains('email') || (value.contains('@') && !value.contains(' '));
+    final isPhone = lowerLabel.contains('phone');
+
     return Padding(
       padding: EdgeInsets.only(bottom: isLast ? 0 : 10.0),
       child: Row(
@@ -1688,17 +1692,49 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.inter(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF0F172A),
-              ),
-            ),
+            child: isEmail || isPhone
+                ? InkWell(
+                    onTap: () async {
+                      if (isEmail) {
+                        final uri = Uri(scheme: 'mailto', path: value.trim());
+                        try {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        } catch (_) {
+                          await launchUrl(uri, mode: LaunchMode.platformDefault);
+                        }
+                      } else if (isPhone) {
+                        final uri = Uri(scheme: 'tel', path: value.trim());
+                        try {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        } catch (_) {
+                          await launchUrl(uri, mode: LaunchMode.platformDefault);
+                        }
+                      }
+                    },
+                    child: Text(
+                      value,
+                      textAlign: TextAlign.end,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryBlue,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  )
+                : Text(
+                    value,
+                    textAlign: TextAlign.end,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
           ),
         ],
       ),

@@ -129,32 +129,56 @@ class City {
 }
 
 class LegalDocument {
+  final int id;
   final String docType;
+  final String title;
+  final String slug;
   final String version;
   final String content;
+  final String contentHtml;
   final String effectiveFrom;
+  final bool isActive;
+  final String updatedAt;
 
   const LegalDocument({
+    this.id = 0,
     required this.docType,
+    this.title = '',
+    this.slug = '',
     required this.version,
     required this.content,
+    this.contentHtml = '',
     required this.effectiveFrom,
+    this.isActive = true,
+    this.updatedAt = '',
   });
 
   factory LegalDocument.fromJson(Map<String, dynamic> json) {
     return LegalDocument(
+      id: json['id'] is int ? json['id'] as int : int.tryParse('${json['id']}') ?? 0,
       docType: json['doc_type'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      slug: json['slug'] as String? ?? '',
       version: json['version'] as String? ?? '',
       content: json['content'] as String? ?? '',
+      contentHtml: json['content_html'] as String? ?? '',
       effectiveFrom: json['effective_from'] as String? ?? '',
+      isActive: json['is_active'] == 1 || json['is_active'] == true,
+      updatedAt: json['updated_at'] as String? ?? '',
     );
   }
 
   Map<String, dynamic> toJson() => {
+        'id': id,
         'doc_type': docType,
+        'title': title,
+        'slug': slug,
         'version': version,
         'content': content,
+        'content_html': contentHtml,
         'effective_from': effectiveFrom,
+        'is_active': isActive ? 1 : 0,
+        'updated_at': updatedAt,
       };
 }
 

@@ -1,15 +1,19 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../bloc/app_bloc.dart';
 import '../../bloc/app_event.dart';
 import '../../core/theme.dart';
+import '../../models/meta_models.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
 import '../../services/firebase_service.dart';
 import '../../services/metadata_service.dart';
 import '../../widgets/auth_header.dart';
 import '../../widgets/custom_button.dart';
+import '../common/legal_document_screen.dart';
 import 'signup_success.dart';
 
 class SignUpStep4Screen extends StatefulWidget {
@@ -49,30 +53,135 @@ class _SignUpStep4ScreenState extends State<SignUpStep4Screen> {
   bool _confirmedAccuracy = false;
   bool _isLoading = false;
 
-  String _termsText =
-      'By registering for the MDRF Digital Hub, you agree to use this platform solely for legitimate physical activity program submissions and MDRF ACTIVE certification applications. You warrant that all information provided is accurate and complete. MDRF reserves the right to verify, reject, or remove any submissions that violate these terms.';
+  LegalDocument? _termsDoc;
+  bool _isLoadingTerms = true;
+  String? _termsError;
+
+  late final TapGestureRecognizer _termsRecognizer;
+  late final TapGestureRecognizer _privacyRecognizer;
 
   @override
   void initState() {
     super.initState();
-    _loadLegalDocuments();
+    _termsRecognizer = TapGestureRecognizer()
+      ..onTap = () {
+        LegalDocumentScreen.open(
+          context,
+          slug: 'terms',
+          title: 'Terms of Service',
+          document: _termsDoc,
+        );
+      };
+
+    _privacyRecognizer = TapGestureRecognizer()
+      ..onTap = () {
+        LegalDocumentScreen.open(
+          context,
+          slug: 'privacy',
+          title: 'Privacy Policy',
+        );
+      };
+
+    _loadTerms();
   }
 
-  Future<void> _loadLegalDocuments() async {
+  @override
+  void dispose() {
+    _termsRecognizer.dispose();
+    _privacyRecognizer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadTerms() async {
+    setState(() {
+      _isLoadingTerms = true;
+      _termsError = null;
+    });
+
     try {
-      final docs = await MetadataService.getLegalDocuments();
-      if (docs.isNotEmpty) {
-        final terms = docs.firstWhere(
-          (d) => d.docType == 'terms_of_service',
-          orElse: () => docs.first,
-        );
-        if (mounted && terms.content.isNotEmpty) {
-          setState(() {
-            _termsText = terms.content;
-          });
-        }
+      final doc = await MetadataService.getLegalDocumentBySlug('terms');
+      if (mounted) {
+        setState(() {
+          _termsDoc = doc;
+          _isLoadingTerms = false;
+        });
       }
-    } catch (_) {}
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _termsError = 'Unable to load Terms of Service. Please check your network connection.';
+          _isLoadingTerms = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _launchEmail(String email) async {
+    final clean = email.replaceFirst('mailto:', '').trim();
+    final uri = Uri(scheme: 'mailto', path: clean);
+    try {
+      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!launched) {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (_) {
+      try {
+        await launchUrl(uri, mode: LaunchMode.platformDefault);
+      } catch (_) {}
+    }
+  }
+
+  List<InlineSpan> _buildClickableSpans(String text, TextStyle baseStyle) {
+    final spans = <InlineSpan>[];
+    final regex = RegExp(
+      r'(\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b)|(https?:\/\/[^\s<>"{}|\\^`]+)|(mailto:[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})',
+      caseSensitive: false,
+    );
+
+    int lastIndex = 0;
+    for (final match in regex.allMatches(text)) {
+      if (match.start > lastIndex) {
+        spans.add(TextSpan(
+          text: text.substring(lastIndex, match.start),
+          style: baseStyle,
+        ));
+      }
+
+      final matchedStr = match.group(0)!;
+      final isEmail = match.group(1) != null || match.group(3) != null;
+      final displayStr = matchedStr.startsWith('mailto:') ? matchedStr.substring(7) : matchedStr;
+
+      spans.add(
+        TextSpan(
+          text: displayStr,
+          style: baseStyle.copyWith(
+            color: AppColors.primaryBlue,
+            fontWeight: FontWeight.w600,
+            decoration: TextDecoration.underline,
+          ),
+          recognizer: TapGestureRecognizer()
+            ..onTap = () {
+              if (isEmail) {
+                _launchEmail(matchedStr);
+              } else {
+                final uri = Uri.tryParse(matchedStr);
+                if (uri != null) launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
+            },
+        ),
+      );
+
+      lastIndex = match.end;
+    }
+
+    if (lastIndex < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(lastIndex),
+        style: baseStyle,
+      ));
+    }
+
+    return spans;
   }
 
   void _onCreateAccount() async {
@@ -169,23 +278,138 @@ class _SignUpStep4ScreenState extends State<SignUpStep4Screen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Terms of Service',
-                          style: GoogleFonts.inter(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              _termsDoc?.title.isNotEmpty == true
+                                  ? _termsDoc!.title
+                                  : 'Terms of Service',
+                              style: GoogleFonts.inter(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textPrimary,
+                              ),
+                            ),
+                            if (_termsDoc?.version.isNotEmpty == true)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                                ),
+                                child: Text(
+                                  'v${_termsDoc!.version}',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: const Color(0xFF1D4ED8),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 10),
-                        Text(
-                          _termsText,
-                          style: GoogleFonts.inter(
-                            fontSize: 12.5,
-                            color: const Color(0xFF475569),
-                            height: 1.5,
+                        if (_isLoadingTerms)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 24.0),
+                            child: Center(
+                              child: SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.primaryBlue,
+                                ),
+                              ),
+                            ),
+                          )
+                        else if (_termsError != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12.0),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _termsError!,
+                                  style: GoogleFonts.inter(
+                                    fontSize: 12,
+                                    color: const Color(0xFFDC2626),
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                TextButton.icon(
+                                  onPressed: _loadTerms,
+                                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                                  label: Text(
+                                    'Retry Loading',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  style: TextButton.styleFrom(
+                                    padding: EdgeInsets.zero,
+                                    foregroundColor: AppColors.primaryBlue,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Container(
+                                constraints: const BoxConstraints(maxHeight: 180),
+                                child: SingleChildScrollView(
+                                  child: Text.rich(
+                                    TextSpan(
+                                      children: _buildClickableSpans(
+                                        _termsDoc!.content,
+                                        GoogleFonts.inter(
+                                          fontSize: 12.5,
+                                          color: const Color(0xFF475569),
+                                          height: 1.5,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              GestureDetector(
+                                onTap: () {
+                                  LegalDocumentScreen.open(
+                                    context,
+                                    slug: 'terms',
+                                    title: 'Terms of Service',
+                                    document: _termsDoc,
+                                  );
+                                },
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'View full document',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.primaryBlue,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(
+                                      Icons.open_in_new_rounded,
+                                      size: 13,
+                                      color: AppColors.primaryBlue,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -214,7 +438,9 @@ class _SignUpStep4ScreenState extends State<SignUpStep4Screen> {
                               fontSize: 12.5,
                               color: AppColors.primaryBlue,
                               fontWeight: FontWeight.w700,
+                              decoration: TextDecoration.underline,
                             ),
+                            recognizer: _termsRecognizer,
                           ),
                           const TextSpan(text: ' and '),
                           TextSpan(
@@ -223,7 +449,9 @@ class _SignUpStep4ScreenState extends State<SignUpStep4Screen> {
                               fontSize: 12.5,
                               color: AppColors.primaryBlue,
                               fontWeight: FontWeight.w700,
+                              decoration: TextDecoration.underline,
                             ),
+                            recognizer: _privacyRecognizer,
                           ),
                           const TextSpan(text: '.'),
                         ],

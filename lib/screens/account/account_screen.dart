@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../bloc/app_bloc.dart';
@@ -10,10 +10,10 @@ import 'change_password_screen.dart';
 import 'contact_support_screen.dart';
 import 'edit_profile_screen.dart';
 import 'organization_details_screen.dart';
+import '../common/legal_document_screen.dart';
 
 import '../../services/api_config.dart';
 import '../../services/auth_service.dart';
-import '../../services/metadata_service.dart';
 import '../../models/account_models.dart';
 import '../../services/account_service.dart';
 
@@ -252,58 +252,6 @@ class _AccountScreenState extends State<AccountScreen> {
     );
   }
 
-  void _showInfoModal(
-    BuildContext context, {
-    required String title,
-    required String content,
-  }) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.inter(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.close_rounded, size: 20),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                content,
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  height: 1.6,
-                  color: const Color(0xFF475569),
-                ),
-              ),
-              const SizedBox(height: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<AppBloc, AppState>(
@@ -520,27 +468,12 @@ class _AccountScreenState extends State<AccountScreen> {
                           size: 20,
                         ),
                         title: 'Privacy',
-                        onTap: () async {
-                          String privacyContent =
-                              'Your privacy and data security are our highest priorities. All organizational, patient, and program records are processed in compliance with global health data standards (GDPR, HIPAA, and MDRF data protocols).\n\nMDRF Active only shares verified certification details with authorized educational and governmental entities.';
-                          try {
-                            final docs = await MetadataService.getLegalDocuments();
-                            final privacy = docs.firstWhere(
-                              (d) => d.docType == 'privacy_policy',
-                              orElse: () => docs.last,
-                            );
-                            if (privacy.content.isNotEmpty) {
-                              privacyContent = privacy.content;
-                            }
-                          } catch (_) {}
-
-                          if (context.mounted) {
-                            _showInfoModal(
-                              context,
-                              title: 'Privacy Policy',
-                              content: privacyContent,
-                            );
-                          }
+                        onTap: () {
+                          LegalDocumentScreen.open(
+                            context,
+                            slug: 'privacy',
+                            title: 'Privacy Policy',
+                          );
                         },
                       ),
                       const SizedBox(height: 8),
@@ -551,27 +484,12 @@ class _AccountScreenState extends State<AccountScreen> {
                           size: 20,
                         ),
                         title: 'Terms of Service',
-                        onTap: () async {
-                          String termsContent =
-                              'By registering for the MDRF Digital Hub, you agree to use this platform solely for legitimate physical activity program submissions and MDRF ACTIVE certification applications...';
-                          try {
-                            final docs = await MetadataService.getLegalDocuments();
-                            final terms = docs.firstWhere(
-                              (d) => d.docType == 'terms_of_service',
-                              orElse: () => docs.first,
-                            );
-                            if (terms.content.isNotEmpty) {
-                              termsContent = terms.content;
-                            }
-                          } catch (_) {}
-
-                          if (context.mounted) {
-                            _showInfoModal(
-                              context,
-                              title: 'Terms of Service',
-                              content: termsContent,
-                            );
-                          }
+                        onTap: () {
+                          LegalDocumentScreen.open(
+                            context,
+                            slug: 'terms',
+                            title: 'Terms of Service',
+                          );
                         },
                       ),
                       const SizedBox(height: 24),

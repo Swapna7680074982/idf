@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/theme.dart';
 import '../widgets/dr_mohans_logo.dart';
 import '../widgets/custom_button.dart';
 import 'login_screen.dart';
 import 'signup/signup_step1_account.dart';
+import 'common/legal_document_screen.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -153,7 +155,16 @@ class WelcomeScreen extends StatelessWidget {
                               fontSize: 12,
                               color: AppColors.primaryBlue,
                               fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.underline,
                             ),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () {
+                                LegalDocumentScreen.open(
+                                  context,
+                                  slug: 'terms',
+                                  title: 'Terms of Service',
+                                );
+                              },
                           ),
                           const TextSpan(text: ' and '),
                           TextSpan(
@@ -162,7 +173,16 @@ class WelcomeScreen extends StatelessWidget {
                               fontSize: 12,
                               color: AppColors.primaryBlue,
                               fontWeight: FontWeight.w600,
+                              decoration: TextDecoration.underline,
                             ),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () {
+                                LegalDocumentScreen.open(
+                                  context,
+                                  slug: 'privacy',
+                                  title: 'Privacy Policy',
+                                );
+                              },
                           ),
                         ],
                       ),

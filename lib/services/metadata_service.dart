@@ -156,18 +156,39 @@ class MetadataService {
   }
 
   /// Get active legal documents (Terms of Service, Privacy Policy)
-  /// GET /api/meta/legal
-  static Future<List<LegalDocument>> getLegalDocuments() async {
-    final response = await ApiClient.get(ApiConfig.legal);
+  /// GET /api/meta/legal?slug=:slug
+  static Future<List<LegalDocument>> getLegalDocuments({String? slug}) async {
+    final Map<String, dynamic>? queryParams =
+        (slug != null && slug.isNotEmpty) ? {'slug': slug} : null;
+    final response = await ApiClient.get(
+      ApiConfig.legal,
+      queryParams: queryParams,
+    );
     if (response is List) {
       return response
           .map((item) => LegalDocument.fromJson(item as Map<String, dynamic>))
           .toList();
+    } else if (response is Map<String, dynamic>) {
+      return [LegalDocument.fromJson(response)];
     }
     throw const ApiException(
       code: 'INVALID_DATA',
       message: 'Failed to load legal documents from server',
       statusCode: 500,
+    );
+  }
+
+  /// Get a specific legal document by slug ('terms' or 'privacy')
+  /// GET /api/meta/legal?slug=:slug
+  static Future<LegalDocument> getLegalDocumentBySlug(String slug) async {
+    final docs = await getLegalDocuments(slug: slug);
+    if (docs.isNotEmpty) {
+      return docs.first;
+    }
+    throw ApiException(
+      code: 'NOT_FOUND',
+      message: 'Failed to load legal document for slug "$slug"',
+      statusCode: 404,
     );
   }
 }
