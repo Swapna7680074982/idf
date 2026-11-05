@@ -1651,7 +1651,7 @@ class _CertificationDetailsScreenState
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      isRejected ? 'FAILED' : (_isAiScanning ? 'SCANNING' : 'DONE'),
+                      isRejected ? 'REJECTED' : (_isAiScanning ? 'SCANNING' : 'DONE'),
                       style: GoogleFonts.inter(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,

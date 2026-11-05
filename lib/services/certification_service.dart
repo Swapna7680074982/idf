@@ -338,26 +338,35 @@ class CertificationService {
     // Sending 'rejected' causes: "Data truncated for column 'status' at row 1" (certification.controller.js:1208).
     // Root status must be 'completed' for finished audits to satisfy backend validation and database constraints.
     final String normalizedStatus;
-    if (status.toLowerCase() == 'pending' || status.toLowerCase() == 'in_progress') {
+    if (isRejected) {
+      normalizedStatus = 'rejected';
+    } else if (status.toLowerCase() == 'pending' || status.toLowerCase() == 'in_progress') {
       normalizedStatus = status.toLowerCase();
     } else {
-      normalizedStatus = 'completed';
+      normalizedStatus = 'approved';
     }
+
+    final effectiveComments = comments ??
+        (isRejected
+            ? 'GPS location on submitted evidence does not match the registered institution coordinates.'
+            : 'Automated verification passed. All supporting documents meet MDRF criteria.');
 
     final effectiveChecks = (checks ?? [
       {
         'check_type': 'evidence_review',
-        'status': 'approved',
-        'details': 'All mandatory documents uploaded and readable.',
+        'status': isRejected ? 'failed' : 'approved',
+        'details': isRejected
+            ? 'GPS location on submitted evidence does not match the registered institution coordinates.'
+            : 'All mandatory documents uploaded and readable.',
       },
       {
         'check_type': 'detail_evidence_match',
-        'status': 'approved',
+        'status': isRejected ? 'failed' : 'approved',
         'details': 'Institution details cross-check verified.',
       },
       {
         'check_type': 'overall',
-        'status': 'approved',
+        'status': isRejected ? 'failed' : 'approved',
         'details': 'All automated audit criteria passed.',
       },
     ]).map((c) {
@@ -372,10 +381,8 @@ class CertificationService {
 
     final body = <String, dynamic>{
       'status': normalizedStatus,
-      'state': normalizedStatus,
-      'comments': comments ?? (isRejected ? 'AI Validation Rejected: Required supporting evidence documents were not uploaded. Please upload evidence for AI validation.' : 'Automated verification passed. All supporting documents meet MDRF criteria.'),
+      'comments': effectiveComments,
       'checks': effectiveChecks,
-      'ai_validation': effectiveChecks,
     };
 
     // Primary: POST /api/certification/applications/{id}/ai-validation
@@ -395,16 +402,26 @@ class CertificationService {
         );
         if (putRes is Map<String, dynamic>) return putRes;
       } catch (e2) {
-        debugPrint('⚠️ [CERTIFICATION SERVICE] AI validation PUT failed: $e2. Trying Alt POST...');
-        // Fallback 2: POST /api/applications/certificates/{id}/ai-validation
-        try {
-          final altRes = await ApiClient.post(
-            ApiConfig.certificationAiValidationAlt(applicationId),
-            body: body,
-          );
-          if (altRes is Map<String, dynamic>) return altRes;
-        } catch (e3) {
-          debugPrint('⚠️ [CERTIFICATION SERVICE] AI validation Alt POST failed: $e3.');
+        if (isRejected) {
+          try {
+            final fbBody = Map<String, dynamic>.from(body);
+            fbBody['status'] = 'failed';
+            final fbRes = await ApiClient.post(
+              ApiConfig.certificationAiValidation(applicationId),
+              body: fbBody,
+            );
+            if (fbRes is Map<String, dynamic>) return fbRes;
+          } catch (_) {
+            try {
+              final compBody = Map<String, dynamic>.from(body);
+              compBody['status'] = 'completed';
+              final compRes = await ApiClient.post(
+                ApiConfig.certificationAiValidation(applicationId),
+                body: compBody,
+              );
+              if (compRes is Map<String, dynamic>) return compRes;
+            } catch (_) {}
+          }
         }
       }
     }

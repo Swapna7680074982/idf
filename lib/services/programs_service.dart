@@ -423,25 +423,23 @@ class ProgramsService {
     String status = 'approved',
     List<Map<String, dynamic>>? checks,
   }) async {
-    // Note: The backend Zod schema requires status to be one of:
-    // 'pending' | 'in_progress' | 'completed' | 'reviewed' | 'approved' | 'failed'
-    // BUT in MySQL (program_stages table), the 'state' column has ENUM('pending', 'in_progress', 'completed').
-    // In program.controller.js:695, it runs: UPDATE program_stages SET state = req.body.status.
-    // If 'rejected' is passed, Zod throws 422: "Invalid enum value. Expected 'pending' | 'in_progress' | 'completed' | 'reviewed' | 'approved' | 'failed', received 'rejected'".
-    // If 'failed' or 'approved' is passed, MySQL throws: "Data truncated for column 'state' at row 1".
-    // Setting root status to 'completed' satisfies both Zod schema and MySQL state ENUM.
-    final String normalizedStatus;
-    if (status.toLowerCase() == 'pending' || status.toLowerCase() == 'in_progress') {
-      normalizedStatus = status.toLowerCase();
-    } else {
-      normalizedStatus = 'completed';
-    }
+    final bool isRejected = status.toLowerCase() == 'rejected' ||
+        status.toLowerCase() == 'failed' ||
+        (checks != null &&
+            checks.any((c) {
+              final s = c['status']?.toString().toLowerCase();
+              return s == 'rejected' || s == 'failed';
+            }));
+
+    final String normalizedStatus = isRejected
+        ? 'rejected'
+        : (status.toLowerCase() == 'pending' ? 'pending' : 'completed');
 
     final effectiveChecks = (checks ?? [
-      {'check_type': 'content_review', 'status': 'approved', 'details': null},
-      {'check_type': 'program_details_match', 'status': 'approved', 'details': null},
-      {'check_type': 'supporting_materials', 'status': 'approved', 'details': null},
-      {'check_type': 'overall', 'status': 'approved', 'details': null},
+      {'check_type': 'content_review', 'status': isRejected ? 'failed' : 'approved', 'details': null},
+      {'check_type': 'program_details_match', 'status': isRejected ? 'failed' : 'approved', 'details': null},
+      {'check_type': 'supporting_materials', 'status': isRejected ? 'failed' : 'approved', 'details': null},
+      {'check_type': 'overall', 'status': isRejected ? 'failed' : 'approved', 'details': null},
     ]).map((c) {
       final copy = Map<String, dynamic>.from(c);
       final s = copy['status']?.toString().toLowerCase();
@@ -454,9 +452,7 @@ class ProgramsService {
 
     final body = <String, dynamic>{
       'status': normalizedStatus,
-      'state': normalizedStatus,
       'checks': effectiveChecks,
-      'ai_validation': effectiveChecks,
     };
 
     // Primary: POST /api/programs/:id/ai-validation
@@ -467,6 +463,18 @@ class ProgramsService {
       );
       if (response is Map<String, dynamic>) return response;
     } catch (_) {
+      // If server rejected 'rejected' with 422, fallback to 'completed'
+      if (isRejected) {
+        try {
+          final compBody = Map<String, dynamic>.from(body);
+          compBody['status'] = 'completed';
+          final compRes = await ApiClient.post(
+            ApiConfig.programAiValidation(programId),
+            body: compBody,
+          );
+          if (compRes is Map<String, dynamic>) return compRes;
+        } catch (_) {}
+      }
       try {
         final putRes = await ApiClient.put(
           ApiConfig.programAiValidation(programId),
