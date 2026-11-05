@@ -463,18 +463,6 @@ class ProgramsService {
       );
       if (response is Map<String, dynamic>) return response;
     } catch (_) {
-      // If server rejected 'rejected' with 422, fallback to 'completed'
-      if (isRejected) {
-        try {
-          final compBody = Map<String, dynamic>.from(body);
-          compBody['status'] = 'completed';
-          final compRes = await ApiClient.post(
-            ApiConfig.programAiValidation(programId),
-            body: compBody,
-          );
-          if (compRes is Map<String, dynamic>) return compRes;
-        } catch (_) {}
-      }
       try {
         final putRes = await ApiClient.put(
           ApiConfig.programAiValidation(programId),

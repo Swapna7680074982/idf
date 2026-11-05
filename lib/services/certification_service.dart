@@ -402,26 +402,15 @@ class CertificationService {
         );
         if (putRes is Map<String, dynamic>) return putRes;
       } catch (e2) {
-        if (isRejected) {
-          try {
-            final fbBody = Map<String, dynamic>.from(body);
-            fbBody['status'] = 'failed';
-            final fbRes = await ApiClient.post(
-              ApiConfig.certificationAiValidation(applicationId),
-              body: fbBody,
-            );
-            if (fbRes is Map<String, dynamic>) return fbRes;
-          } catch (_) {
-            try {
-              final compBody = Map<String, dynamic>.from(body);
-              compBody['status'] = 'completed';
-              final compRes = await ApiClient.post(
-                ApiConfig.certificationAiValidation(applicationId),
-                body: compBody,
-              );
-              if (compRes is Map<String, dynamic>) return compRes;
-            } catch (_) {}
-          }
+        debugPrint('⚠️ [CERTIFICATION SERVICE] AI validation PUT failed: $e2. Trying Alt POST...');
+        try {
+          final altRes = await ApiClient.post(
+            ApiConfig.certificationAiValidationAlt(applicationId),
+            body: body,
+          );
+          if (altRes is Map<String, dynamic>) return altRes;
+        } catch (e3) {
+          debugPrint('⚠️ [CERTIFICATION SERVICE] AI validation Alt POST failed: $e3.');
         }
       }
     }
