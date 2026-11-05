@@ -61,34 +61,46 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
         final bool isMissingCoreData = progName.isEmpty || progDesc.isEmpty;
         final bool isMissingDocsOrData = isMissingDocs || isMissingCoreData;
 
-        final String aiStatus = isMissingDocsOrData ? 'failed' : 'approved';
+        final String aiStatus = isMissingDocsOrData ? 'rejected' : 'approved';
         final List<Map<String, dynamic>> checks = isMissingDocsOrData
             ? [
                 {
                   'check_type': 'content_review',
-                  'status': isMissingCoreData ? 'failed' : 'approved',
+                  'status': isMissingCoreData ? 'rejected' : 'approved',
+                  'status_label': isMissingCoreData ? 'FAILED' : 'VERIFIED',
+                  'score': isMissingCoreData ? 0 : 25,
+                  'max_score': 25,
                   'details': isMissingCoreData
                       ? 'Mandatory program details or description missing'
-                      : 'Content parameters verified',
+                      : 'Content parameters verified.',
                 },
                 {
                   'check_type': 'program_details_match',
                   'status': 'approved',
-                  'details': 'Program details verified',
+                  'status_label': 'VERIFIED',
+                  'score': 25,
+                  'max_score': 25,
+                  'details': 'Schedule and location information verified.',
                 },
                 {
                   'check_type': 'supporting_materials',
-                  'status': isMissingDocs ? 'failed' : 'approved',
+                  'status': isMissingDocs ? 'rejected' : 'approved',
+                  'status_label': isMissingDocs ? 'FAILED' : 'VERIFIED',
+                  'score': isMissingDocs ? 0 : 25,
+                  'max_score': 25,
                   'details': isMissingDocs
                       ? 'Mandatory supporting documents not uploaded. AI validation rejected.'
-                      : 'Materials and media verified',
+                      : 'Materials and media verified.',
                 },
                 {
                   'check_type': 'overall',
-                  'status': 'failed',
+                  'status': 'rejected',
+                  'status_label': 'FAILED',
+                  'score': 10,
+                  'max_score': 25,
                   'details': isMissingDocs
-                      ? 'Automated review rejected: Supporting documentation missing'
-                      : 'Automated review rejected: Core data incomplete',
+                      ? 'Automated review rejected: Supporting documentation is missing.'
+                      : 'Automated review rejected: Core data incomplete.',
                 },
               ]
             : [
@@ -130,19 +142,30 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
           final refreshed = await ProgramsService.getMyApplicationDetail(progId);
           if (mounted) {
             setState(() {
+              if (isMissingDocsOrData) {
+                refreshed['status'] = 'Rejected';
+                refreshed['review_status'] = 'rejected';
+                refreshed['display_status'] = 'Rejected';
+                if (refreshed['submission_details'] is Map<String, dynamic>) {
+                  (refreshed['submission_details'] as Map<String, dynamic>)['current_status'] = 'Rejected';
+                  (refreshed['submission_details'] as Map<String, dynamic>)['display_status'] = 'Rejected';
+                }
+                refreshed['ai_validation'] = checks;
+              }
               _liveDetail = refreshed;
             });
           }
         } catch (_) {}
 
         if (mounted) {
-          final serverMsg = res['message']?.toString() ??
-              'AI validation recorded; program is now in review';
+          final serverMsg = isMissingDocsOrData
+              ? 'AI validation rejected: Missing required supporting documents'
+              : (res['message']?.toString() ?? 'AI validation recorded; program is now in review');
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(serverMsg),
               behavior: SnackBarBehavior.floating,
-              backgroundColor: const Color(0xFF10B981),
+              backgroundColor: isMissingDocsOrData ? const Color(0xFFDC2626) : const Color(0xFF10B981),
               duration: const Duration(seconds: 3),
             ),
           );

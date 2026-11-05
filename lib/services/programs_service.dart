@@ -427,6 +427,7 @@ class ProgramsService {
     // 'pending' | 'in_progress' | 'completed' | 'reviewed' | 'approved' | 'failed'
     // BUT in MySQL (program_stages table), the 'state' column has ENUM('pending', 'in_progress', 'completed').
     // In program.controller.js:695, it runs: UPDATE program_stages SET state = req.body.status.
+    // If 'rejected' is passed, Zod throws 422: "Invalid enum value. Expected 'pending' | 'in_progress' | 'completed' | 'reviewed' | 'approved' | 'failed', received 'rejected'".
     // If 'failed' or 'approved' is passed, MySQL throws: "Data truncated for column 'state' at row 1".
     // Setting root status to 'completed' satisfies both Zod schema and MySQL state ENUM.
     final String normalizedStatus;
@@ -444,8 +445,9 @@ class ProgramsService {
     ]).map((c) {
       final copy = Map<String, dynamic>.from(c);
       final s = copy['status']?.toString().toLowerCase();
-      if (s == 'rejected') {
+      if (s == 'rejected' || s == 'failed') {
         copy['status'] = 'failed';
+        copy['status_label'] = 'FAILED';
       }
       return copy;
     }).toList();

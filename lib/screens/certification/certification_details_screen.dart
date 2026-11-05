@@ -114,7 +114,7 @@ class _CertificationDetailsScreenState
         (_detail?.reviewStatus.toLowerCase().contains('reject') ?? false) ||
         (widget.certificateItem?.status.toLowerCase().contains('reject') ?? false);
 
-    final statusToSend = isRejected ? 'failed' : 'approved';
+    final statusToSend = isRejected ? 'rejected' : 'approved';
     final commentsToSend = isMissingEvidence
         ? 'AI Validation Rejected: Required supporting evidence documents were not uploaded. Please upload evidence for AI validation.'
         : (isRejected
@@ -125,7 +125,7 @@ class _CertificationDetailsScreenState
         ? [
             {
               'check_type': 'evidence_review',
-              'status': 'failed',
+              'status': 'rejected',
               'status_label': 'FAILED',
               'score': 0,
               'max_score': 40,
@@ -133,7 +133,7 @@ class _CertificationDetailsScreenState
             },
             {
               'check_type': 'detail_evidence_match',
-              'status': 'failed',
+              'status': 'rejected',
               'status_label': 'INSUFFICIENT',
               'score': 10,
               'max_score': 30,
@@ -141,7 +141,7 @@ class _CertificationDetailsScreenState
             },
             {
               'check_type': 'overall',
-              'status': 'failed',
+              'status': 'rejected',
               'status_label': 'FAILED',
               'score': 15,
               'max_score': 30,
@@ -794,6 +794,16 @@ class _CertificationDetailsScreenState
   }
 
   Widget _buildHeaderCard(CertificationApplicationDetail detail) {
+    final hasNoEvidence = detail.materials.isEmpty &&
+        (widget.application?.hasMissingRequiredEvidence ?? true) &&
+        (detail.status.toLowerCase() != 'approved');
+    final isRejected = hasNoEvidence ||
+        detail.status.toLowerCase().contains('reject') ||
+        detail.reviewStatus.toLowerCase().contains('reject') ||
+        detail.displayStatus.toLowerCase().contains('reject') ||
+        detail.decision.toLowerCase().contains('reject') ||
+        (widget.certificateItem?.status.toLowerCase().contains('reject') ?? false);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -818,11 +828,11 @@ class _CertificationDetailsScreenState
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
+                  color: isRejected ? const Color(0xFFFEE2E2) : const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Center(
-                  child: Text('🏅', style: TextStyle(fontSize: 24)),
+                child: Center(
+                  child: Text(isRejected ? '❌' : '🏅', style: const TextStyle(fontSize: 24)),
                 ),
               ),
               const SizedBox(width: 12),
@@ -852,11 +862,13 @@ class _CertificationDetailsScreenState
                   ],
                 ),
               ),
-              _buildStatusPill(detail.reviewStatus.isNotEmpty
-                  ? detail.reviewStatus
-                  : (detail.displayStatus.isNotEmpty && detail.displayStatus.toLowerCase() != 'submitted'
-                      ? detail.displayStatus
-                      : detail.status)),
+              _buildStatusPill(isRejected
+                  ? 'Rejected'
+                  : (detail.reviewStatus.isNotEmpty
+                      ? detail.reviewStatus
+                      : (detail.displayStatus.isNotEmpty && detail.displayStatus.toLowerCase() != 'submitted'
+                          ? detail.displayStatus
+                          : detail.status))),
             ],
           ),
           const SizedBox(height: 14),
@@ -867,13 +879,19 @@ class _CertificationDetailsScreenState
               Expanded(
                 child: _buildMetaItem(
                     'Review Stage',
-                    _formatReviewStatus(detail.reviewStatus.isNotEmpty
-                        ? detail.reviewStatus
-                        : detail.status)),
+                    isRejected
+                        ? 'Rejected'
+                        : _formatReviewStatus(detail.reviewStatus.isNotEmpty
+                            ? detail.reviewStatus
+                            : detail.status)),
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _buildMetaItem('Decision', detail.decisionText ?? detail.decision),
+                child: _buildMetaItem(
+                    'Decision',
+                    isRejected
+                        ? (detail.decisionText ?? 'Rejected')
+                        : (detail.decisionText ?? detail.decision)),
               ),
               const SizedBox(width: 8),
               Expanded(

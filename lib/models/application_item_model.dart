@@ -388,6 +388,15 @@ class CertificateApplicationItem {
             '')
         .toString();
 
+    final rawAiChecks = json['ai_validation'] ?? json['validations'] ?? json['ai_audit'];
+    final bool hasFailedAi = rawAiChecks is List &&
+        rawAiChecks.any((c) {
+          final s = (c is Map ? (c['status'] ?? '') : '').toString().toLowerCase();
+          return s == 'rejected' || s == 'failed';
+        });
+    final decisionStr = (json['decision'] ?? json['decision_text'] ?? '').toString().toLowerCase();
+    final isCertRejected = hasFailedAi || decisionStr == 'rejected' || rawStatus.toLowerCase() == 'rejected' || revStatus.toLowerCase() == 'rejected';
+
     return CertificateApplicationItem(
       id: (json['id'] ?? json['application_id'] ?? '').toString(),
       institutionName: (json['institution_name'] ?? '').toString(),
@@ -396,9 +405,9 @@ class CertificateApplicationItem {
       applicationNo: appNoStr,
       issuedDate: (json['issued_on'] ?? json['issued_date'] ?? json['applied_at'] ?? '').toString(),
       expiresDate: (json['expires_on'] ?? json['expires_date'] ?? '').toString(),
-      status: rawStatus,
-      reviewStatus: revStatus,
-      displayStatus: dispStatus,
+      status: isCertRejected ? 'Rejected' : rawStatus,
+      reviewStatus: isCertRejected ? 'rejected' : revStatus,
+      displayStatus: isCertRejected ? 'Rejected' : dispStatus,
       score: (json['score'] ?? '').toString(),
       emoji: (json['emoji'] ?? '🏅').toString(),
       rejectionReason: reason,

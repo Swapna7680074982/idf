@@ -1889,16 +1889,37 @@ class CertificationApplicationDetail {
       }
     }
 
+    final rawStatus = json['status']?.toString() ?? 'Submitted';
+    final rawReviewStatus = json['review_status']?.toString() ?? 'ai_audit';
+    final rawDecision = json['decision']?.toString() ?? 'Pending';
+
+    final bool hasFailedAi = checks.any((c) {
+      final s = c.status.toLowerCase();
+      return s == 'rejected' || s == 'failed';
+    }) ||
+    (foundComment?.toLowerCase().contains('ai validation rejected') ?? false) ||
+    (json['ai_validation_comment']?.toString().toLowerCase().contains('rejected') ?? false) ||
+    rawStatus.toLowerCase().contains('reject') ||
+    rawReviewStatus.toLowerCase().contains('reject') ||
+    rawDecision.toLowerCase().contains('reject');
+
+    final effectiveStatus = (hasFailedAi && rawStatus.toLowerCase() != 'approved') ? 'Rejected' : rawStatus;
+    final effectiveReviewStatus = (hasFailedAi && rawStatus.toLowerCase() != 'approved') ? 'rejected' : rawReviewStatus;
+    final effectiveDisplayStatus = (hasFailedAi && rawStatus.toLowerCase() != 'approved')
+        ? 'Rejected'
+        : (json['display_status']?.toString() ?? rawStatus);
+    final effectiveDecision = (hasFailedAi && rawStatus.toLowerCase() != 'approved') ? 'Rejected' : rawDecision;
+
     return CertificationApplicationDetail(
       id: json['id'] is int ? json['id'] as int : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       applicationId: json['application_id']?.toString() ?? '',
       applicationNo: json['application_no']?.toString() ?? json['application_id']?.toString() ?? '',
       applicationType: json['application_type']?.toString() ?? 'new',
-      status: json['status']?.toString() ?? 'Submitted',
-      reviewStatus: json['review_status']?.toString() ?? 'ai_audit',
-      displayStatus: json['display_status']?.toString() ?? 'Submitted',
-      decision: json['decision']?.toString() ?? 'Pending',
-      decisionText: json['decision_text']?.toString() ?? 'Pending',
+      status: effectiveStatus,
+      reviewStatus: effectiveReviewStatus,
+      displayStatus: effectiveDisplayStatus,
+      decision: effectiveDecision,
+      decisionText: json['decision_text']?.toString() ?? (hasFailedAi ? 'Rejected' : 'Pending'),
       editable: json['editable'] == true,
       currentStep: json['current_step'] is int ? json['current_step'] as int : 4,
       totalSteps: json['total_steps'] is int ? json['total_steps'] as int : 4,

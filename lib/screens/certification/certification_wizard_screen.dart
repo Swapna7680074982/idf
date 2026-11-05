@@ -142,7 +142,7 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
 
       if (_model.id != null) {
         try {
-          final aiStatus = isMissingEvidence ? 'failed' : 'approved';
+          final aiStatus = isMissingEvidence ? 'rejected' : 'approved';
           final aiComments = isMissingEvidence
               ? 'AI Validation Rejected: Required supporting evidence documents were not uploaded. Please upload evidence for AI validation.'
               : 'Automated verification passed. All supporting documents meet MDRF criteria.';
@@ -150,7 +150,7 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
               ? [
                   {
                     'check_type': 'evidence_review',
-                    'status': 'failed',
+                    'status': 'rejected',
                     'status_label': 'FAILED',
                     'score': 0,
                     'max_score': 40,
@@ -158,7 +158,7 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
                   },
                   {
                     'check_type': 'detail_evidence_match',
-                    'status': 'failed',
+                    'status': 'rejected',
                     'status_label': 'INSUFFICIENT',
                     'score': 10,
                     'max_score': 30,
@@ -166,7 +166,7 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
                   },
                   {
                     'check_type': 'overall',
-                    'status': 'failed',
+                    'status': 'rejected',
                     'status_label': 'FAILED',
                     'score': 15,
                     'max_score': 30,

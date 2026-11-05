@@ -326,9 +326,17 @@ class CertificationService {
     String? comments,
     List<Map<String, dynamic>>? checks,
   }) async {
-    // In MySQL (certificate_stages / timeline table), the 'state' column is ENUM('pending', 'in_progress', 'completed').
-    // Sending 'failed', 'approved', or 'rejected' causes: "Data truncated for column 'state' at row 1".
-    // Root status must be 'completed' for finished audits to satisfy both Zod schema and MySQL state ENUM.
+    final bool isRejected = status.toLowerCase() == 'rejected' ||
+        status.toLowerCase() == 'failed' ||
+        (checks != null &&
+            checks.any((c) {
+              final s = c['status']?.toString().toLowerCase();
+              return s == 'rejected' || s == 'failed';
+            }));
+
+    // In MySQL (certificate_stages / timeline table), the 'state' and 'status' columns are ENUM('pending', 'in_progress', 'completed').
+    // Sending 'rejected' causes: "Data truncated for column 'status' at row 1" (certification.controller.js:1208).
+    // Root status must be 'completed' for finished audits to satisfy backend validation and database constraints.
     final String normalizedStatus;
     if (status.toLowerCase() == 'pending' || status.toLowerCase() == 'in_progress') {
       normalizedStatus = status.toLowerCase();
@@ -355,8 +363,9 @@ class CertificationService {
     ]).map((c) {
       final copy = Map<String, dynamic>.from(c);
       final s = copy['status']?.toString().toLowerCase();
-      if (s == 'rejected') {
+      if (s == 'rejected' || s == 'failed') {
         copy['status'] = 'failed';
+        copy['status_label'] = 'FAILED';
       }
       return copy;
     }).toList();
@@ -364,8 +373,9 @@ class CertificationService {
     final body = <String, dynamic>{
       'status': normalizedStatus,
       'state': normalizedStatus,
-      'comments': comments ?? 'Automated verification passed. All supporting documents meet MDRF criteria.',
+      'comments': comments ?? (isRejected ? 'AI Validation Rejected: Required supporting evidence documents were not uploaded. Please upload evidence for AI validation.' : 'Automated verification passed. All supporting documents meet MDRF criteria.'),
       'checks': effectiveChecks,
+      'ai_validation': effectiveChecks,
     };
 
     // Primary: POST /api/certification/applications/{id}/ai-validation
