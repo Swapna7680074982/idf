@@ -534,6 +534,10 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
                               _selectedCity = val;
                               if (val != null) {
                                 _cityTextController.text = val.name;
+                                if (val.pincode != null && val.pincode!.isNotEmpty) {
+                                  _pincodeController.text = val.pincode!;
+                                  widget.model.pincode = val.pincode!;
+                                }
                               }
                             });
                           },

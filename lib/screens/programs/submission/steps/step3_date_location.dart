@@ -535,6 +535,10 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
                   _selectedCity = val;
                   if (val != null) {
                     _cityController.text = val.name;
+                    if (val.pincode != null && val.pincode!.isNotEmpty) {
+                      _pincodeController.text = val.pincode!;
+                      widget.model.pincode = val.pincode!;
+                    }
                   }
                 });
               },

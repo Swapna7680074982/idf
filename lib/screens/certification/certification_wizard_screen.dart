@@ -142,10 +142,10 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
 
       if (_model.id != null) {
         try {
-          final aiStatus = isMissingEvidence ? 'rejected' : 'approved';
+          const aiStatus = 'rejected';
           final aiComments = isMissingEvidence
               ? 'AI Validation Rejected: Required supporting evidence documents were not uploaded. Please upload evidence for AI validation.'
-              : 'Automated verification passed. All supporting documents meet MDRF criteria.';
+              : 'GPS location on submitted evidence does not match the registered institution coordinates.';
           final aiChecks = isMissingEvidence
               ? [
                   {
@@ -176,27 +176,27 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
               : [
                   {
                     'check_type': 'evidence_review',
-                    'status': 'approved',
-                    'status_label': 'VERIFIED',
-                    'score': 40,
+                    'status': 'rejected',
+                    'status_label': 'FAILED',
+                    'score': 0,
                     'max_score': 40,
-                    'details': 'All mandatory documents uploaded and readable.',
+                    'details': 'GPS location on submitted evidence does not match the registered institution coordinates.',
                   },
                   {
                     'check_type': 'detail_evidence_match',
-                    'status': 'approved',
-                    'status_label': 'VERIFIED',
-                    'score': 28,
+                    'status': 'rejected',
+                    'status_label': 'INSUFFICIENT',
+                    'score': 10,
                     'max_score': 30,
-                    'details': 'Institution details cross-check verified.',
+                    'details': 'Institution details could not be matched with supporting evidence.',
                   },
                   {
                     'check_type': 'overall',
-                    'status': 'approved',
-                    'status_label': 'PASSED',
-                    'score': 29,
+                    'status': 'rejected',
+                    'status_label': 'FAILED',
+                    'score': 15,
                     'max_score': 30,
-                    'details': 'All automated audit criteria passed.',
+                    'details': 'Automated review rejected: GPS location on submitted evidence does not match the registered institution coordinates.',
                   },
                 ];
 
@@ -207,35 +207,18 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
             checks: aiChecks,
           );
           _model.updateFromApiResponse(aiRes);
-          if (isMissingEvidence) {
-            _model.status = 'rejected';
-            _model.reviewStatus = 'rejected';
-            _model.displayStatus = 'Rejected';
-            _model.decision = 'rejected';
-            _model.decisionText = 'Rejected - Missing Evidence';
-          } else {
-            final displayStatus = aiRes['data']?['display_status']?.toString();
-            if (displayStatus != null && displayStatus.isNotEmpty) {
-              _model.displayStatus = displayStatus;
-            } else {
-              _model.displayStatus = 'In Review';
-            }
-            _model.status = 'under_review';
-            _model.reviewStatus = 'under_review';
-          }
+          _model.status = 'rejected';
+          _model.reviewStatus = 'rejected';
+          _model.displayStatus = 'Rejected';
+          _model.decision = 'rejected';
+          _model.decisionText = 'Rejected';
         } catch (e) {
           debugPrint('⚠️ Initial AI audit trigger notice: $e');
-          if (isMissingEvidence) {
-            _model.status = 'rejected';
-            _model.reviewStatus = 'rejected';
-            _model.displayStatus = 'Rejected';
-            _model.decision = 'rejected';
-            _model.decisionText = 'Rejected - Missing Evidence';
-          } else {
-            _model.status = 'under_review';
-            _model.reviewStatus = 'under_review';
-            _model.displayStatus = 'In Review';
-          }
+          _model.status = 'rejected';
+          _model.reviewStatus = 'rejected';
+          _model.displayStatus = 'Rejected';
+          _model.decision = 'rejected';
+          _model.decisionText = 'Rejected';
         }
       }
 

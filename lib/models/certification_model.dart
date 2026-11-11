@@ -215,6 +215,9 @@ class CertificationQuestion {
   }
 
   factory CertificationQuestion.fromJson(Map<String, dynamic> json) {
+    var rawText = json['text']?.toString() ?? '';
+    var rawAnswerType = json['answer_type']?.toString().toLowerCase() ?? 'yes_no';
+
     final optsRaw = json['options'] ?? json['choices'] ?? json['answer_options'];
     List<String> parsedOpts = [];
     List<CertificationQuestionOption> parsedOptionItems = [];
@@ -226,12 +229,42 @@ class CertificationQuestion {
       }
     }
 
+    // 12Q. The question relating to active office policies: separate into three distinct options:
+    // a. Ergonomic breaks, breaking sedentary time, or five-minute activity breaks.
+    // b. Ten minutes of office time at any point during the day dedicated to music and active dance steps or other movements led by an instructor.
+    // c. Weekly office sports activities in which employees hire a space or use an available workplace space to compete in teams.
+    final textLower = rawText.toLowerCase();
+    final isOfficePolicyQuestion = textLower.contains('active office') ||
+        textLower.contains('activities exist at the workplace') ||
+        textLower.contains('ergonomic breaks') ||
+        (json['id'] != null && json['id'].toString() == '12');
+
+    if (isOfficePolicyQuestion) {
+      rawText = 'Do any of the following two activities exist at the workplace as an ACTIVE office policy?';
+      rawAnswerType = 'checkbox';
+      parsedOptionItems = const [
+        CertificationQuestionOption(
+          id: 'a',
+          label: 'Ergonomic breaks, breaking sedentary time, or five-minute activity breaks.',
+        ),
+        CertificationQuestionOption(
+          id: 'b',
+          label: 'Ten minutes of office time at any point during the day dedicated to music and active dance steps or other movements led by an instructor.',
+        ),
+        CertificationQuestionOption(
+          id: 'c',
+          label: 'Weekly office sports activities in which employees hire a space or use an available workplace space to compete in teams.',
+        ),
+      ];
+      parsedOpts = parsedOptionItems.map((o) => o.label).toList();
+    }
+
     return CertificationQuestion(
       id: json['id'] is int
           ? json['id'] as int
           : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
-      text: json['text']?.toString() ?? '',
-      answerType: json['answer_type']?.toString().toLowerCase() ?? 'yes_no',
+      text: rawText,
+      answerType: rawAnswerType,
       placeholder: json['placeholder']?.toString(),
       isRequired: json['is_required'] == true || json['is_required'] == 1,
       options: parsedOpts,
@@ -768,7 +801,7 @@ class CertificationApplicationModel {
     return null;
   }
 
-  /// Safely checks if a question has been answered (boolean, list, string, number)
+  /// Safely checks if a question has been answered (boolean, list, string, number, map)
   bool isQuestionAnswered(dynamic questionId) {
     if (questionId == null) return false;
     final intId = int.tryParse(questionId.toString());
@@ -776,9 +809,28 @@ class CertificationApplicationModel {
     final val = questionAnswers[intId];
     if (val == null) return false;
     if (val is bool) return true;
+    if (intId == 12) {
+      if (val is List) return val.length >= 2;
+      if (val is String) {
+        return val.split(',').where((s) => s.trim().isNotEmpty).length >= 2;
+      }
+      return false;
+    }
     if (val is List) return val.isNotEmpty;
     if (val is String) return val.trim().isNotEmpty;
     if (val is num) return true;
+    if (val is Map) {
+      if (val.containsKey('options')) {
+        final opts = val['options'];
+        if (opts is List) {
+          if (intId == 12) return opts.length >= 2;
+          return opts.isNotEmpty;
+        }
+      }
+      final opt = val['option_id'] ?? val['id'] ?? val['value'] ?? val['text'] ?? val['label'];
+      if (opt != null && opt.toString().trim().isNotEmpty) return true;
+      return val.isNotEmpty;
+    }
     return true;
   }
 
@@ -1450,11 +1502,25 @@ class CertificationTimelineStage {
   });
 
   factory CertificationTimelineStage.fromJson(Map<String, dynamic> json) {
+    final stg = json['stage']?.toString() ?? '';
+    var st = json['state']?.toString() ?? 'pending';
+    var nt = json['note']?.toString();
+
+    // 6. change ai validation change pending -> rejected
+    if (stg.toLowerCase() == 'ai_validation' || stg.toLowerCase() == 'ai_audit') {
+      if (st.toLowerCase() == 'pending') {
+        st = 'rejected';
+        nt = (nt == null || nt.toLowerCase().contains('pending'))
+            ? 'AI validation rejected'
+            : nt;
+      }
+    }
+
     return CertificationTimelineStage(
-      stage: json['stage']?.toString() ?? '',
+      stage: stg,
       label: json['label']?.toString() ?? '',
-      state: json['state']?.toString() ?? 'pending',
-      note: json['note']?.toString(),
+      state: st,
+      note: nt,
       comment: json['comment']?.toString() ?? json['comments']?.toString() ?? json['reviewer_comment']?.toString() ?? json['admin_comment']?.toString(),
       occurredAt: json['occurred_at']?.toString(),
     );
@@ -1495,7 +1561,9 @@ class CertificationAiValidationCheck {
   factory CertificationAiValidationCheck.fromJson(Map<String, dynamic> json) {
     final ct = json['check_type']?.toString() ?? json['check']?.toString() ?? '';
     final lbl = json['label']?.toString() ?? _defaultLabelForType(ct);
-    final stat = json['status']?.toString() ?? 'pending';
+    final rawStat = json['status']?.toString() ?? 'pending';
+    // 6. change ai validation change pending -> rejected
+    final stat = rawStat.toLowerCase() == 'pending' ? 'rejected' : rawStat;
     final parsedScore = int.tryParse(json['score']?.toString() ?? '') ?? (stat == 'approved' ? 25 : 0);
     final parsedMax = int.tryParse(json['max_score']?.toString() ?? '') ?? 25;
 
@@ -1507,7 +1575,7 @@ class CertificationAiValidationCheck {
       statusLabel: json['status_label']?.toString() ??
           (stat == 'approved'
               ? 'Approved'
-              : ((stat == 'rejected' || stat == 'failed') ? 'Failed' : 'Pending')),
+              : 'Rejected'),
       details: json['details']?.toString(),
       score: parsedScore,
       maxScore: parsedMax,

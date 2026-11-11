@@ -106,22 +106,29 @@ class Region {
 class City {
   final int id;
   final String name;
+  final String? pincode;
 
   const City({
     required this.id,
     required this.name,
+    this.pincode,
   });
 
   factory City.fromJson(Map<String, dynamic> json) {
     return City(
       id: json['id'] is int ? json['id'] : int.tryParse('${json['id']}') ?? 0,
       name: json['name'] as String? ?? '',
+      pincode: json['pincode']?.toString() ??
+          json['postal_code']?.toString() ??
+          json['zip_code']?.toString() ??
+          json['pin_code']?.toString(),
     );
   }
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
+        if (pincode != null) 'pincode': pincode,
       };
 
   @override

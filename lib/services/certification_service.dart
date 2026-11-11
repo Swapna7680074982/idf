@@ -322,29 +322,18 @@ class CertificationService {
   /// (Also accessible via POST /api/applications/certificates/{id}/ai-validation or PUT)
   static Future<Map<String, dynamic>> updateAiValidationStatus(
     dynamic applicationId, {
-    String status = 'approved',
+    String status = 'rejected',
     String? comments,
     List<Map<String, dynamic>>? checks,
   }) async {
-    final bool isRejected = status.toLowerCase() == 'rejected' ||
-        status.toLowerCase() == 'failed' ||
+    final bool isRejected = status.toLowerCase() != 'approved' ||
         (checks != null &&
             checks.any((c) {
               final s = c['status']?.toString().toLowerCase();
               return s == 'rejected' || s == 'failed';
             }));
 
-    // In MySQL (certificate_stages / timeline table), the 'state' and 'status' columns are ENUM('pending', 'in_progress', 'completed').
-    // Sending 'rejected' causes: "Data truncated for column 'status' at row 1" (certification.controller.js:1208).
-    // Root status must be 'completed' for finished audits to satisfy backend validation and database constraints.
-    final String normalizedStatus;
-    if (isRejected) {
-      normalizedStatus = 'rejected';
-    } else if (status.toLowerCase() == 'pending' || status.toLowerCase() == 'in_progress') {
-      normalizedStatus = status.toLowerCase();
-    } else {
-      normalizedStatus = 'approved';
-    }
+    final String normalizedStatus = isRejected ? 'rejected' : 'approved';
 
     final effectiveComments = comments ??
         (isRejected
@@ -362,12 +351,16 @@ class CertificationService {
       {
         'check_type': 'detail_evidence_match',
         'status': isRejected ? 'failed' : 'approved',
-        'details': 'Institution details cross-check verified.',
+        'details': isRejected
+            ? 'Institution details could not be matched with supporting evidence.'
+            : 'Institution details cross-check verified.',
       },
       {
         'check_type': 'overall',
         'status': isRejected ? 'failed' : 'approved',
-        'details': 'All automated audit criteria passed.',
+        'details': isRejected
+            ? 'Automated review rejected: GPS location on submitted evidence does not match the registered institution coordinates.'
+            : 'All automated audit criteria passed.',
       },
     ]).map((c) {
       final copy = Map<String, dynamic>.from(c);

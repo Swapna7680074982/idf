@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/date_time_utils.dart';
 import '../../core/theme.dart';
@@ -24,7 +24,9 @@ class CertificationTabScreen extends StatefulWidget {
 }
 
 class _CertificationTabScreenState extends State<CertificationTabScreen> {
+  // ignore: unused_field
   CertificateApplicationItem? _latestApp;
+  // ignore: unused_field
   bool _isLoading = false;
 
   @override
@@ -109,23 +111,30 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
             _buildHeroCard(context),
             const SizedBox(height: 24),
 
-            // Current Application Section
-            Text(
-              'Current Application',
-              style: GoogleFonts.inter(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF0F172A),
-              ),
-            ),
-            const SizedBox(height: 12),
+            // Current Application Section (Commented out)
+            // Text(
+            //   'Current Application',
+            //   style: GoogleFonts.inter(
+            //     fontSize: 17,
+            //     fontWeight: FontWeight.w700,
+            //     color: const Color(0xFF0F172A),
+            //   ),
+            // ),
+            // const SizedBox(height: 12),
+            // if (_isLoading)
+            //   _buildLoadingCard()
+            // else if (_latestApp != null)
+            //   _buildCurrentApplicationCard(context, _latestApp!)
+            // else
+            //   _buildEmptyApplicationCard(context),
+            // const SizedBox(height: 24),
 
-            if (_isLoading)
-              _buildLoadingCard()
-            else if (_latestApp != null)
-              _buildCurrentApplicationCard(context, _latestApp!)
-            else
-              _buildEmptyApplicationCard(context),
+            // Simple How it Works
+            _buildSimpleHowItWorks(),
+            const SizedBox(height: 18),
+
+            // Simple Highlights
+            _buildSimpleHighlights(),
             const SizedBox(height: 24),
           ],
         ),
@@ -234,6 +243,7 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
   }
 
 
+  // ignore: unused_element
   Widget _buildCertBadge(String status) {
     Color bg = const Color(0xFFF1F5F9);
     Color text = const Color(0xFF475569);
@@ -297,6 +307,7 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildCurrentApplicationCard(
       BuildContext context, CertificateApplicationItem app) {
     final isRenewInProgress = app.isRenewInProgress;
@@ -540,6 +551,7 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildLoadingCard() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -561,6 +573,7 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
     );
   }
 
+  // ignore: unused_element
   Widget _buildEmptyApplicationCard(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(18),
@@ -603,6 +616,169 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------
+  // Simple Informational Cards
+  // -------------------------------------------------------------
+
+  Widget _buildSimpleHowItWorks() {
+    final steps = [
+      {
+        'num': '1',
+        'title': 'Submit Details',
+        'desc': 'Enter basic institution profile and contact information.',
+      },
+      {
+        'num': '2',
+        'title': 'Activity Assessment',
+        'desc': 'Complete physical activity & workplace policy questions.',
+      },
+      {
+        'num': '3',
+        'title': 'Get Certified',
+        'desc': 'Receive your accredited MDRF Active status & certificate.',
+      },
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'How it Works',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Column(
+            children: steps.map((s) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFFE0F2FE),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          s['num']!,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF0284C7),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            s['title']!,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: const Color(0xFF1E293B),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            s['desc']!,
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF64748B),
+                              height: 1.3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSimpleHighlights() {
+    final highlights = [
+      'Official MDRF Active accreditation badge',
+      'Encourages daily physical activity & ergonomics',
+      'Downloadable certificate & annual renewal',
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Certification Highlights',
+            style: GoogleFonts.inter(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF0F172A),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Column(
+            children: highlights.map((text) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      size: 16,
+                      color: Color(0xFF10B981),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        text,
+                        style: GoogleFonts.inter(
+                          fontSize: 12.5,
+                          color: const Color(0xFF475569),
+                          height: 1.3,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
           ),
         ],
       ),

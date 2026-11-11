@@ -51,6 +51,8 @@ class _HomeScreenState extends State<HomeScreen> {
   HomeSummaryResponse? _homeSummary;
   List<ProgramModel> _allPublicPrograms = [];
   CertificateApplicationItem? _latestCertApplication;
+  int? _myProgramApplicationsCount;
+  int? _myCertificateApplicationsCount;
 
   // Refresh keys to force re-fetch when switching tabs from bottom navigation
   int _programsRefreshKey = 0;
@@ -101,20 +103,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final certs = await CertificationService.getMyCertificateApplications();
-      if (certs.isNotEmpty) {
-        final items = certs
-            .map((c) => CertificateApplicationItem.fromJson(c))
-            .toList();
-        items.sort((a, b) {
-          final idA = int.tryParse(a.id) ?? 0;
-          final idB = int.tryParse(b.id) ?? 0;
-          return idB.compareTo(idA);
+      final items = certs
+          .map((c) => CertificateApplicationItem.fromJson(c))
+          .toList();
+      items.sort((a, b) {
+        final idA = int.tryParse(a.id) ?? 0;
+        final idB = int.tryParse(b.id) ?? 0;
+        return idB.compareTo(idA);
+      });
+      if (mounted) {
+        setState(() {
+          _myCertificateApplicationsCount = items.length;
+          _latestCertApplication = items.isNotEmpty ? items.first : null;
         });
-        if (mounted) {
-          setState(() {
-            _latestCertApplication = items.first;
-          });
-        }
       }
     } catch (_) {}
 
@@ -128,7 +129,17 @@ class _HomeScreenState extends State<HomeScreen> {
         final revStatus = (prog.reviewStatus ?? '').toLowerCase();
         // ONLY APPROVED programs belong in public programs
         final isUnapproved = revStatus == 'submitted' || revStatus == 'draft' || revStatus == 'in_review';
-        if (!isUnapproved) {
+        
+        // Remove MDRF active certification programs from dashboard
+        final isCertificationProgram = prog.title.toLowerCase().contains('certification') ||
+            prog.title.toLowerCase().contains('mdrf active') ||
+            prog.tag.toLowerCase().contains('certification') ||
+            (prog.category?.toLowerCase() ?? '').contains('certification') ||
+            (item.programType.toLowerCase()).contains('certification') ||
+            (item.title.toLowerCase()).contains('certification') ||
+            (prog.programNo != null && prog.programNo!.toLowerCase().contains('cert'));
+
+        if (!isUnapproved && !isCertificationProgram) {
           if (approvedSeen.add(prog.id)) {
             approvedList.add(prog);
           }
@@ -152,8 +163,20 @@ class _HomeScreenState extends State<HomeScreen> {
       } catch (_) {}
 
       try {
-        final myApps = await ProgramsService.getMyApplications();
+        final myApps = await ProgramsService.getMyApplications(status: 'all', limit: 100);
         final items = myApps['items'] is List ? myApps['items'] as List : [];
+        final totalProg = (myApps['total'] is int)
+            ? myApps['total'] as int
+            : (myApps['pagination'] is Map && myApps['pagination']['total'] is int
+                ? myApps['pagination']['total'] as int
+                : items.length);
+
+        if (mounted) {
+          setState(() {
+            _myProgramApplicationsCount = totalProg;
+          });
+        }
+
         final myAppIds = <String>{};
         final myAppNos = <String>{};
         final myAppTitles = <String>{};
@@ -587,66 +610,8 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildMyApplicationsCard(state),
             const SizedBox(height: 20),
 
-            // Programs Section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Programs',
-                  style: GoogleFonts.inter(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    _switchTab(1);
-                  },
-                  child: Text(
-                    'See All',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primaryBlue,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _buildProgramsCarousel(state),
-            const SizedBox(height: 20),
-
-            // MDRF Active Certification Section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'MDRF Active Certification',
-                  style: GoogleFonts.inter(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    _switchTab(3, appTabIndex: 1);
-                  },
-                  child: Text(
-                    'View All',
-                    style: GoogleFonts.inter(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.primaryBlue,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            _buildCertificationCard(user),
+            // Explore Initiatives (Programs & MDRF Active Certification Info)
+            _buildExploreInitiativesSection(),
             const SizedBox(height: 16),
           ],
         ),
@@ -890,8 +855,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // My Applications Card
   // -------------------------------------------------------------
   Widget _buildMyApplicationsCard(AppState state) {
-    final progCount = _homeSummary?.programApplicationsCount ?? state.programApplicationsCount;
-    final certCount = _homeSummary?.certificationApplicationsCount ?? state.certificationApplicationsCount;
+    final progCount = _myProgramApplicationsCount ?? _homeSummary?.programApplicationsCount ?? state.programApplicationsCount;
+    final certCount = _myCertificateApplicationsCount ?? _homeSummary?.certificationApplicationsCount ?? state.certificationApplicationsCount;
 
     return Container(
       decoration: BoxDecoration(
@@ -926,7 +891,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '$progCount active submissions',
+                          '$progCount active ${progCount == 1 ? 'submission' : 'submissions'}',
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             color: const Color(0xFF64748B),
@@ -973,7 +938,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '$certCount active application',
+                          '$certCount active ${certCount == 1 ? 'application' : 'applications'}',
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             color: const Color(0xFF64748B),
@@ -1000,8 +965,204 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // -------------------------------------------------------------
+  // Explore Initiatives (Programs & MDRF Active Certification Info)
+  // -------------------------------------------------------------
+  Widget _buildExploreInitiativesSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Explore Initiatives',
+          style: GoogleFonts.inter(
+            fontSize: 17,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // 1. Community Programs Card
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border, width: 1.1),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                _switchTab(1); // Navigate to Programs screen
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.event_note_rounded,
+                          color: AppColors.primaryBlue,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Community Programs',
+                            style: GoogleFonts.inter(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Discover public physical activity drives, health workshops and initiatives.',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF64748B),
+                              height: 1.35,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Text(
+                                'Explore Programs',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primaryBlue,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 14,
+                                color: AppColors.primaryBlue,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // 2. MDRF Active Certification Card
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border, width: 1.1),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                _switchTab(2); // Navigate to MDRF Active screen
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF0FDFA),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.workspace_premium_rounded,
+                          color: Color(0xFF00828A),
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'MDRF Active Certification',
+                            style: GoogleFonts.inter(
+                              fontSize: 14.5,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Accredit your workplace, school or clinic for promoting active movement.',
+                            style: GoogleFonts.inter(
+                              fontSize: 12,
+                              color: const Color(0xFF64748B),
+                              height: 1.35,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Text(
+                                'Learn More & Apply',
+                                style: GoogleFonts.inter(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: const Color(0xFF00828A),
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 14,
+                                color: Color(0xFF00828A),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // -------------------------------------------------------------
   // Programs Carousel (Shows All Community Programs, Not My Programs)
   // -------------------------------------------------------------
+  // ignore: unused_element
   Widget _buildProgramsCarousel(AppState state) {
     // Show ALL approved community programs across the IDF platform (strictly public programs, not user's proposals)
     final List<ProgramModel> programsToDisplay = _allPublicPrograms;
@@ -1235,6 +1396,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // -------------------------------------------------------------
   // MDRF Active Certification Card
   // -------------------------------------------------------------
+  // ignore: unused_element
   Widget _buildCertificationCard(UserModel user) {
     CertificateApplicationItem? item = _latestCertApplication;
 
@@ -1326,26 +1488,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         fontSize: 11,
                         color: const Color(0xFF64748B),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          'Apply Now',
-                          style: GoogleFonts.inter(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primaryBlue,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(
-                          Icons.arrow_forward_rounded,
-                          size: 13,
-                          color: AppColors.primaryBlue,
-                        ),
-                      ],
                     ),
                   ],
                 ),

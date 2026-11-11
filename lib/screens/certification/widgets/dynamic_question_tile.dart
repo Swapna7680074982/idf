@@ -164,9 +164,13 @@ class _DynamicQuestionTileState extends State<DynamicQuestionTile> {
         text = const Color(0xFF475569);
         break;
       case AnswerFormatType.checkbox:
-        label = 'Checkbox';
-        bg = const Color(0xFFF0FDF4);
-        text = const Color(0xFF16A34A);
+        final isMulti = widget.question.id == 12 ||
+            widget.question.text.toLowerCase().contains('two activities') ||
+            widget.question.optionItems.length > 1 ||
+            widget.question.options.length > 1;
+        label = isMulti ? 'Checkbox (Select 2+)' : 'Checkbox';
+        bg = isMulti ? const Color(0xFFEFF6FF) : const Color(0xFFF0FDF4);
+        text = isMulti ? const Color(0xFF1D4ED8) : const Color(0xFF16A34A);
         break;
     }
 
@@ -607,78 +611,123 @@ class _DynamicQuestionTileState extends State<DynamicQuestionTile> {
         selectedKeys = widget.value.toString().split(',').map((s) => s.trim()).toList();
       }
 
-      return Column(
-        children: options.map((opt) {
-          final optIdStr = opt.id.toString();
-          final optLabel = opt.label;
-          final isChecked = selectedKeys.contains(optIdStr) || selectedKeys.contains(optLabel);
+      final requiresMoreThanOne = widget.question.id == 12 ||
+          widget.question.text.toLowerCase().contains('two activities') ||
+          options.length > 1;
+      final selectedCount = selectedKeys.length;
+      final hasEnough = selectedCount >= 2;
 
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            decoration: BoxDecoration(
-              color: isChecked ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: isChecked ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
-                width: 1.1,
-              ),
-            ),
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
-              child: InkWell(
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...options.map((opt) {
+            final optIdStr = opt.id.toString();
+            final optLabel = opt.label;
+            final isChecked = selectedKeys.contains(optIdStr) || selectedKeys.contains(optLabel);
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              decoration: BoxDecoration(
+                color: isChecked ? const Color(0xFFF0FDF4) : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(10),
-                onTap: () {
-                  final updated = List<String>.from(selectedKeys);
-                  if (isChecked) {
-                    updated.remove(optIdStr);
-                    updated.remove(optLabel);
-                  } else {
-                    updated.add(optIdStr);
-                  }
-                  widget.onChanged(updated);
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  child: Row(
-                    children: [
-                      SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: Checkbox(
-                          value: isChecked,
-                          activeColor: const Color(0xFF16A34A),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                          onChanged: (val) {
-                            final updated = List<String>.from(selectedKeys);
-                            if (val == true) {
-                              if (!updated.contains(optIdStr)) updated.add(optIdStr);
-                            } else {
-                              updated.remove(optIdStr);
-                              updated.remove(optLabel);
-                            }
-                            widget.onChanged(updated);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          opt.label,
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            fontWeight: isChecked ? FontWeight.w600 : FontWeight.w500,
-                            color: isChecked ? const Color(0xFF0F172A) : const Color(0xFF334155),
+                border: Border.all(
+                  color: isChecked ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+                  width: 1.1,
+                ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () {
+                    final updated = List<String>.from(selectedKeys);
+                    if (isChecked) {
+                      updated.remove(optIdStr);
+                      updated.remove(optLabel);
+                    } else {
+                      updated.add(optIdStr);
+                    }
+                    widget.onChanged(updated);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: Checkbox(
+                            value: isChecked,
+                            activeColor: const Color(0xFF16A34A),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                            onChanged: (val) {
+                              final updated = List<String>.from(selectedKeys);
+                              if (val == true) {
+                                if (!updated.contains(optIdStr)) updated.add(optIdStr);
+                              } else {
+                                updated.remove(optIdStr);
+                                updated.remove(optLabel);
+                              }
+                              widget.onChanged(updated);
+                            },
                           ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            opt.label,
+                            style: GoogleFonts.inter(
+                              fontSize: 13,
+                              fontWeight: isChecked ? FontWeight.w600 : FontWeight.w500,
+                              color: isChecked ? const Color(0xFF0F172A) : const Color(0xFF334155),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+            );
+          }),
+          if (requiresMoreThanOne) ...[
+            const SizedBox(height: 2),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+              decoration: BoxDecoration(
+                color: hasEnough ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: hasEnough ? const Color(0xFF86EFAC) : const Color(0xFFFDE68A),
+                  width: 1.0,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    hasEnough ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                    size: 15,
+                    color: hasEnough ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      hasEnough
+                          ? '$selectedCount options selected (Requirement met)'
+                          : 'Please select more than one option (at least 2 required)',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: hasEnough ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          );
-        }).toList(),
+          ],
+        ],
       );
     }
 

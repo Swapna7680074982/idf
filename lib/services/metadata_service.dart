@@ -43,6 +43,7 @@ class MetadataService {
       if (response is List) {
         return response
             .map((item) => ProgramTypeItem.fromJson(item as Map<String, dynamic>))
+            .where((item) => !item.name.toLowerCase().contains('conference'))
             .toList();
       }
     } catch (_) {
@@ -51,6 +52,7 @@ class MetadataService {
         if (alt is List) {
           return alt
               .map((item) => ProgramTypeItem.fromJson(item as Map<String, dynamic>))
+              .where((item) => !item.name.toLowerCase().contains('conference'))
               .toList();
         }
       } catch (_) {}

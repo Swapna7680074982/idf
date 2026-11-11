@@ -54,7 +54,7 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
       final types = await MetadataService.getProgramTypes();
       if (mounted) {
         setState(() {
-          _programTypes = types;
+          _programTypes = types.where((t) => !t.name.toLowerCase().contains('conference')).toList();
           _isLoadingTypes = false;
 
           // Match previously selected type if user had previously chosen one

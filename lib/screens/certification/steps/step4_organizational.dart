@@ -38,6 +38,33 @@ class _Step4OrganizationalState extends State<Step4Organizational> {
 
   void _onNext(List<dynamic> dynamicQuestions) {
     if (dynamicQuestions.isNotEmpty) {
+      for (final q in dynamicQuestions) {
+        if (q is CertificationQuestion) {
+          final isMultiCheckbox = q.id == 12 ||
+              q.text.toLowerCase().contains('two activities') ||
+              (q.formatType == AnswerFormatType.checkbox && (q.optionItems.length > 1 || q.options.length > 1));
+          if (isMultiCheckbox) {
+            final val = widget.model.questionAnswers[q.id];
+            int selectedCount = 0;
+            if (val is List) {
+              selectedCount = val.length;
+            } else if (val != null && val.toString().trim().isNotEmpty) {
+              selectedCount = val.toString().split(',').where((s) => s.trim().isNotEmpty).length;
+            }
+            if (selectedCount < 2) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Please select more than one option (at least 2 required) for the checkbox question.'),
+                  backgroundColor: Color(0xFFEF4444),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              return;
+            }
+          }
+        }
+      }
+
       final unanswered = dynamicQuestions.where((q) => !widget.model.isQuestionAnswered(q.id));
       if (unanswered.isNotEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(

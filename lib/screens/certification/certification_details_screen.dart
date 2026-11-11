@@ -84,14 +84,7 @@ class _CertificationDetailsScreenState
       if (mounted) {
         setState(() {
           _isLoading = false;
-          // Build fallback detail from widget.application if network error
-          if (_detail == null && widget.application != null) {
-            _detail = _buildFallbackDetailFromModel(widget.application!);
-          } else if (_detail == null && widget.certificateItem != null) {
-            _detail = _buildFallbackDetailFromItem(widget.certificateItem!);
-          } else {
-            _errorMessage = 'Could not load details from server: $e';
-          }
+          _errorMessage = 'Could not load details from server: $e';
         });
       }
     }
@@ -109,16 +102,13 @@ class _CertificationDetailsScreenState
         (widget.certificateItem?.isApproved ?? false);
     final isMissingEvidence = !hasEvidence && !isApproved;
 
-    final isRejected = isMissingEvidence ||
-        (_detail?.status.toLowerCase().contains('reject') ?? false) ||
-        (_detail?.reviewStatus.toLowerCase().contains('reject') ?? false) ||
-        (widget.certificateItem?.status.toLowerCase().contains('reject') ?? false);
+    final isRejected = !isApproved;
 
     final statusToSend = isRejected ? 'rejected' : 'approved';
     final commentsToSend = isMissingEvidence
         ? 'AI Validation Rejected: Required supporting evidence documents were not uploaded. Please upload evidence for AI validation.'
         : (isRejected
-            ? 'AI Validation Rejected: Institution dossier does not meet certification criteria.'
+            ? 'GPS location on submitted evidence does not match the registered institution coordinates.'
             : 'Automated verification passed. All supporting documents meet MDRF criteria.');
 
     final checksToSend = isRejected
@@ -129,7 +119,9 @@ class _CertificationDetailsScreenState
               'status_label': 'FAILED',
               'score': 0,
               'max_score': 40,
-              'details': 'Mandatory evidence documents not uploaded. Supporting evidence is missing.',
+              'details': isMissingEvidence
+                  ? 'Mandatory evidence documents not uploaded. Supporting evidence is missing.'
+                  : 'GPS location on submitted evidence does not match the registered institution coordinates.',
             },
             {
               'check_type': 'detail_evidence_match',
@@ -145,7 +137,9 @@ class _CertificationDetailsScreenState
               'status_label': 'FAILED',
               'score': 15,
               'max_score': 30,
-              'details': 'Automated review rejected: Application does not contain required evidence files.',
+              'details': isMissingEvidence
+                  ? 'Automated review rejected: Application does not contain required evidence files.'
+                  : 'Automated review rejected: GPS location on submitted evidence does not match the registered institution coordinates.',
             },
           ]
         : [
@@ -412,241 +406,6 @@ class _CertificationDetailsScreenState
         ),
       );
     }
-  }
-
-  CertificationApplicationDetail _buildFallbackDetailFromModel(
-      CertificationApplicationModel model) {
-    return CertificationApplicationDetail(
-      id: model.id ?? 1,
-      applicationId: model.applicationId ?? 'APP-CERT-2026-0001',
-      applicationNo: model.applicationNo ?? model.applicationId ?? 'APP-CERT-2026-0001',
-      applicationType: 'new',
-      status: model.status,
-      reviewStatus: model.reviewStatus,
-      displayStatus: model.displayStatus,
-      decision: model.decision,
-      decisionText: model.decisionText ?? model.decision,
-      editable: model.status.toLowerCase().contains('changes') || model.status.toLowerCase() == 'draft',
-      currentStep: 4,
-      totalSteps: 4,
-      submittedAt: model.submissionDate?.toIso8601String() ?? '2026-10-24T05:00:00.000Z',
-      institution: CertificationInstitution(
-        name: model.institutionName.isNotEmpty ? model.institutionName : 'Institution',
-        category: model.institutionTypeTitle.isNotEmpty ? model.institutionTypeTitle : 'Workplace',
-        address: model.address,
-        country: model.country,
-        region: model.regionState,
-        city: model.city,
-        pincode: model.pincode,
-        contactPerson: model.contactPerson,
-        contactEmail: model.contactEmail,
-        contactPhone: model.contactPhone,
-      ),
-      timeline: model.timeline ?? [
-        const CertificationTimelineStage(
-          stage: 'submitted',
-          label: 'Submitted',
-          state: 'completed',
-          note: 'Application submitted',
-        ),
-        const CertificationTimelineStage(
-          stage: 'ai_validation',
-          label: 'AI Audit',
-          state: 'in_progress',
-          note: 'AI audit in progress',
-        ),
-        const CertificationTimelineStage(
-          stage: 'manual_review',
-          label: 'Manual Review',
-          state: 'pending',
-        ),
-        const CertificationTimelineStage(
-          stage: 'scoring',
-          label: 'Scoring',
-          state: 'pending',
-        ),
-        const CertificationTimelineStage(
-          stage: 'certificate',
-          label: 'Certificate',
-          state: 'pending',
-        ),
-      ],
-      aiValidation: model.aiValidation ?? [
-        const CertificationAiValidationCheck(
-          checkType: 'evidence_review',
-          label: 'Evidence Review',
-          status: 'pending',
-          details: 'Evidence files under review',
-        ),
-        const CertificationAiValidationCheck(
-          checkType: 'detail_evidence_match',
-          label: 'Detail Evidence Match',
-          status: 'pending',
-          details: 'Institution details cross-check pending',
-        ),
-        const CertificationAiValidationCheck(
-          checkType: 'overall',
-          label: 'Overall',
-          status: 'pending',
-          details: 'Overall audit pending',
-        ),
-      ],
-      materials: model.evidenceItems.expand((e) {
-        if (e.attachments.isNotEmpty) {
-          return e.attachments.asMap().entries.map((entry) => CertificationMaterialItem(
-            id: '${e.id}_${entry.key}',
-            requirementId: e.id,
-            title: e.title,
-            name: entry.value.fileName ?? 'evidence_${entry.key + 1}.jpg',
-            kind: e.evidenceKind,
-            source: 'upload',
-            aiStatus: 'pending',
-            url: entry.value.fileUrl ?? '',
-          ));
-        }
-        return [
-          CertificationMaterialItem(
-            id: e.id,
-            requirementId: e.id,
-            title: e.title,
-            name: e.fileName ?? 'evidence.pdf',
-            kind: e.evidenceKind,
-            source: 'upload',
-            aiStatus: 'pending',
-            url: e.fileUrl ?? '',
-          ),
-        ];
-      }).toList(),
-    );
-  }
-
-  CertificationApplicationDetail _buildFallbackDetailFromItem(
-      CertificateApplicationItem item) {
-    final statusLower = item.status.toLowerCase();
-    final isRejected = statusLower.contains('reject');
-    final isChangesRequired = statusLower.contains('change');
-    final isApproved = item.isApproved;
-
-    final reviewStatus = isApproved
-        ? 'approved'
-        : (isRejected
-            ? 'rejected'
-            : (isChangesRequired ? 'changes_required' : 'ai_audit'));
-
-    final decision = isApproved
-        ? 'Approved'
-        : (isRejected
-            ? 'Rejected'
-            : (isChangesRequired ? 'Changes Required' : 'Pending'));
-
-    final reason = item.rejectionReason ??
-        (isRejected
-            ? 'Application did not meet the MDRF Active accreditation requirements.'
-            : (isChangesRequired
-                ? 'Auditor requested modifications before certification can be granted.'
-                : null));
-
-    return CertificationApplicationDetail(
-      id: int.tryParse(item.id) ?? 1,
-      applicationId: item.certificateId.isNotEmpty ? item.certificateId : 'APP-CERT-${item.id}',
-      applicationNo: item.certificateId.isNotEmpty ? item.certificateId : 'APP-CERT-${item.id}',
-      applicationType: 'new',
-      status: item.status,
-      reviewStatus: reviewStatus,
-      displayStatus: item.status,
-      decision: decision,
-      decisionText: isRejected
-          ? 'Application Rejected'
-          : (isApproved ? 'Approved' : (isChangesRequired ? 'Changes Required' : 'Pending')),
-      editable: isChangesRequired || isRejected,
-      currentStep: 4,
-      totalSteps: 4,
-      submittedAt: item.issuedDate,
-      decisionAt: isApproved || isRejected ? item.issuedDate : null,
-      reviewerComment: reason,
-      adminComment: reason,
-      institution: CertificationInstitution(
-        name: item.institutionName,
-        category: item.institutionType,
-        address: item.address.isNotEmpty ? item.address : '—',
-        country: '—',
-        region: '—',
-        city: item.city.isNotEmpty ? item.city : '—',
-        pincode: item.pincode,
-        contactPerson: '—',
-        contactEmail: '—',
-        contactPhone: '—',
-      ),
-      timeline: [
-        const CertificationTimelineStage(
-          stage: 'submitted',
-          label: 'Submitted',
-          state: 'completed',
-          note: 'Application submitted successfully',
-        ),
-        CertificationTimelineStage(
-          stage: 'ai_validation',
-          label: 'AI Audit',
-          state: isRejected ? 'rejected' : 'completed',
-          note: isRejected
-              ? 'AI audit rejected • Missing evidence documents'
-              : 'AI automated checks completed',
-        ),
-        CertificationTimelineStage(
-          stage: 'manual_review',
-          label: 'Manual Review',
-          state: isApproved
-              ? 'completed'
-              : (isRejected
-                  ? 'blocked'
-                  : (isChangesRequired ? 'changes_required' : 'in_progress')),
-          note: isApproved
-              ? 'Manual review completed • Approved'
-              : (isRejected
-                  ? 'Manual review not conducted • AI validation rejected'
-                  : (isChangesRequired
-                      ? 'Auditor requested modifications'
-                      : 'Manual review in progress')),
-          comment: isRejected ? null : reason,
-        ),
-        CertificationTimelineStage(
-          stage: 'certificate',
-          label: 'Certificate',
-          state: isApproved
-              ? 'completed'
-              : (isRejected
-                  ? 'blocked'
-                  : (isChangesRequired ? 'blocked' : 'pending')),
-          note: isApproved
-              ? 'Certificate issued'
-              : (isRejected
-                  ? 'Certificate not issued • Application rejected'
-                  : (isChangesRequired
-                      ? 'Certificate not issued due to changes required'
-                      : 'Certificate issuance pending completion of review')),
-        ),
-      ],
-      aiValidation: const [
-        CertificationAiValidationCheck(
-          checkType: 'evidence_review',
-          label: 'Evidence Review',
-          status: 'approved',
-          details: 'Mandatory documentation inspected.',
-        ),
-        CertificationAiValidationCheck(
-          checkType: 'detail_evidence_match',
-          label: 'Detail Evidence Match',
-          status: 'approved',
-          details: 'Institution details verified.',
-        ),
-        CertificationAiValidationCheck(
-          checkType: 'overall',
-          label: 'Overall AI Audit',
-          status: 'approved',
-          details: 'Automated validation completed.',
-        ),
-      ],
-    );
   }
 
   @override
@@ -1484,88 +1243,17 @@ class _CertificationDetailsScreenState
 
   List<CertificationAiValidationCheck> _resolveAiValidationChecks(
       CertificationApplicationDetail detail) {
-    final hasNoEvidence = detail.materials.isEmpty &&
-        (widget.application?.hasMissingRequiredEvidence ?? true) &&
-        (detail.status.toLowerCase() != 'approved');
-    final isRejected = hasNoEvidence ||
-        detail.status.toLowerCase().contains('reject') ||
-        detail.reviewStatus.toLowerCase().contains('reject') ||
-        detail.displayStatus.toLowerCase().contains('reject') ||
-        detail.decision.toLowerCase().contains('reject') ||
-        (widget.certificateItem?.status.toLowerCase().contains('reject') ?? false);
-
-    if (isRejected) {
-      return const [
-        CertificationAiValidationCheck(
-          checkType: 'evidence_review',
-          label: 'Evidence Review',
-          status: 'rejected',
-          statusLabel: 'FAILED',
-          score: 0,
-          maxScore: 40,
-          details: 'Mandatory supporting evidence not uploaded. Please upload evidence for AI validation.',
-        ),
-        CertificationAiValidationCheck(
-          checkType: 'detail_evidence_match',
-          label: 'Detail Evidence Match',
-          status: 'rejected',
-          statusLabel: 'INSUFFICIENT',
-          score: 10,
-          maxScore: 30,
-          details: 'Institution details could not be cross-verified with supporting documentation.',
-        ),
-        CertificationAiValidationCheck(
-          checkType: 'overall',
-          label: 'Overall AI Audit',
-          status: 'rejected',
-          statusLabel: 'REJECTED',
-          score: 15,
-          maxScore: 30,
-          details: 'Application rejected: Mandatory evidence was not uploaded for automated audit.',
-        ),
-      ];
-    }
-
-    final filtered = detail.aiValidation
+    // Only return live AI validation checks from API. Do not show fallback synthetic data.
+    return detail.aiValidation
         .where((c) => c.checkType != 'image_location_validation')
         .toList();
-    if (filtered.isNotEmpty) {
-      return filtered;
-    }
-
-    return const [
-      CertificationAiValidationCheck(
-        checkType: 'evidence_review',
-        label: 'Evidence Review',
-        status: 'approved',
-        statusLabel: 'VERIFIED',
-        score: 40,
-        maxScore: 40,
-        details: 'Mandatory documentation inspected and verified.',
-      ),
-      CertificationAiValidationCheck(
-        checkType: 'detail_evidence_match',
-        label: 'Detail Evidence Match',
-        status: 'approved',
-        statusLabel: 'VERIFIED',
-        score: 28,
-        maxScore: 30,
-        details: 'Institution details cross-check verified.',
-      ),
-      CertificationAiValidationCheck(
-        checkType: 'overall',
-        label: 'Overall AI Audit',
-        status: 'approved',
-        statusLabel: 'PASSED',
-        score: 29,
-        maxScore: 30,
-        details: 'All automated audit criteria passed successfully.',
-      ),
-    ];
   }
 
   Widget _buildAiValidationCard(CertificationApplicationDetail detail) {
     final checks = _resolveAiValidationChecks(detail);
+    if (checks.isEmpty) {
+      return const SizedBox.shrink();
+    }
     final hasNoEvidence = detail.materials.isEmpty &&
         (widget.application?.hasMissingRequiredEvidence ?? true) &&
         (detail.status.toLowerCase() != 'approved');
