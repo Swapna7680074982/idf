@@ -224,18 +224,26 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
       return;
     }
 
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
     final DateTime initialDate;
     final DateTime firstDate;
 
     if (isStart) {
-      initialDate = _startDate ?? DateTime.now();
-      firstDate = DateTime.now().subtract(const Duration(days: 365));
+      // Based on current date, hide/disable all previous past dates
+      firstDate = today;
+      initialDate = (_startDate != null && !_startDate!.isBefore(today))
+          ? _startDate!
+          : today;
     } else {
-      // Disables all dates before selected start date
-      firstDate = _startDate!;
-      initialDate = (_endDate != null && !_endDate!.isBefore(_startDate!))
+      // Disables all dates before selected start date (and before today)
+      final minDate = (_startDate != null && !_startDate!.isBefore(today))
+          ? _startDate!
+          : today;
+      firstDate = minDate;
+      initialDate = (_endDate != null && !_endDate!.isBefore(firstDate))
           ? _endDate!
-          : _startDate!;
+          : firstDate;
     }
 
     final picked = await showDatePicker(
@@ -243,6 +251,10 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
       initialDate: initialDate,
       firstDate: firstDate,
       lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+      selectableDayPredicate: (DateTime day) {
+        final dayOnly = DateTime(day.year, day.month, day.day);
+        return !dayOnly.isBefore(firstDate);
+      },
       builder: (context, child) {
         return Theme(
           data: Theme.of(context).copyWith(
@@ -283,10 +295,32 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
       );
       return;
     }
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (_startDate!.isBefore(today)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Start date cannot be in the past. Please select today or a future date.'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
     if (_endDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Please select an end date'),
+          backgroundColor: Color(0xFFEF4444),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    if (_endDate!.isBefore(_startDate!)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('End date cannot be before start date'),
           backgroundColor: Color(0xFFEF4444),
           behavior: SnackBarBehavior.floating,
         ),
@@ -347,7 +381,17 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
               hintText: 'DD MMM YYYY',
               suffixIcon: Icon(Icons.calendar_today_outlined, size: 18, color: Color(0xFF64748B)),
             ),
-            validator: (val) => val == null || val.isEmpty ? 'Please select start date' : null,
+            validator: (val) {
+              if (val == null || val.isEmpty) {
+                return 'Please select start date';
+              }
+              final now = DateTime.now();
+              final today = DateTime(now.year, now.month, now.day);
+              if (_startDate != null && _startDate!.isBefore(today)) {
+                return 'Start date cannot be in the past';
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 16),
 
@@ -365,6 +409,11 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
             validator: (val) {
               if (val == null || val.trim().isEmpty) {
                 return 'Please select end date';
+              }
+              final now = DateTime.now();
+              final today = DateTime(now.year, now.month, now.day);
+              if (_endDate != null && _endDate!.isBefore(today)) {
+                return 'End date cannot be in the past';
               }
               if (_startDate != null && _endDate != null && _endDate!.isBefore(_startDate!)) {
                 return 'End date cannot be before start date';
