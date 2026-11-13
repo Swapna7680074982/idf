@@ -46,9 +46,10 @@ class NotificationService {
     int page = 1,
     int limit = 20,
   }) async {
+    final effectiveLimit = limit > 50 ? 50 : (limit < 1 ? 20 : limit);
     final queryParams = <String, dynamic>{
       'page': page,
-      'limit': limit,
+      'limit': effectiveLimit,
     };
     if (unreadOnly != null) {
       queryParams['unread_only'] = unreadOnly;

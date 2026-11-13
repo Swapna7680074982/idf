@@ -163,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
       } catch (_) {}
 
       try {
-        final myApps = await ProgramsService.getMyApplications(status: 'all', limit: 100);
+        final myApps = await ProgramsService.getMyApplications(status: 'all', limit: 50);
         final items = myApps['items'] is List ? myApps['items'] as List : [];
         final totalProg = (myApps['total'] is int)
             ? myApps['total'] as int

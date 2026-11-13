@@ -84,9 +84,10 @@ class ProgramsService {
     int page = 1,
     int limit = 20,
   }) async {
+    final effectiveLimit = limit > 50 ? 50 : (limit < 1 ? 20 : limit);
     final queryParams = <String, String>{
       'page': page.toString(),
-      'limit': limit.toString(),
+      'limit': effectiveLimit.toString(),
     };
 
     final response = await ApiClient.get(
@@ -371,10 +372,11 @@ class ProgramsService {
     int page = 1,
     int limit = 20,
   }) async {
+    final effectiveLimit = limit > 50 ? 50 : (limit < 1 ? 20 : limit);
     final queryParams = <String, String>{
       'status': status,
       'page': page.toString(),
-      'limit': limit.toString(),
+      'limit': effectiveLimit.toString(),
     };
     if (search != null && search.trim().isNotEmpty) {
       queryParams['search'] = search.trim();
