@@ -71,6 +71,57 @@ class _Step7EvidenceState extends State<Step7Evidence> {
     );
   }
 
+  void _handleContinue() {
+    if (widget.model.hasEvidenceOption) {
+      // Check if specific items are marked isRequired and missing attachments
+      final missingRequired = widget.model.evidenceItems
+          .where((e) => e.isRequired && !e.hasAttachments)
+          .toList();
+
+      if (missingRequired.isNotEmpty) {
+        final names = missingRequired.map((e) => e.title).join(', ');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              missingRequired.length == 1
+                  ? 'Please upload the required document: ${missingRequired.first.title}'
+                  : 'Please upload the required documents: $names',
+            ),
+            backgroundColor: const Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      // Check if mandatory evidence is missing according to model config
+      if (widget.model.hasMissingRequiredEvidence) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please upload all required supporting documents before proceeding.'),
+            backgroundColor: Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      // If user selected "Yes, Upload" and evidence items exist, ensure they didn't leave them completely empty
+      if (widget.model.evidenceItems.isNotEmpty && !widget.model.hasAnyEvidenceUploaded) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please upload supporting documents or choose "No, Skip".'),
+            backgroundColor: Color(0xFFEF4444),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+    }
+
+    widget.onContinue();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -387,7 +438,7 @@ class _Step7EvidenceState extends State<Step7Evidence> {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: widget.onContinue,
+                onPressed: _handleContinue,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryBlue,
                   foregroundColor: Colors.white,

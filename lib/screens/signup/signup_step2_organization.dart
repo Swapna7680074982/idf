@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../core/theme.dart';
 import '../../models/meta_models.dart';
 import '../../services/api_client.dart';
 import '../../services/auth_service.dart';
@@ -6,6 +8,7 @@ import '../../services/metadata_service.dart';
 import '../../widgets/auth_header.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/custom_text_field.dart';
+import '../../widgets/searchable_selection_sheet.dart';
 import 'signup_step3_verify.dart';
 
 import '../../data/countries_data.dart';
@@ -38,6 +41,8 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
   final _contactPersonController = TextEditingController();
   final _contactEmailController = TextEditingController();
   final _contactPhoneController = TextEditingController();
+  final _regionController = TextEditingController();
+  final _cityController = TextEditingController();
 
   List<OrganizationType> _orgTypes = [];
   List<Country> _countries = [];
@@ -51,6 +56,8 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
 
   bool _isLoading = false;
   bool _isLoadingMetadata = true;
+  bool _isLoadingRegions = false;
+  bool _isLoadingCities = false;
 
   Country? _selectedContactCountry;
 
@@ -91,13 +98,25 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
   }
 
   Future<void> _loadRegions(int countryId) async {
+    setState(() {
+      _isLoadingRegions = true;
+      _regions = [];
+      _selectedRegion = null;
+      _cities = [];
+      _selectedCity = null;
+      _regionController.clear();
+      _cityController.clear();
+    });
+
     try {
       final regions = await MetadataService.getRegions(countryId);
       if (mounted) {
         setState(() {
           _regions = regions;
+          _isLoadingRegions = false;
           _selectedRegion = regions.isNotEmpty ? regions.first : null;
           if (_selectedRegion != null) {
+            _regionController.text = _selectedRegion!.name;
             _loadCities(_selectedRegion!.id);
           } else {
             _cities = [];
@@ -105,25 +124,37 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
           }
         });
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingRegions = false);
+      }
+    }
   }
 
   Future<void> _loadCities(int regionId) async {
-    debugPrint('🏙️ [SIGNUP STEP 2] Fetching cities for regionId: $regionId...');
+    setState(() {
+      _isLoadingCities = true;
+      _cities = [];
+      _selectedCity = null;
+      _cityController.clear();
+    });
+
     try {
       final cities = await MetadataService.getCities(regionId);
-      debugPrint('🏙️ [SIGNUP STEP 2] Received ${cities.length} cities:');
-      for (final c in cities) {
-        debugPrint('   -> [City ID: ${c.id}] ${c.name}');
-      }
       if (mounted) {
         setState(() {
           _cities = cities;
+          _isLoadingCities = false;
           _selectedCity = cities.isNotEmpty ? cities.first : null;
+          if (_selectedCity != null) {
+            _cityController.text = _selectedCity!.name;
+          }
         });
       }
     } catch (e) {
-      debugPrint('❌ [SIGNUP STEP 2] Error loading cities: $e');
+      if (mounted) {
+        setState(() => _isLoadingCities = false);
+      }
     }
   }
 
@@ -134,6 +165,8 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
     _contactPersonController.dispose();
     _contactEmailController.dispose();
     _contactPhoneController.dispose();
+    _regionController.dispose();
+    _cityController.dispose();
     super.dispose();
   }
 
@@ -186,6 +219,19 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
       return;
     }
 
+    final chosenState = _selectedRegion?.name ?? _regionController.text.trim();
+    final chosenCity = _selectedCity?.name ?? _cityController.text.trim();
+
+    if (chosenCity.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select or enter your city'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _isLoading = true;
     });
@@ -208,6 +254,8 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
         countryId: _selectedCountry?.id,
         regionId: _selectedRegion?.id,
         cityId: _selectedCity?.id,
+        state: chosenState,
+        city: chosenCity,
         address: _addressController.text.trim(),
         contactPerson: _contactPersonController.text.trim().isNotEmpty
             ? _contactPersonController.text.trim()
@@ -245,8 +293,8 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
               organizationName: orgName,
               organizationType: _selectedOrgType?.name ?? '',
               country: _selectedCountry?.name ?? '',
-              state: _selectedRegion?.name ?? '',
-              city: _selectedCity?.name ?? '',
+              state: chosenState,
+              city: chosenCity,
               address: _addressController.text.trim(),
               codeLength: registerStartResult.verification.codeLength,
             ),
@@ -317,75 +365,161 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
                   const SizedBox(height: 16),
 
                   // Organization Type
-                  CustomDropdownField(
+                  SearchableDropdownField<OrganizationType>(
                     label: 'Organization Type',
+                    value: _selectedOrgType,
                     hintText: 'Select type...',
-                    value: _selectedOrgType?.name,
-                    items: _orgTypes.map((o) => o.name).toList(),
+                    sheetTitle: 'Select Organization Type',
+                    items: _orgTypes,
+                    itemLabel: (type) => type.name,
                     onChanged: (val) {
                       setState(() {
-                        _selectedOrgType = _orgTypes.firstWhere(
-                          (o) => o.name == val,
-                          orElse: () => _orgTypes.first,
-                        );
+                        _selectedOrgType = val;
                       });
                     },
                   ),
                   const SizedBox(height: 16),
 
                   // Country
-                  CustomDropdownField(
-                    label: 'Country',
-                    hintText: 'Select Country',
-                    value: _selectedCountry?.name,
-                    items: _countries.map((c) => c.name).toList(),
-                    onChanged: (val) {
-                      final country = _countries.firstWhere(
-                        (c) => c.name == val,
-                        orElse: () => _countries.first,
-                      );
-                      setState(() {
-                        _selectedCountry = country;
-                      });
-                      _loadRegions(country.id);
-                    },
-                  ),
+                  if (_isLoadingMetadata)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryBlue),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Loading countries from server...',
+                            style: GoogleFonts.inter(fontSize: 13.5, color: const Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    SearchableDropdownField<Country>(
+                      label: 'Country',
+                      value: _selectedCountry,
+                      hintText: 'Select Country',
+                      sheetTitle: 'Select Country',
+                      items: _countries,
+                      itemLabel: (country) => country.name,
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedCountry = val;
+                          if (val != null) {
+                            _loadRegions(val.id);
+                          }
+                        });
+                      },
+                    ),
                   const SizedBox(height: 16),
 
                   // Region / State
-                  CustomDropdownField(
-                    label: 'Region / State',
-                    hintText: 'Select Region / State',
-                    value: _selectedRegion?.name,
-                    items: _regions.map((r) => r.name).toList(),
-                    onChanged: (val) {
-                      final region = _regions.firstWhere(
-                        (r) => r.name == val,
-                        orElse: () => _regions.first,
-                      );
-                      setState(() {
-                        _selectedRegion = region;
-                      });
-                      _loadCities(region.id);
-                    },
-                  ),
+                  if (_isLoadingRegions)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryBlue),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Loading regions...',
+                            style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (_regions.isNotEmpty)
+                    SearchableDropdownField<Region>(
+                      label: 'Region / State',
+                      value: _selectedRegion,
+                      hintText: 'Select Region / State',
+                      sheetTitle: 'Select Region / State',
+                      items: _regions,
+                      itemLabel: (region) => region.name,
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedRegion = val;
+                          if (val != null) {
+                            _regionController.text = val.name;
+                            _loadCities(val.id);
+                          }
+                        });
+                      },
+                    )
+                  else
+                    CustomTextField(
+                      label: 'Region / State',
+                      hintText: 'e.g. Maharashtra, Nairobi County, Texas',
+                      controller: _regionController,
+                    ),
                   const SizedBox(height: 16),
 
                   // City
-                  CustomDropdownField(
-                    label: 'City',
-                    hintText: 'Select City',
-                    value: _selectedCity?.name,
-                    items: _cities.map((c) => c.name).toList(),
-                    onChanged: (val) {
-                      setState(() {
-                        _selectedCity = _cities.firstWhere(
-                          (c) => c.name == val,
-                          orElse: () => _cities.first,
-                        );
-                      });
-                    },
-                  ),
+                  if (_isLoadingCities)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Row(
+                        children: [
+                          const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryBlue),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            'Loading cities...',
+                            style: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    )
+                  else if (_cities.isNotEmpty)
+                    SearchableDropdownField<City>(
+                      label: 'City',
+                      value: _selectedCity,
+                      hintText: 'Select City',
+                      sheetTitle: 'Select City',
+                      items: _cities,
+                      itemLabel: (city) => city.name,
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedCity = val;
+                          if (val != null) {
+                            _cityController.text = val.name;
+                          }
+                        });
+                      },
+                    )
+                  else
+                    CustomTextField(
+                      label: 'City',
+                      hintText: 'Enter City',
+                      controller: _cityController,
+                    ),
                   const SizedBox(height: 16),
 
                   CustomTextField(

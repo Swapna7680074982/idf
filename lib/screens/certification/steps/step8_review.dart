@@ -287,7 +287,21 @@ class Step8Review extends StatelessWidget {
               width: double.infinity,
               height: 48,
               child: ElevatedButton(
-                onPressed: onContinue,
+                onPressed: () {
+                  if (model.hasEvidenceOption &&
+                      (model.hasMissingRequiredEvidence ||
+                          (model.evidenceItems.isNotEmpty && !model.hasAnyEvidenceUploaded))) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Please upload all required supporting documents before proceeding to submission.'),
+                        backgroundColor: Color(0xFFEF4444),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
+                  onContinue();
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryBlue,
                   foregroundColor: Colors.white,

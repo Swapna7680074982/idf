@@ -218,6 +218,18 @@ class _Step9ConfirmationState extends State<Step9Confirmation> {
                           );
                           return;
                         }
+                        if (widget.model.hasEvidenceOption &&
+                            (widget.model.hasMissingRequiredEvidence ||
+                                (widget.model.evidenceItems.isNotEmpty && !widget.model.hasAnyEvidenceUploaded))) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Please upload all required supporting documents before submitting.'),
+                              backgroundColor: Color(0xFFEF4444),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          return;
+                        }
                         widget.onSubmit();
                       },
                 style: ElevatedButton.styleFrom(
