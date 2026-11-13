@@ -710,6 +710,7 @@ class CertificationApplicationModel {
   bool? receivesSponsorship;
 
   // Step 7: Evidence
+  bool hasEvidenceOption;
   List<EvidenceItem> evidenceItems;
 
   // Step 9: Declaration
@@ -768,6 +769,7 @@ class CertificationApplicationModel {
     this.hasExternalPartnerships,
     this.advocacyActivitiesDescription = '',
     this.receivesSponsorship,
+    this.hasEvidenceOption = true,
     List<EvidenceItem>? evidenceItems,
     this.declarationAccepted = false,
     this.id,
@@ -844,6 +846,7 @@ class CertificationApplicationModel {
 
   /// Checks if any evidence requirement exists for this certification
   bool get isEvidenceRequired {
+    if (!hasEvidenceOption) return false;
     if (evidenceItems.any((e) => e.isRequired)) return true;
     if (categoryConfig != null && categoryConfig!.evidenceRequirements.isNotEmpty) return true;
     return evidenceItems.isNotEmpty;
@@ -851,6 +854,7 @@ class CertificationApplicationModel {
 
   /// Checks if mandatory evidence is missing (i.e. required but no files attached)
   bool get hasMissingRequiredEvidence {
+    if (!hasEvidenceOption) return false;
     if (evidenceItems.isEmpty) {
       if (categoryConfig != null && categoryConfig!.evidenceRequirements.isNotEmpty) {
         return true;
@@ -1140,6 +1144,7 @@ class CertificationApplicationModel {
     if (other.evidenceItems.isNotEmpty) {
       evidenceItems = List<EvidenceItem>.from(other.evidenceItems);
     }
+    hasEvidenceOption = other.hasEvidenceOption;
     declarationAccepted = other.declarationAccepted;
     if (other.id != null) id = other.id;
     if (other.applicationId != null && other.applicationId!.isNotEmpty) applicationId = other.applicationId;
@@ -1259,8 +1264,9 @@ class CertificationApplicationModel {
       'detail_fields': Map<String, dynamic>.from(detailFieldValues),
       'question_answers': qaMap,
       'answers': answersList,
-      'evidence': validEvidence,
-      'materials': validEvidence,
+      'has_evidence': hasEvidenceOption,
+      'evidence': hasEvidenceOption ? validEvidence : <Map<String, dynamic>>[],
+      'materials': hasEvidenceOption ? validEvidence : <Map<String, dynamic>>[],
       'declaration_accepted': declarationAccepted,
     };
   }

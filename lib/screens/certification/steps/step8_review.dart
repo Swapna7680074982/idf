@@ -71,8 +71,9 @@ class Step8Review extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMissingEvidence = model.hasMissingRequiredEvidence ||
-        (model.isEvidenceRequired && !model.hasAnyEvidenceUploaded);
+    final isMissingEvidence = model.hasEvidenceOption &&
+        (model.hasMissingRequiredEvidence ||
+            (model.isEvidenceRequired && !model.hasAnyEvidenceUploaded));
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -132,7 +133,7 @@ class Step8Review extends StatelessWidget {
                           'Evidence',
                           isDone: !isMissingEvidence,
                           isBadgeIncomplete: isMissingEvidence,
-                          incompleteLabel: 'Missing Evidence',
+                          incompleteLabel: !model.hasEvidenceOption ? 'Skipped' : 'Missing Evidence',
                           onEdit: () => onJumpToStep?.call(7),
                         ),
                       ],
@@ -196,7 +197,7 @@ class Step8Review extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
 
-                  // Missing Evidence Alert Notice for AI Validation
+                  // Missing Evidence Alert Notice
                   if (isMissingEvidence)
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -215,7 +216,7 @@ class Step8Review extends StatelessWidget {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'Please upload evidence for AI validation.',
+                              'Please upload the required evidence documents or select "No, Skip" in the Evidence step.',
                               style: GoogleFonts.inter(
                                 fontSize: 12.5,
                                 color: const Color(0xFF991B1B),
@@ -244,7 +245,7 @@ class Step8Review extends StatelessWidget {
                           const SizedBox(width: 10),
                           Expanded(
                             child: Text(
-                              'All required sections and supporting evidence have been provided. Application is ready for AI validation.',
+                              'All required sections have been completed. Application is ready for submission.',
                               style: GoogleFonts.inter(
                                 fontSize: 12,
                                 color: const Color(0xFF15803D),

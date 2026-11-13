@@ -135,91 +135,10 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
         _model.id = effectiveId;
       }
 
-      // 3. Record/Trigger AI validation status to backend (Same as Programs flow)
-      // Automatically transitions application status to In Review (under_review) or Rejected if evidence missing
-      final isMissingEvidence = _model.hasMissingRequiredEvidence ||
-          (_model.isEvidenceRequired && !_model.hasAnyEvidenceUploaded);
-
-      if (_model.id != null) {
-        try {
-          const aiStatus = 'rejected';
-          final aiComments = isMissingEvidence
-              ? 'AI Validation Rejected: Required supporting evidence documents were not uploaded. Please upload evidence for AI validation.'
-              : 'GPS location on submitted evidence does not match the registered institution coordinates.';
-          final aiChecks = isMissingEvidence
-              ? [
-                  {
-                    'check_type': 'evidence_review',
-                    'status': 'rejected',
-                    'status_label': 'FAILED',
-                    'score': 0,
-                    'max_score': 40,
-                    'details': 'Mandatory evidence documents not uploaded. Supporting evidence is missing.',
-                  },
-                  {
-                    'check_type': 'detail_evidence_match',
-                    'status': 'rejected',
-                    'status_label': 'INSUFFICIENT',
-                    'score': 10,
-                    'max_score': 30,
-                    'details': 'Institution details could not be matched with supporting evidence.',
-                  },
-                  {
-                    'check_type': 'overall',
-                    'status': 'rejected',
-                    'status_label': 'FAILED',
-                    'score': 15,
-                    'max_score': 30,
-                    'details': 'Automated review rejected: Application does not contain required evidence files.',
-                  },
-                ]
-              : [
-                  {
-                    'check_type': 'evidence_review',
-                    'status': 'rejected',
-                    'status_label': 'FAILED',
-                    'score': 0,
-                    'max_score': 40,
-                    'details': 'GPS location on submitted evidence does not match the registered institution coordinates.',
-                  },
-                  {
-                    'check_type': 'detail_evidence_match',
-                    'status': 'rejected',
-                    'status_label': 'INSUFFICIENT',
-                    'score': 10,
-                    'max_score': 30,
-                    'details': 'Institution details could not be matched with supporting evidence.',
-                  },
-                  {
-                    'check_type': 'overall',
-                    'status': 'rejected',
-                    'status_label': 'FAILED',
-                    'score': 15,
-                    'max_score': 30,
-                    'details': 'Automated review rejected: GPS location on submitted evidence does not match the registered institution coordinates.',
-                  },
-                ];
-
-          final aiRes = await CertificationService.updateAiValidationStatus(
-            _model.id!,
-            status: aiStatus,
-            comments: aiComments,
-            checks: aiChecks,
-          );
-          _model.updateFromApiResponse(aiRes);
-          _model.status = 'rejected';
-          _model.reviewStatus = 'rejected';
-          _model.displayStatus = 'Rejected';
-          _model.decision = 'rejected';
-          _model.decisionText = 'Rejected';
-        } catch (e) {
-          debugPrint('⚠️ Initial AI audit trigger notice: $e');
-          _model.status = 'rejected';
-          _model.reviewStatus = 'rejected';
-          _model.displayStatus = 'Rejected';
-          _model.decision = 'rejected';
-          _model.decisionText = 'Rejected';
-        }
+      if (_model.status.isEmpty) {
+        _model.status = 'submitted';
+        _model.reviewStatus = 'under_review';
+        _model.displayStatus = 'Under Review';
       }
 
       if (mounted) {

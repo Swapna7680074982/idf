@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/date_time_utils.dart';
 import '../../core/theme.dart';
@@ -256,22 +256,7 @@ class _ExpiredCertificateDetailsScreenState
                     const SizedBox(height: 14),
                   ],
 
-                  // 3. AI Audit Card (Only real checks if present from API)
-                  if (detail != null && detail.aiValidation.isNotEmpty) ...[
-                    _buildSectionCard(
-                      title: '🔍 AI Audit',
-                      children: detail.aiValidation.map((c) {
-                        final isApproved = c.status.toLowerCase() == 'approved';
-                        return _buildCheckRow(
-                          c.label,
-                          isApproved ? 'Approved' : c.status,
-                          isDone: isApproved,
-                          isLast: c == detail.aiValidation.last,
-                        );
-                      }).toList(),
-                    ),
-                    const SizedBox(height: 14),
-                  ],
+
 
                   // 4. Application Timeline (Only real stages if present from API)
                   if (detail != null && detail.timeline.isNotEmpty) ...[
@@ -384,38 +369,7 @@ class _ExpiredCertificateDetailsScreenState
     );
   }
 
-  Widget _buildCheckRow(String label, String status,
-      {required bool isDone, bool isLast = false}) {
-    return Padding(
-      padding: EdgeInsets.only(bottom: isLast ? 0 : 10.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: GoogleFonts.inter(
-              fontSize: 12.5,
-              color: const Color(0xFF64748B),
-            ),
-          ),
-          Row(
-            children: [
-              const Icon(Icons.check_box_rounded, size: 16, color: Color(0xFF16A34A)),
-              const SizedBox(width: 4),
-              Text(
-                status,
-                style: GoogleFonts.inter(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF16A34A),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
+
 
   Widget _buildTimelineStep({
     required String title,
