@@ -150,6 +150,7 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
           MaterialPageRoute(
             builder: (_) => CertificationSubmittedScreen(
               application: _model,
+              submissionResponse: submitResponse,
             ),
           ),
         );

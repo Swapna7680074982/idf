@@ -124,29 +124,40 @@ class CertificationService {
     // 2. Build the unified submission JSON payload
     final body = model.toSubmissionJson();
 
-    // 3. Try Primary Endpoint: POST /api/certification/applications/submit
+    // 3. Try Primary Endpoint: POST /api/certification/applications/submit-full
     try {
       final response = await ApiClient.post(
-        ApiConfig.certificationApplicationsSubmit,
+        ApiConfig.certificationApplicationsSubmitFull,
         body: body,
       );
       if (response is Map<String, dynamic>) {
         return response;
       }
     } catch (e) {
-      debugPrint('⚠️ Unified /submit notice: $e. Trying /applications/{id}/submit...');
-      // 4. Try supported route: POST /api/certification/applications/{category_id_or_id}/submit
-      final targetId = model.id ?? model.categoryId ?? 1;
+      debugPrint('⚠️ Unified /submit-full notice: $e. Trying /submit...');
       try {
-        final altRes = await ApiClient.post(
-          ApiConfig.certificationApplicationSubmit(targetId),
+        final response = await ApiClient.post(
+          ApiConfig.certificationApplicationsSubmit,
           body: body,
         );
-        if (altRes is Map<String, dynamic>) {
-          return altRes;
+        if (response is Map<String, dynamic>) {
+          return response;
         }
-      } catch (_) {
-        rethrow;
+      } catch (e2) {
+        debugPrint('⚠️ Unified /submit notice: $e2. Trying /applications/{id}/submit...');
+        // 4. Try supported route: POST /api/certification/applications/{category_id_or_id}/submit
+        final targetId = model.id ?? model.categoryId ?? 1;
+        try {
+          final altRes = await ApiClient.post(
+            ApiConfig.certificationApplicationSubmit(targetId),
+            body: body,
+          );
+          if (altRes is Map<String, dynamic>) {
+            return altRes;
+          }
+        } catch (_) {
+          rethrow;
+        }
       }
     }
 

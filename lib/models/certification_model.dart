@@ -652,6 +652,141 @@ class EvidenceItem {
   }
 }
 
+class CertificationScoreSummary {
+  final int total;
+  final int max;
+  final double percent;
+  final int? passScore;
+  final bool passed;
+
+  const CertificationScoreSummary({
+    required this.total,
+    required this.max,
+    required this.percent,
+    this.passScore,
+    this.passed = false,
+  });
+
+  factory CertificationScoreSummary.fromJson(Map<String, dynamic> json) {
+    return CertificationScoreSummary(
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      max: (json['max'] as num?)?.toInt() ?? (json['max_score'] as num?)?.toInt() ?? 0,
+      percent: (json['percent'] as num?)?.toDouble() ?? 0.0,
+      passScore: (json['pass_score'] as num?)?.toInt(),
+      passed: json['passed'] == true,
+    );
+  }
+}
+
+class CertificationSectionScoreItem {
+  final int sectionId;
+  final String name;
+  final int score;
+  final int maxScore;
+
+  const CertificationSectionScoreItem({
+    required this.sectionId,
+    required this.name,
+    required this.score,
+    required this.maxScore,
+  });
+
+  factory CertificationSectionScoreItem.fromJson(Map<String, dynamic> json) {
+    return CertificationSectionScoreItem(
+      sectionId: (json['section_id'] as num?)?.toInt() ?? 0,
+      name: json['name']?.toString() ?? json['section_name']?.toString() ?? '',
+      score: (json['score'] as num?)?.toInt() ?? 0,
+      maxScore: (json['max_score'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class CertificationSubmittedAnswerItem {
+  final int questionId;
+  final String questionText;
+  final int? sectionId;
+  final String sectionName;
+  final String? sectionCode;
+  final String answerType;
+  final dynamic rawAnswer;
+  final String formattedAnswer;
+  final int score;
+  final int maxScore;
+
+  const CertificationSubmittedAnswerItem({
+    required this.questionId,
+    required this.questionText,
+    this.sectionId,
+    this.sectionName = '',
+    this.sectionCode,
+    this.answerType = 'text',
+    this.rawAnswer,
+    required this.formattedAnswer,
+    required this.score,
+    required this.maxScore,
+  });
+
+  factory CertificationSubmittedAnswerItem.fromJson(Map<String, dynamic> json) {
+    final qId = (json['question_id'] as num?)?.toInt() ?? 0;
+    final qText = json['question_text']?.toString() ?? json['question']?.toString() ?? 'Question #$qId';
+    final secId = (json['section_id'] as num?)?.toInt();
+    final secName = json['section_name']?.toString() ?? '';
+    final secCode = json['section_code']?.toString();
+    final aType = json['answer_type']?.toString().toLowerCase() ?? '';
+
+    final sc = (json['score'] as num?)?.toInt() ?? (json['points_awarded'] as num?)?.toInt() ?? 0;
+    final maxSc = (json['max_score'] as num?)?.toInt() ?? (json['max_points'] as num?)?.toInt() ?? 0;
+
+    String formatted = '';
+    if (json['answer_option_label'] != null && json['answer_option_label'].toString().isNotEmpty) {
+      formatted = json['answer_option_label'].toString();
+    } else if (json['answer_bool'] != null) {
+      formatted = (json['answer_bool'] == true || json['answer_bool'] == 1 || json['answer_bool'] == 'true') ? 'Yes' : 'No';
+    } else if (json['answer_number'] != null) {
+      if (aType == 'percentage') {
+        formatted = '${json['answer_number']}%';
+      } else {
+        formatted = '${json['answer_number']}';
+      }
+    } else if (json['answer_text'] != null && json['answer_text'].toString().isNotEmpty) {
+      formatted = json['answer_text'].toString();
+    } else if (json['answer'] != null) {
+      final ans = json['answer'];
+      if (ans is bool) {
+        formatted = ans ? 'Yes' : 'No';
+      } else if (ans is num) {
+        formatted = aType == 'percentage' ? '$ans%' : '$ans';
+      } else if (ans is List) {
+        formatted = ans.join(', ');
+      } else {
+        final str = ans.toString().trim();
+        if (str.toLowerCase() == 'true') {
+          formatted = 'Yes';
+        } else if (str.toLowerCase() == 'false') {
+          formatted = 'No';
+        } else {
+          formatted = str;
+        }
+      }
+    } else {
+      formatted = '—';
+    }
+
+    return CertificationSubmittedAnswerItem(
+      questionId: qId,
+      questionText: qText,
+      sectionId: secId,
+      sectionName: secName,
+      sectionCode: secCode,
+      answerType: aType,
+      rawAnswer: json['answer'] ?? json['answer_text'] ?? json['answer_number'] ?? json['answer_bool'],
+      formattedAnswer: formatted,
+      score: sc,
+      maxScore: maxSc,
+    );
+  }
+}
+
 class CertificationApplicationModel {
   // Category Info
   int? categoryId;
@@ -729,6 +864,10 @@ class CertificationApplicationModel {
   List<CertificationTimelineStage>? timeline;
   List<CertificationAiValidationCheck>? aiValidation;
   List<CertificationMaterialItem>? materials;
+  CertificationScoreSummary? scoreSummary;
+  List<CertificationSectionScoreItem> sectionScores = [];
+  List<CertificationSubmittedAnswerItem> submittedAnswers = [];
+  Map<String, dynamic>? rawSubmissionData;
 
   CertificationApplicationModel({
     this.categoryId,
@@ -1486,6 +1625,28 @@ class CertificationApplicationModel {
         }
       }
     }
+
+    rawSubmissionData = appMap;
+
+    if (appMap['scores'] is Map) {
+      scoreSummary = CertificationScoreSummary.fromJson(
+        Map<String, dynamic>.from(appMap['scores'] as Map),
+      );
+    }
+
+    if (appMap['section_scores'] is List) {
+      sectionScores = (appMap['section_scores'] as List)
+          .whereType<Map>()
+          .map((e) => CertificationSectionScoreItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    }
+
+    if (appMap['answers'] is List) {
+      submittedAnswers = (appMap['answers'] as List)
+          .whereType<Map>()
+          .map((e) => CertificationSubmittedAnswerItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    }
   }
 }
 
@@ -1819,6 +1980,9 @@ class CertificationApplicationDetail {
   final List<CertificationTimelineStage> timeline;
   final List<CertificationAiValidationCheck> aiValidation;
   final List<CertificationMaterialItem> materials;
+  final CertificationScoreSummary? scores;
+  final List<CertificationSectionScoreItem> sectionScores;
+  final List<CertificationSubmittedAnswerItem> answers;
 
   const CertificationApplicationDetail({
     required this.id,
@@ -1843,6 +2007,9 @@ class CertificationApplicationDetail {
     this.timeline = const [],
     this.aiValidation = const [],
     this.materials = const [],
+    this.scores,
+    this.sectionScores = const [],
+    this.answers = const [],
   });
 
   String? get effectiveComment {
@@ -1875,6 +2042,9 @@ class CertificationApplicationDetail {
     List<CertificationTimelineStage>? timeline,
     List<CertificationAiValidationCheck>? aiValidation,
     List<CertificationMaterialItem>? materials,
+    CertificationScoreSummary? scores,
+    List<CertificationSectionScoreItem>? sectionScores,
+    List<CertificationSubmittedAnswerItem>? answers,
   }) {
     return CertificationApplicationDetail(
       id: id ?? this.id,
@@ -1899,6 +2069,9 @@ class CertificationApplicationDetail {
       timeline: timeline ?? this.timeline,
       aiValidation: aiValidation ?? this.aiValidation,
       materials: materials ?? this.materials,
+      scores: scores ?? this.scores,
+      sectionScores: sectionScores ?? this.sectionScores,
+      answers: answers ?? this.answers,
     );
   }
 
@@ -1984,6 +2157,29 @@ class CertificationApplicationDetail {
         : (json['display_status']?.toString() ?? rawStatus);
     final effectiveDecision = (hasFailedAi && rawStatus.toLowerCase() != 'approved') ? 'Rejected' : rawDecision;
 
+    CertificationScoreSummary? scores;
+    if (json['scores'] is Map) {
+      scores = CertificationScoreSummary.fromJson(
+        Map<String, dynamic>.from(json['scores'] as Map),
+      );
+    }
+
+    List<CertificationSectionScoreItem> sectionScores = [];
+    if (json['section_scores'] is List) {
+      sectionScores = (json['section_scores'] as List)
+          .whereType<Map>()
+          .map((e) => CertificationSectionScoreItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    }
+
+    List<CertificationSubmittedAnswerItem> answers = [];
+    if (json['answers'] is List) {
+      answers = (json['answers'] as List)
+          .whereType<Map>()
+          .map((e) => CertificationSubmittedAnswerItem.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    }
+
     return CertificationApplicationDetail(
       id: json['id'] is int ? json['id'] as int : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
       applicationId: json['application_id']?.toString() ?? '',
@@ -2011,6 +2207,9 @@ class CertificationApplicationDetail {
       timeline: stages,
       aiValidation: checks,
       materials: mats,
+      scores: scores,
+      sectionScores: sectionScores,
+      answers: answers,
     );
   }
 }

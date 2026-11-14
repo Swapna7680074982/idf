@@ -64,6 +64,7 @@ class ApiConfig {
   static String get certificationCategories => '$baseUrl/api/certification/categories';
   static String get certificationCategoryConfig => '$baseUrl/api/certification/categories/config';
   static String get certificationApplications => '$baseUrl/api/certification/applications';
+  static String get certificationApplicationsSubmitFull => '$baseUrl/api/certification/applications/submit-full';
   static String get certificationApplicationsSubmit => '$baseUrl/api/certification/applications/submit';
   static String get applicationsCertificates => '$baseUrl/api/applications/certificates';
   static String certificationApplication(dynamic id) => '$baseUrl/api/certification/applications/$id';
