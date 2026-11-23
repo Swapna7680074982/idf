@@ -7,6 +7,7 @@ import '../../../../models/program_submission_model.dart';
 import '../../../../services/metadata_service.dart';
 import '../../../../widgets/country_phone_input_field.dart';
 import '../../../../widgets/custom_button.dart';
+import '../../../../core/validators.dart';
 
 class Step2Organizer extends StatefulWidget {
   final ProgramSubmissionModel model;
@@ -271,15 +272,10 @@ class _Step2OrganizerState extends State<Step2Organizer> {
             decoration: const InputDecoration(
               hintText: 'organizer@institution.org',
             ),
-            validator: (val) {
-              if (val == null || val.trim().isEmpty) {
-                return 'Please enter email';
-              }
-              if (!val.contains('@') || !val.contains('.')) {
-                return 'Please enter a valid email address';
-              }
-              return null;
-            },
+            validator: (val) => Validators.validateEmail(
+              val,
+              fieldName: 'organizer email',
+            ),
           ),
           const SizedBox(height: 28),
 

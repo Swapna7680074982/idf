@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import '../widgets/auth_header.dart';
 import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
+import '../core/validators.dart';
 import 'login_screen.dart';
 
 // -------------------------------------------------------------
@@ -30,10 +31,11 @@ class _ResetPasswordStep1ScreenState extends State<ResetPasswordStep1Screen> {
 
   void _onContinue() async {
     final email = _emailController.text.trim();
-    if (email.isEmpty || !email.contains('@')) {
+    final emailError = Validators.validateEmail(email);
+    if (emailError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid email address'),
+        SnackBar(
+          content: Text(emailError),
           backgroundColor: Colors.redAccent,
         ),
       );

@@ -1581,22 +1581,22 @@ class CertificationApplicationModel {
 
     if (appMap['timeline'] is List) {
       timeline = (appMap['timeline'] as List)
-          .whereType<Map<String, dynamic>>()
-          .map((e) => CertificationTimelineStage.fromJson(e))
+          .whereType<Map>()
+          .map((e) => CertificationTimelineStage.fromJson(Map<String, dynamic>.from(e)))
           .toList();
     }
     final rawAi = appMap['ai_audit'] ?? appMap['ai_validation'];
     if (rawAi is List) {
       aiValidation = rawAi
-          .whereType<Map<String, dynamic>>()
-          .map((e) => CertificationAiValidationCheck.fromJson(e))
+          .whereType<Map>()
+          .map((e) => CertificationAiValidationCheck.fromJson(Map<String, dynamic>.from(e)))
           .toList();
     }
     final rawMaterials = appMap['evidence'] ?? appMap['materials'] ?? appMap['supporting_material'];
     if (rawMaterials is List) {
       materials = rawMaterials
-          .whereType<Map<String, dynamic>>()
-          .map((e) => CertificationMaterialItem.fromJson(e))
+          .whereType<Map>()
+          .map((e) => CertificationMaterialItem.fromJson(Map<String, dynamic>.from(e)))
           .toList();
 
       for (final ev in rawMaterials) {
@@ -2080,17 +2080,17 @@ class CertificationApplicationDetail {
     List<CertificationTimelineStage> stages = [];
     if (tRaw is List) {
       stages = tRaw
-          .whereType<Map<String, dynamic>>()
-          .map((e) => CertificationTimelineStage.fromJson(e))
+          .whereType<Map>()
+          .map((e) => CertificationTimelineStage.fromJson(Map<String, dynamic>.from(e)))
           .toList();
     }
 
-    final aiRaw = json['ai_validation'];
+    final aiRaw = json['ai_validation'] ?? json['ai_audit'];
     List<CertificationAiValidationCheck> checks = [];
     if (aiRaw is List) {
       checks = aiRaw
-          .whereType<Map<String, dynamic>>()
-          .map((e) => CertificationAiValidationCheck.fromJson(e))
+          .whereType<Map>()
+          .map((e) => CertificationAiValidationCheck.fromJson(Map<String, dynamic>.from(e)))
           .toList();
     }
 
@@ -2098,8 +2098,8 @@ class CertificationApplicationDetail {
     List<CertificationMaterialItem> mats = [];
     if (mRaw is List) {
       mats = mRaw
-          .whereType<Map<String, dynamic>>()
-          .map((e) => CertificationMaterialItem.fromJson(e))
+          .whereType<Map>()
+          .map((e) => CertificationMaterialItem.fromJson(Map<String, dynamic>.from(e)))
           .toList();
     }
 
@@ -2136,26 +2136,17 @@ class CertificationApplicationDetail {
       }
     }
 
-    final rawStatus = json['status']?.toString() ?? 'Submitted';
+    final rawStatus = json['status']?.toString() ??
+        json['display_status']?.toString() ??
+        json['current_status']?.toString() ??
+        'In Review';
     final rawReviewStatus = json['review_status']?.toString() ?? 'ai_audit';
+    final rawDisplayStatus = json['display_status']?.toString() ??
+        json['current_status']?.toString() ??
+        rawStatus;
     final rawDecision = json['decision']?.toString() ?? 'Pending';
-
-    final bool hasFailedAi = checks.any((c) {
-      final s = c.status.toLowerCase();
-      return s == 'rejected' || s == 'failed';
-    }) ||
-    (foundComment?.toLowerCase().contains('ai validation rejected') ?? false) ||
-    (json['ai_validation_comment']?.toString().toLowerCase().contains('rejected') ?? false) ||
-    rawStatus.toLowerCase().contains('reject') ||
-    rawReviewStatus.toLowerCase().contains('reject') ||
-    rawDecision.toLowerCase().contains('reject');
-
-    final effectiveStatus = (hasFailedAi && rawStatus.toLowerCase() != 'approved') ? 'Rejected' : rawStatus;
-    final effectiveReviewStatus = (hasFailedAi && rawStatus.toLowerCase() != 'approved') ? 'rejected' : rawReviewStatus;
-    final effectiveDisplayStatus = (hasFailedAi && rawStatus.toLowerCase() != 'approved')
-        ? 'Rejected'
-        : (json['display_status']?.toString() ?? rawStatus);
-    final effectiveDecision = (hasFailedAi && rawStatus.toLowerCase() != 'approved') ? 'Rejected' : rawDecision;
+    final rawDecisionText = json['decision_text']?.toString() ??
+        (rawDecision.isNotEmpty ? rawDecision : 'Pending');
 
     CertificationScoreSummary? scores;
     if (json['scores'] is Map) {
@@ -2185,11 +2176,11 @@ class CertificationApplicationDetail {
       applicationId: json['application_id']?.toString() ?? '',
       applicationNo: json['application_no']?.toString() ?? json['application_id']?.toString() ?? '',
       applicationType: json['application_type']?.toString() ?? 'new',
-      status: effectiveStatus,
-      reviewStatus: effectiveReviewStatus,
-      displayStatus: effectiveDisplayStatus,
-      decision: effectiveDecision,
-      decisionText: json['decision_text']?.toString() ?? (hasFailedAi ? 'Rejected' : 'Pending'),
+      status: rawStatus,
+      reviewStatus: rawReviewStatus,
+      displayStatus: rawDisplayStatus,
+      decision: rawDecision,
+      decisionText: rawDecisionText,
       editable: json['editable'] == true,
       currentStep: json['current_step'] is int ? json['current_step'] as int : 4,
       totalSteps: json['total_steps'] is int ? json['total_steps'] as int : 4,

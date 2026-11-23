@@ -394,15 +394,26 @@ class _CertificationDetailsScreenState
   }
 
   Widget _buildHeaderCard(CertificationApplicationDetail detail) {
-    final hasNoEvidence = detail.materials.isEmpty &&
-        (widget.application?.hasMissingRequiredEvidence ?? true) &&
-        (detail.status.toLowerCase() != 'approved');
-    final isRejected = hasNoEvidence ||
-        detail.status.toLowerCase().contains('reject') ||
-        detail.reviewStatus.toLowerCase().contains('reject') ||
-        detail.displayStatus.toLowerCase().contains('reject') ||
-        detail.decision.toLowerCase().contains('reject') ||
-        (widget.certificateItem?.status.toLowerCase().contains('reject') ?? false);
+    final statusLower = detail.status.toLowerCase();
+    final reviewLower = detail.reviewStatus.toLowerCase();
+    final displayLower = detail.displayStatus.toLowerCase();
+    final decisionLower = detail.decision.toLowerCase();
+    final certItemLower = widget.certificateItem?.status.toLowerCase() ?? '';
+
+    final isApproved = statusLower == 'approved' ||
+        displayLower == 'approved' ||
+        reviewLower == 'approved' ||
+        statusLower == 'certified' ||
+        displayLower == 'certified' ||
+        statusLower == 'active' ||
+        displayLower == 'active';
+
+    final isRejected = !isApproved &&
+        (statusLower == 'rejected' ||
+            reviewLower == 'rejected' ||
+            displayLower == 'rejected' ||
+            decisionLower == 'rejected' ||
+            certItemLower == 'rejected');
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -428,11 +439,18 @@ class _CertificationDetailsScreenState
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: isRejected ? const Color(0xFFFEE2E2) : const Color(0xFFFEF3C7),
+                  color: isRejected
+                      ? const Color(0xFFFEE2E2)
+                      : isApproved
+                          ? const Color(0xFFDCFCE7)
+                          : const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
-                  child: Text(isRejected ? '❌' : '🏅', style: const TextStyle(fontSize: 24)),
+                  child: Text(
+                    isRejected ? '❌' : (isApproved ? '🏅' : '⏳'),
+                    style: const TextStyle(fontSize: 24),
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -462,13 +480,9 @@ class _CertificationDetailsScreenState
                   ],
                 ),
               ),
-              _buildStatusPill(isRejected
-                  ? 'Rejected'
-                  : (detail.reviewStatus.isNotEmpty
-                      ? detail.reviewStatus
-                      : (detail.displayStatus.isNotEmpty && detail.displayStatus.toLowerCase() != 'submitted'
-                          ? detail.displayStatus
-                          : detail.status))),
+              _buildStatusPill(detail.displayStatus.isNotEmpty
+                  ? detail.displayStatus
+                  : (detail.status.isNotEmpty ? detail.status : 'In Review')),
             ],
           ),
           const SizedBox(height: 14),
@@ -479,19 +493,15 @@ class _CertificationDetailsScreenState
               Expanded(
                 child: _buildMetaItem(
                     'Review Stage',
-                    isRejected
-                        ? 'Rejected'
-                        : _formatReviewStatus(detail.reviewStatus.isNotEmpty
-                            ? detail.reviewStatus
-                            : detail.status)),
+                    _formatReviewStatus(detail.reviewStatus.isNotEmpty
+                        ? detail.reviewStatus
+                        : detail.status)),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: _buildMetaItem(
                     'Decision',
-                    isRejected
-                        ? (detail.decisionText ?? 'Rejected')
-                        : (detail.decisionText ?? detail.decision)),
+                    detail.decisionText ?? (detail.decision.isNotEmpty ? detail.decision : 'Pending')),
               ),
               const SizedBox(width: 8),
               Expanded(
@@ -653,16 +663,12 @@ class _CertificationDetailsScreenState
         revStatus == 'approved' ||
         decision == 'approved';
 
-    final hasNoEvidence = (_detail?.materials.isEmpty ?? true) &&
-        (widget.application?.hasMissingRequiredEvidence ?? true) &&
-        (!isApproved);
-
-    final isRejected = hasNoEvidence ||
-        status.contains('reject') ||
-        dispStatus.contains('reject') ||
-        revStatus.contains('reject') ||
-        decision.contains('reject') ||
-        (widget.certificateItem?.status.toLowerCase().contains('reject') ?? false);
+    final isRejected = !isApproved &&
+        (status.contains('reject') ||
+            dispStatus.contains('reject') ||
+            revStatus.contains('reject') ||
+            decision.contains('reject') ||
+            (widget.certificateItem?.status.toLowerCase().contains('reject') ?? false));
 
     final isChangesRequired = !isRejected &&
         (status.contains('change') ||
@@ -686,23 +692,25 @@ class _CertificationDetailsScreenState
         c.status.toLowerCase().contains('reject')) ?? false;
 
     final isAiRejected = isRejected &&
-        (hasNoEvidence ||
-            (aiStage?.state.toLowerCase() == 'rejected') ||
+        ((aiStage?.state.toLowerCase() == 'rejected') ||
             (aiStage?.state.toLowerCase() == 'failed') ||
             hasAiFailedCheck ||
             decision.contains('missing evidence') ||
-            decision.contains('evidence') ||
-            (widget.application?.hasMissingRequiredEvidence ?? false));
+            decision.contains('evidence'));
 
     final comment = _detail?.effectiveComment ??
         manualStage?.comment ??
         (isRejected
-            ? (hasNoEvidence
-                ? 'Application rejected: Mandatory supporting evidence was not uploaded. Please upload evidence for AI validation.'
-                : 'Application did not meet the MDRF Active accreditation requirements.')
+            ? 'Application did not meet the IDF Active accreditation requirements.'
             : (isChangesRequired
                 ? 'Auditor requested modifications before certification can be granted.'
                 : null));
+
+    final aiStageState = isRejected
+        ? 'rejected'
+        : (aiStage?.state.isNotEmpty == true
+            ? aiStage!.state.toLowerCase()
+            : (isApproved ? 'completed' : 'in_progress'));
 
     return [
       CertificationTimelineStage(
@@ -715,12 +723,10 @@ class _CertificationDetailsScreenState
       CertificationTimelineStage(
         stage: 'ai_validation',
         label: 'AI Audit',
-        state: isRejected ? 'rejected' : 'completed',
+        state: aiStageState,
         note: isRejected
-            ? (hasNoEvidence
-                ? 'AI audit rejected • Missing evidence documents'
-                : (aiStage?.note ?? 'AI audit rejected'))
-            : (aiStage?.note ?? 'AI automated checks completed'),
+            ? (aiStage?.note ?? 'AI audit rejected')
+            : (aiStage?.note ?? (aiStageState == 'completed' ? 'AI automated checks completed' : 'AI audit in progress')),
         occurredAt: aiStage?.occurredAt ?? _detail?.submittedAt,
       ),
       CertificationTimelineStage(
@@ -1878,7 +1884,7 @@ class _CertificationDetailsScreenState
 
     final comment = detail.effectiveComment ??
         (isRejected
-            ? 'Application did not meet the MDRF Active accreditation requirements.'
+            ? 'Application did not meet the IDF Active accreditation requirements.'
             : '');
 
     if (comment.isEmpty) return const SizedBox.shrink();
@@ -2032,7 +2038,10 @@ class _CertificationDetailsScreenState
     if (lower == 'approved' || lower == 'active' || lower == 'certified') {
       bg = const Color(0xFFDCFCE7);
       fg = const Color(0xFF15803D);
-    } else if (lower.contains('manual') || lower.contains('review') || lower == 'under_review') {
+    } else if (lower.contains('ai audit') || lower == 'ai_audit') {
+      bg = const Color(0xFFEFF6FF);
+      fg = const Color(0xFF2563EB);
+    } else if (lower.contains('review') || lower.contains('manual') || lower == 'under_review') {
       bg = const Color(0xFFFEF3C7);
       fg = const Color(0xFFD97706);
     } else if (lower.contains('renew')) {
@@ -2082,12 +2091,15 @@ class _CertificationDetailsScreenState
     final lower = reviewStatus.trim().toLowerCase();
     switch (lower) {
       case 'submitted':
+        return 'Submitted';
       case 'ai_audit':
-      case 'under_review':
-      case 'manual_review':
-      case 'manual review':
+        return 'AI Audit';
       case 'in review':
       case 'in_review':
+      case 'under_review':
+        return 'In Review';
+      case 'manual_review':
+      case 'manual review':
         return 'Manual Review';
       case 'approved':
       case 'certified':
@@ -2105,7 +2117,7 @@ class _CertificationDetailsScreenState
       case 'renew certificate':
         return 'Renew Certificate';
       default:
-        if (reviewStatus.trim().isEmpty) return 'Manual Review';
+        if (reviewStatus.trim().isEmpty) return 'In Review';
         return reviewStatus.replaceAll('_', ' ').split(' ').map((word) {
           if (word.isEmpty) return '';
           return word[0].toUpperCase() + word.substring(1).toLowerCase();

@@ -16,6 +16,7 @@ class ProgramApplicationItem {
   final String submittedDate;
   final String lastUpdatedDate;
   final String status; // 'In Review', 'Submitted', 'Approved', 'Completed', 'Draft'
+  final String reviewStatus;
   final String? description;
   final String? banner;
   final String? contactPerson;
@@ -39,6 +40,7 @@ class ProgramApplicationItem {
     required this.submittedDate,
     required this.lastUpdatedDate,
     required this.status,
+    this.reviewStatus = '',
     this.description,
     this.banner,
     this.contactPerson,
@@ -60,16 +62,9 @@ class ProgramApplicationItem {
         .map((m) => (m['name'] ?? m['file_name'] ?? 'Document').toString())
         .toList();
 
-    final rawAiChecks = json['ai_validation'] ?? json['validations'] ?? json['ai_audit'];
-    final bool hasFailedAi = rawAiChecks is List &&
-        rawAiChecks.any((c) {
-          final s = (c is Map ? (c['status'] ?? '') : '').toString().toLowerCase();
-          return s == 'rejected' || s == 'failed';
-        });
-    final decisionStr = (json['decision'] ?? json['decision_text'] ?? '').toString().toLowerCase();
-
-    final statusStr = (json['display_status'] ?? json['review_status'] ?? json['status'] ?? 'Submitted').toString();
-    String normalizedStatus = (hasFailedAi || decisionStr == 'rejected')
+    final decisionStr = (json['decision'] ?? json['decision_text'] ?? '').toString().trim().toLowerCase();
+    final statusStr = (json['review_status'] ?? json['current_status'] ?? json['status'] ?? json['display_status'] ?? 'Submitted').toString();
+    String normalizedStatus = (decisionStr == 'rejected' || statusStr.toLowerCase() == 'rejected')
         ? 'Rejected'
         : _normalizeStatus(statusStr);
 
@@ -87,6 +82,7 @@ class ProgramApplicationItem {
       submittedDate: (json['submitted_at'] ?? json['submitted'] ?? json['registered_at'] ?? '').toString(),
       lastUpdatedDate: (json['last_updated'] ?? json['updated_at'] ?? json['registered_at'] ?? '').toString(),
       status: normalizedStatus,
+      reviewStatus: (json['review_status'] ?? '').toString(),
       description: (json['description'] ?? json['about'] ?? '').toString(),
       banner: ApiConfig.extractBannerUrl(json),
       contactPerson: json['contact_person']?.toString(),
@@ -119,6 +115,7 @@ class ProgramApplicationItem {
       submittedDate: item.registeredAt ?? item.startDate ?? '',
       lastUpdatedDate: item.registeredAt ?? item.startDate ?? '',
       status: normalizedStatus,
+      reviewStatus: item.reviewStatus ?? '',
       banner: ApiConfig.extractBannerUrl({
         'cover_image_url': item.coverImageUrl,
         'banner_image_url': item.bannerImageUrl,
@@ -158,6 +155,7 @@ class ProgramApplicationItem {
       submittedDate: model.startDate,
       lastUpdatedDate: model.startDate,
       status: normalizedStatus,
+      reviewStatus: model.reviewStatus ?? '',
       description: model.description,
       banner: model.imageUrl,
       contactPerson: model.contactInfo.contactPerson,
@@ -171,13 +169,17 @@ class ProgramApplicationItem {
 
   static String _normalizeStatus(String raw) {
     final lower = raw.trim().toLowerCase();
-    if (lower == 'submitted' ||
-        lower == 'in review' ||
+    if (lower == 'in review' ||
         lower == 'in_review' ||
-        lower == 'review' ||
-        lower == 'manual_review' ||
-        lower == 'manual review' ||
         lower == 'under_review') {
+      return 'In Review';
+    }
+    if (lower == 'submitted') {
+      return 'Submitted';
+    }
+    if (lower == 'manual_review' ||
+        lower == 'manual review' ||
+        lower == 'review') {
       return 'Manual Review';
     }
     if (lower == 'approved' || lower == 'completed' || lower == 'complete') return 'Approved';
@@ -388,14 +390,11 @@ class CertificateApplicationItem {
             '')
         .toString();
 
-    final rawAiChecks = json['ai_validation'] ?? json['validations'] ?? json['ai_audit'];
-    final bool hasFailedAi = rawAiChecks is List &&
-        rawAiChecks.any((c) {
-          final s = (c is Map ? (c['status'] ?? '') : '').toString().toLowerCase();
-          return s == 'rejected' || s == 'failed';
-        });
-    final decisionStr = (json['decision'] ?? json['decision_text'] ?? '').toString().toLowerCase();
-    final isCertRejected = hasFailedAi || decisionStr == 'rejected' || rawStatus.toLowerCase() == 'rejected' || revStatus.toLowerCase() == 'rejected';
+    final decisionStr = (json['decision'] ?? json['decision_text'] ?? '').toString().trim().toLowerCase();
+    final isCertRejected = decisionStr == 'rejected' ||
+        rawStatus.toLowerCase() == 'rejected' ||
+        revStatus.toLowerCase() == 'rejected' ||
+        dispStatus.toLowerCase() == 'rejected';
 
     return CertificateApplicationItem(
       id: (json['id'] ?? json['application_id'] ?? '').toString(),
@@ -407,7 +406,9 @@ class CertificateApplicationItem {
       expiresDate: (json['expires_on'] ?? json['expires_date'] ?? '').toString(),
       status: isCertRejected ? 'Rejected' : rawStatus,
       reviewStatus: isCertRejected ? 'rejected' : revStatus,
-      displayStatus: isCertRejected ? 'Rejected' : dispStatus,
+      displayStatus: isCertRejected
+          ? 'Rejected'
+          : (dispStatus.isNotEmpty ? dispStatus : rawStatus),
       score: (json['score'] ?? '').toString(),
       emoji: (json['emoji'] ?? '🏅').toString(),
       rejectionReason: reason,

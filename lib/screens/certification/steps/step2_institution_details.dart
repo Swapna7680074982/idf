@@ -7,6 +7,7 @@ import '../../../models/meta_models.dart';
 import '../../../services/metadata_service.dart';
 import '../../../widgets/country_phone_input_field.dart';
 import '../../../widgets/searchable_selection_sheet.dart';
+import '../../../core/validators.dart';
 
 class Step2InstitutionDetails extends StatefulWidget {
   final CertificationApplicationModel model;
@@ -581,8 +582,10 @@ class _Step2InstitutionDetailsState extends State<Step2InstitutionDetails> {
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
                         hintText: 'contact@institution.com',
-                        validator: (v) =>
-                            v == null || v.trim().isEmpty ? 'Please enter contact email' : null,
+                        validator: (v) => Validators.validateEmail(
+                          v,
+                          fieldName: 'contact email',
+                        ),
                       ),
                       const SizedBox(height: 16),
 

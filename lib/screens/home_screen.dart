@@ -130,9 +130,10 @@ class _HomeScreenState extends State<HomeScreen> {
         // ONLY APPROVED programs belong in public programs
         final isUnapproved = revStatus == 'submitted' || revStatus == 'draft' || revStatus == 'in_review';
         
-        // Remove MDRF active certification programs from dashboard
+        // Remove active certification programs from dashboard
         final isCertificationProgram = prog.title.toLowerCase().contains('certification') ||
             prog.title.toLowerCase().contains('mdrf active') ||
+            prog.title.toLowerCase().contains('idf active') ||
             prog.tag.toLowerCase().contains('certification') ||
             (prog.category?.toLowerCase() ?? '').contains('certification') ||
             (item.programType.toLowerCase()).contains('certification') ||
@@ -346,7 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 index: 2,
                 icon: Icons.star_outline_rounded,
                 activeIcon: Icons.star_rounded,
-                label: 'MDRF Active',
+                label: 'IDF Active',
               ),
               _buildWhatsAppNavItem(
                 index: 3,
@@ -563,7 +564,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: _buildQuickActionCard(
                       emoji: '🏅',
                       iconBg: const Color(0xFFE0F2FE),
-                      title: 'Apply for MDRF Active Certificate',
+                      title: 'Apply for IDF Active Certificate',
                       subtitle: 'Get certified today',
                       onTap: () {
                         Navigator.of(context).push(
@@ -610,7 +611,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildMyApplicationsCard(state),
             const SizedBox(height: 20),
 
-            // Explore Initiatives (Programs & MDRF Active Certification Info)
+            // Explore Initiatives (Programs & IDF Active Certification Info)
             _buildExploreInitiativesSection(),
             const SizedBox(height: 16),
           ],
@@ -626,7 +627,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final card = _homeSummary?.idfActivateCard;
     final tag = card != null && card.tag.isNotEmpty
         ? card.tag
-        : (card != null && card.badge.isNotEmpty ? card.badge : 'MDRF ACTIVATE INITIATIVE');
+        : (card != null && card.badge.isNotEmpty ? card.badge : 'IDF ACTIVE INITIATIVE');
     final title = card != null && card.title.isNotEmpty
         ? card.title
         : 'Promoting Physical Activity for a Healthier World';
@@ -725,7 +726,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 const SizedBox(height: 14),
                 InkWell(
                   onTap: () async {
-                    final uri = Uri.parse('https://mdrf.in/');
+                    final uri = Uri.parse('https://idf.org/');
                     try {
                       final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
                       if (!launched) {
@@ -939,7 +940,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // -------------------------------------------------------------
-  // Explore Initiatives (Programs & MDRF Active Certification Info)
+  // Explore Initiatives (Programs & IDF Active Certification Info)
   // -------------------------------------------------------------
   Widget _buildExploreInitiativesSection() {
     return Column(
@@ -1076,7 +1077,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Explore community initiatives across MDRF',
+              'Explore community initiatives across IDF Active',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 12,
@@ -1280,7 +1281,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // -------------------------------------------------------------
-  // MDRF Active Certification Card
+  // IDF Active Certification Card
   // -------------------------------------------------------------
   // ignore: unused_element
   Widget _buildCertificationCard(UserModel user) {
@@ -1355,7 +1356,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'MDRF Active Certification',
+                      'IDF Active Certification',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
@@ -1666,7 +1667,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
   // -------------------------------------------------------------
-  // MDRF Active Tab
+  // IDF Active Tab
   // -------------------------------------------------------------
   Widget _buildIDFActiveTab(AppState state) {
     return CertificationTabScreen(

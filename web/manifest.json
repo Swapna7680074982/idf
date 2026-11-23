@@ -1,6 +1,6 @@
 {
-    "name": "MDRF",
-    "short_name": "MDRF",
+    "name": "IDF Active",
+    "short_name": "IDF Active",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#004B93",

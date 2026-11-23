@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
@@ -188,14 +188,14 @@ class _CertificateViewScreenState extends State<CertificateViewScreen> {
     final verifyUrl =
         '${ApiConfig.baseUrl}/api/applications/certificates/$certId/download';
 
-    final shareText = '''🏆 *MDRF ACTIVE CERTIFICATION*
+    final shareText = '''🏆 *IDF ACTIVE CERTIFICATION*
 🏛 *Institution:* $instName
 📜 *Certificate No:* $certNo
 ⭐ *Score:* $score
 📅 *Issued On:* $issued
 ⏳ *Expires On:* $expires
 
-Verified by MDRF Active Accreditation Program.
+Verified by IDF Active Accreditation Program.
 Download / Verify: $verifyUrl''';
 
     final encoded = Uri.encodeComponent(shareText);
@@ -508,7 +508,7 @@ Download / Verify: $verifyUrl''';
                               ),
                               const SizedBox(width: 10),
                               Text(
-                                'MDRF ACTIVE CERTIFICATION',
+                                'IDF ACTIVE CERTIFICATION',
                                 style: GoogleFonts.inter(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w700,

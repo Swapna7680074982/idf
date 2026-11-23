@@ -119,7 +119,7 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    "MDRF Activate",
+                    "IDF Active",
                     style: GoogleFonts.inter(
                       fontSize: 26,
                       fontWeight: FontWeight.w700,

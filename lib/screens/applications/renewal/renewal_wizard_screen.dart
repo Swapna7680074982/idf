@@ -8,6 +8,7 @@ import '../../../models/meta_models.dart';
 import '../../../services/api_client.dart';
 import '../../../services/certification_service.dart';
 import '../../../widgets/country_phone_input_field.dart';
+import '../../../core/validators.dart';
 import '../../certification/certification_wizard_screen.dart';
 import '../../certification/widgets/dynamic_question_tile.dart';
 import '../../certification/widgets/evidence_upload_tile.dart';
@@ -306,7 +307,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Validating eligibility & queuing MDRF AI audit',
+                  'Validating eligibility & queuing IDF Active AI audit',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 12,
@@ -516,7 +517,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                             child: Padding(
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
-                                'I accept the MDRF declaration and confirm that all previous institution details, facilities, and questionnaire answers remain accurate and unchanged.',
+                                'I accept the IDF Active declaration and confirm that all previous institution details, facilities, and questionnaire answers remain accurate and unchanged.',
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   color: const Color(0xFF475569),
@@ -615,7 +616,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Please review your updated application before submitting. Once submitted, it will be queued for MDRF accreditation AI audit and committee review.',
+                  'Please review your updated application before submitting. Once submitted, it will be queued for IDF Active accreditation AI audit and committee review.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 13,
@@ -830,10 +831,27 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                   height: 48,
                   child: ElevatedButton(
                     onPressed: () {
+                      final emailText = emailCtrl.text.trim();
+                      if (emailText.isNotEmpty) {
+                        final emailErr = Validators.validateEmail(
+                          emailText,
+                          isRequired: false,
+                          fieldName: 'contact email',
+                        );
+                        if (emailErr != null) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(emailErr),
+                              backgroundColor: Colors.redAccent,
+                            ),
+                          );
+                          return;
+                        }
+                      }
                       setState(() {
                         if (nameCtrl.text.trim().isNotEmpty) _model.institutionName = nameCtrl.text.trim();
                         _model.contactPerson = contactCtrl.text.trim();
-                        _model.contactEmail = emailCtrl.text.trim();
+                        _model.contactEmail = emailText;
                         final digits = phoneCtrl.text.trim();
                         _model.contactPhone = digits.isNotEmpty ? '${renewalPhoneCountry.phoneCode} $digits' : '';
                         _model.address = addressCtrl.text.trim();
@@ -1998,7 +2016,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Please review your renewal submission before submitting. Once submitted, it will be transferred directly to MDRF review.',
+                  'Please review your renewal submission before submitting. Once submitted, it will be transferred directly to IDF Active review.',
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     color: const Color(0xFF1D4ED8),

@@ -114,29 +114,13 @@ class CertificationSubmittedScreen extends StatelessWidget {
     final rev = application.reviewStatus.trim().toLowerCase();
     final appStatus = application.status.trim().toLowerCase();
     final dispStatus = application.displayStatus.trim().toLowerCase();
-    final isRejected = appStatus.contains('reject') ||
-        dispStatus.contains('reject') ||
-        rev.contains('reject');
+    final isRejected = appStatus == 'rejected' ||
+        dispStatus == 'rejected' ||
+        rev == 'rejected';
 
-    final String status;
-    if (isRejected) {
-      status = 'Rejected';
-    } else if (rev == 'manual_review' ||
-        rev == 'manual review' ||
-        rev == 'under_review' ||
-        rev == 'in_review' ||
-        rev == 'in review' ||
-        rev == 'ai_audit' ||
-        rev == 'submitted') {
-      status = 'Manual Review';
-    } else if (application.displayStatus.trim().isNotEmpty &&
-        dispStatus != 'submitted') {
-      status = application.displayStatus.trim();
-    } else if (appStatus == 'submitted') {
-      status = 'Manual Review';
-    } else {
-      status = application.status.trim().isNotEmpty ? application.status.trim() : 'Manual Review';
-    }
+    final String status = application.displayStatus.trim().isNotEmpty
+        ? application.displayStatus.trim()
+        : (application.status.trim().isNotEmpty ? application.status.trim() : 'In Review');
 
     final scores = _resolveScoreSummary();
     final sectionScores = _resolveSectionScores();

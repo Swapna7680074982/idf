@@ -6,6 +6,7 @@ import '../../services/auth_service.dart';
 import '../../widgets/auth_header.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/email_illustration.dart';
+import '../../core/validators.dart';
 import 'signup_step4_terms.dart';
 
 class SignUpStep3Screen extends StatefulWidget {
@@ -215,10 +216,11 @@ class _SignUpStep3ScreenState extends State<SignUpStep3Screen> {
           ElevatedButton(
             onPressed: () async {
               final newEmail = newEmailController.text.trim();
-              if (newEmail.isEmpty || !newEmail.contains('@')) {
+              final emailError = Validators.validateEmail(newEmail);
+              if (emailError != null) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Please enter a valid email address'),
+                  SnackBar(
+                    content: Text(emailError),
                     backgroundColor: Colors.redAccent,
                   ),
                 );

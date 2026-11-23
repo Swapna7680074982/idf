@@ -29,7 +29,7 @@ class ProgramSubmittedSuccessScreen extends StatelessWidget {
     final now = submission.submissionDate ?? DateTime.now();
     final dateStr = DateTimeUtils.formatDateTime(now.toIso8601String());
     final statusLower = submission.status.trim().toLowerCase();
-    final isRejected = statusLower.contains('reject');
+    final isRejected = statusLower == 'rejected';
 
     return Scaffold(
       backgroundColor: Colors.white,

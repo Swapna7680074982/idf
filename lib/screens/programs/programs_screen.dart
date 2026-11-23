@@ -190,7 +190,7 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
             final idStr = (item['id'] ?? '').toString();
             final title = (item['title'] ?? item['program_name'] ?? '').toString();
             final progType = (item['program_type'] ?? '').toString();
-            final statusStr = (item['display_status'] ?? item['review_status'] ?? item['status'] ?? 'Submitted').toString();
+            final statusStr = (item['review_status'] ?? item['status'] ?? item['display_status'] ?? 'Submitted').toString();
 
             if (idStr.isNotEmpty && mySeen.add(idStr)) {
               myList.add(ProgramModel(

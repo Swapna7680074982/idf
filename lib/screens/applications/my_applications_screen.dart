@@ -726,10 +726,18 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       displayLabel = 'Approved';
     } else if (s == 'in review' ||
         s == 'under review' ||
-        s == 'in_review' ||
-        s == 'manual_review' ||
+        s == 'in_review') {
+      bg = const Color(0xFFFEF3C7);
+      text = const Color(0xFFB45309);
+      border = const Color(0xFFFDE68A);
+      displayLabel = 'In Review';
+    } else if (s == 'submitted') {
+      bg = const Color(0xFFEFF6FF);
+      text = const Color(0xFF1D4ED8);
+      border = const Color(0xFFBFDBFE);
+      displayLabel = 'Submitted';
+    } else if (s == 'manual_review' ||
         s == 'manual review' ||
-        s == 'submitted' ||
         s == 'pending' ||
         s == 'draft') {
       bg = const Color(0xFFFEF3C7);

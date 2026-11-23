@@ -83,7 +83,7 @@ class WelcomeScreen extends StatelessWidget {
                           ),
                           const SizedBox(height: 22),
                           Text(
-                            "MDRF Activate",
+                            "IDF Active",
                             style: GoogleFonts.inter(
                               fontSize: 26,
                               fontWeight: FontWeight.w700,

@@ -12,6 +12,7 @@ import '../../widgets/searchable_selection_sheet.dart';
 import 'signup_step3_verify.dart';
 
 import '../../data/countries_data.dart';
+import '../../core/validators.dart';
 
 class SignUpStep2Screen extends StatefulWidget {
   final String fullName;
@@ -200,6 +201,24 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
         ),
       );
       return;
+    }
+
+    final contactEmail = _contactEmailController.text.trim();
+    if (contactEmail.isNotEmpty) {
+      final contactEmailError = Validators.validateEmail(
+        contactEmail,
+        isRequired: false,
+        fieldName: 'contact email',
+      );
+      if (contactEmailError != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(contactEmailError),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+        return;
+      }
     }
 
     final contactPhone = _contactPhoneController.text.trim();

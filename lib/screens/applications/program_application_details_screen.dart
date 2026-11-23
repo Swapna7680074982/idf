@@ -8,6 +8,7 @@ import '../../models/application_item_model.dart';
 import '../../models/program_model.dart';
 import '../../services/api_config.dart';
 import '../../services/programs_service.dart';
+import '../../core/validators.dart';
 
 class ProgramApplicationDetailsScreen extends StatefulWidget {
   final ProgramApplicationItem item;
@@ -234,7 +235,9 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
         programInfo?['title']?.toString() ??
         widget.item.programName);
 
-    final status = submissionDetails?['current_status']?.toString() ??
+    final status = _liveDetail?['review_status']?.toString() ??
+        submissionDetails?['review_status']?.toString() ??
+        submissionDetails?['current_status']?.toString() ??
         _liveDetail?['status']?.toString() ??
         (_liveProgram?.reviewStatus?.isNotEmpty == true ? _liveProgram!.reviewStatus! : null) ??
         widget.item.status;
@@ -1237,7 +1240,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
       bg = const Color(0xFFDCFCE7);
       text = const Color(0xFF16A34A);
       border = const Color(0xFF86EFAC);
-    } else if (s == 'in review' || s == 'under review' || s == 'manual_review' || s == 'pending') {
+    } else if (s == 'in review' || s == 'under review' || s == 'in_review' || s == 'manual_review' || s == 'pending') {
       bg = const Color(0xFFFEF3C7);
       text = const Color(0xFFB45309);
       border = const Color(0xFFFDE68A);
@@ -1255,7 +1258,7 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
       border = const Color(0xFFFCA5A5);
     }
 
-    final displayLabel = (s == 'manual_review' || s == 'in_review')
+    final displayLabel = (s == 'manual_review' || s == 'in_review' || s == 'in review' || s == 'under_review')
         ? 'In Review'
         : (s == 'changes_required' ? 'Changes Required' : ((s == 'failed' || s == 'rejected') ? 'Rejected' : status));
 
@@ -1790,7 +1793,7 @@ class ProgramAiValidationReport {
       contactPts += 5;
       contactNotes.add('Coordinator listed');
     }
-    if (contactEmail.contains('@') && contactEmail.contains('.')) {
+    if (Validators.isValidEmail(contactEmail)) {
       contactPts += 5;
       contactNotes.add('Email address verified');
     } else if (contactEmail.isNotEmpty) {

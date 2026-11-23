@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'bloc/app_bloc.dart';
@@ -30,11 +30,11 @@ void main() async {
       statusBarBrightness: Brightness.dark,
     ),
   );
-  runApp(const MDRFDigitalHubApp());
+  runApp(const IDFDigitalHubApp());
 }
 
-class MDRFDigitalHubApp extends StatelessWidget {
-  const MDRFDigitalHubApp({super.key});
+class IDFDigitalHubApp extends StatelessWidget {
+  const IDFDigitalHubApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +42,7 @@ class MDRFDigitalHubApp extends StatelessWidget {
       create: (context) => AppBloc(),
       child: MaterialApp(
         navigatorKey: rootNavigatorKey,
-        title: 'MDRF Activate',
+        title: 'IDF Active',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         home: const SplashScreen(),

@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../bloc/app_bloc.dart';
@@ -14,6 +14,7 @@ import 'signup/signup_step1_account.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
+import '../core/validators.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -39,10 +40,11 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
 
-    if (email.isEmpty) {
+    final emailError = Validators.validateEmail(email);
+    if (emailError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your email address'),
+        SnackBar(
+          content: Text(emailError),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -121,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
             // Top Header
             AuthHeader(
               title: 'Welcome back',
-              subtitle: 'Sign in to your MDRF Digital Hub account',
+              subtitle: 'Sign in to your IDF Active account',
               onBack: () => Navigator.of(context).pop(),
             ),
 

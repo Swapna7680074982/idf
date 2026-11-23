@@ -9,6 +9,7 @@ import '../../models/meta_models.dart';
 import '../../services/account_service.dart';
 import '../../services/metadata_service.dart';
 import '../../widgets/country_phone_input_field.dart';
+import '../../core/validators.dart';
 
 class OrganizationDetailsScreen extends StatefulWidget {
   const OrganizationDetailsScreen({super.key});
@@ -467,6 +468,11 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                         controller: _contactEmailController,
                         hintText: 'contact@org.com',
                         keyboardType: TextInputType.emailAddress,
+                        validator: (val) => Validators.validateEmail(
+                          val,
+                          isRequired: false,
+                          fieldName: 'contact email',
+                        ),
                       ),
                       const SizedBox(height: 20),
 

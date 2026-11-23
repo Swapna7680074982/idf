@@ -11,6 +11,7 @@ import '../../models/meta_models.dart';
 import '../../services/account_service.dart';
 import '../../services/api_config.dart';
 import '../../widgets/country_phone_input_field.dart';
+import '../../core/validators.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -365,15 +366,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         controller: _emailController,
                         hintText: 'Email Address',
                         keyboardType: TextInputType.emailAddress,
-                        validator: (val) {
-                          if (val == null || val.trim().isEmpty) {
-                            return 'Please enter your email';
-                          }
-                          if (!val.contains('@')) {
-                            return 'Please enter a valid email address';
-                          }
-                          return null;
-                        },
+                        validator: (val) => Validators.validateEmail(
+                          val,
+                          fieldName: 'email address',
+                        ),
                       ),
                       const SizedBox(height: 20),
 

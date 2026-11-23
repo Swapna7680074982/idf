@@ -349,7 +349,7 @@ class CertificationService {
     final effectiveComments = comments ??
         (isRejected
             ? 'GPS location on submitted evidence does not match the registered institution coordinates.'
-            : 'Automated verification passed. All supporting documents meet MDRF criteria.');
+            : 'Automated verification passed. All supporting documents meet IDF Active criteria.');
 
     final effectiveChecks = (checks ?? [
       {

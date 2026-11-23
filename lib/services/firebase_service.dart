@@ -93,13 +93,13 @@ class FirebaseService {
       final RemoteNotification? notification = message.notification;
       final String title = notification?.title ??
           message.data['title']?.toString() ??
-          'MDRF Activate';
+          'IDF Active';
       final String body = notification?.body ??
           message.data['body']?.toString() ??
           message.data['message']?.toString() ??
           '';
 
-      if (notification == null && (title.isEmpty || title == 'MDRF Activate') && body.isEmpty) {
+      if (notification == null && (title.isEmpty || title == 'IDF Active') && body.isEmpty) {
         return;
       }
 

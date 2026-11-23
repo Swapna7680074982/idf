@@ -9,6 +9,7 @@ import 'signup_step2_organization.dart';
 
 import '../../data/countries_data.dart';
 import '../../models/meta_models.dart';
+import '../../core/validators.dart';
 
 class SignUpStep1Screen extends StatefulWidget {
   const SignUpStep1Screen({super.key});
@@ -52,10 +53,11 @@ class _SignUpStep1ScreenState extends State<SignUpStep1Screen> {
       return;
     }
 
-    if (email.isEmpty || !email.contains('@')) {
+    final emailError = Validators.validateEmail(email);
+    if (emailError != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid email address'),
+        SnackBar(
+          content: Text(emailError),
           backgroundColor: Colors.redAccent,
         ),
       );
@@ -122,7 +124,7 @@ class _SignUpStep1ScreenState extends State<SignUpStep1Screen> {
             // Top Header
             const AuthHeader(
               title: 'Account Details',
-              subtitle: 'Create your MDRF Digital Hub account',
+              subtitle: 'Create your IDF Active account',
               currentStep: 1,
               totalSteps: 4,
             ),

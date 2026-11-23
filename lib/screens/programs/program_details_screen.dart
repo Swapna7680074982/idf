@@ -410,12 +410,26 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                             ),
                           if (activeProgram.reviewStatus != null && activeProgram.reviewStatus!.isNotEmpty)
                             _buildMetaChip(
-                              emoji: activeProgram.reviewStatus == 'submitted' ? '⏳' : '📝',
-                              label: activeProgram.reviewStatus!.toUpperCase(),
-                              bgColor: activeProgram.reviewStatus == 'submitted'
+                              emoji: (activeProgram.reviewStatus?.toLowerCase() == 'submitted' ||
+                                      activeProgram.reviewStatus?.toLowerCase() == 'in_review' ||
+                                      activeProgram.reviewStatus?.toLowerCase() == 'in review' ||
+                                      activeProgram.reviewStatus?.toLowerCase() == 'under_review' ||
+                                      activeProgram.reviewStatus?.toLowerCase() == 'manual_review')
+                                  ? '⏳'
+                                  : '📝',
+                              label: activeProgram.reviewStatus!.replaceAll('_', ' ').toUpperCase(),
+                              bgColor: (activeProgram.reviewStatus?.toLowerCase() == 'submitted' ||
+                                      activeProgram.reviewStatus?.toLowerCase() == 'in_review' ||
+                                      activeProgram.reviewStatus?.toLowerCase() == 'in review' ||
+                                      activeProgram.reviewStatus?.toLowerCase() == 'under_review' ||
+                                      activeProgram.reviewStatus?.toLowerCase() == 'manual_review')
                                   ? const Color(0xFFFEF3C7)
                                   : const Color(0xFFF1F5F9),
-                              textColor: activeProgram.reviewStatus == 'submitted'
+                              textColor: (activeProgram.reviewStatus?.toLowerCase() == 'submitted' ||
+                                      activeProgram.reviewStatus?.toLowerCase() == 'in_review' ||
+                                      activeProgram.reviewStatus?.toLowerCase() == 'in review' ||
+                                      activeProgram.reviewStatus?.toLowerCase() == 'under_review' ||
+                                      activeProgram.reviewStatus?.toLowerCase() == 'manual_review')
                                   ? const Color(0xFFB45309)
                                   : const Color(0xFF475569),
                             ),
@@ -726,7 +740,7 @@ class _ProgramDetailsScreenState extends State<ProgramDetailsScreen> {
                             ],
                           ),
                         ),
-                        if (activeProgram.reviewStatus == 'submitted') ...[
+                        if (['submitted', 'in_review', 'in review', 'under_review', 'manual_review'].contains(activeProgram.reviewStatus?.toLowerCase())) ...[
                           const SizedBox(height: 10),
                           Container(
                             width: double.infinity,

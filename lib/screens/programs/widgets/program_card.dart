@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/date_time_utils.dart';
 import '../../../core/theme.dart';
@@ -110,7 +110,7 @@ class ProgramCard extends StatelessWidget {
 
                     // Row 3: Organizer Subtitle
                     Text(
-                      program.organizer.isNotEmpty ? program.organizer : 'MDRF Africa Region',
+                      program.organizer.isNotEmpty ? program.organizer : 'IDF Active Africa Region',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
@@ -221,12 +221,22 @@ class ProgramCard extends StatelessWidget {
 
     final s = rev.trim().toLowerCase();
     switch (s) {
-      case 'submitted':
       case 'in_review':
       case 'in review':
+      case 'under_review':
+        bg = const Color(0xFFFEF3C7);
+        border = const Color(0xFFFDE68A);
+        text = const Color(0xFFB45309);
+        label = 'In Review';
+        break;
+      case 'submitted':
+        bg = const Color(0xFFEFF6FF);
+        border = const Color(0xFFBFDBFE);
+        text = const Color(0xFF1D4ED8);
+        label = 'Submitted';
+        break;
       case 'manual_review':
       case 'manual review':
-      case 'under_review':
       case 'pending':
         bg = const Color(0xFFFEF3C7);
         border = const Color(0xFFFDE68A);
