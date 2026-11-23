@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme.dart';
+import '../../../core/capitalization_formatter.dart';
 import '../../../models/certification_model.dart';
 
 class DynamicQuestionTile extends StatefulWidget {
@@ -573,6 +574,8 @@ class _DynamicQuestionTileState extends State<DynamicQuestionTile> {
       controller: _textController,
       minLines: 3,
       maxLines: 5,
+      textCapitalization: TextCapitalization.sentences,
+      inputFormatters: const [CapitalizeFirstLetterFormatter(words: false)],
       decoration: InputDecoration(
         hintText: widget.question.placeholder ?? 'Enter your detailed explanation or answer here...',
         hintStyle: GoogleFonts.inter(fontSize: 13, color: const Color(0xFF94A3B8)),

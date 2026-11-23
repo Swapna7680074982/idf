@@ -550,7 +550,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       emoji: '📋',
                       iconBg: const Color(0xFFFEF3C7),
                       title: 'Submit a Program',
-                      subtitle: 'Share your Physical Activity initiative',
+                      subtitle: 'Share your activity',
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(

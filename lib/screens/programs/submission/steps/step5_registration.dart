@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme.dart';
+import '../../../../core/capitalization_formatter.dart';
 import '../../../../models/program_submission_model.dart';
 import '../../../../widgets/custom_button.dart';
 
@@ -74,6 +75,8 @@ class _Step5RegistrationState extends State<Step5Registration> {
             controller: _instructionsController,
             maxLines: 4,
             minLines: 3,
+            textCapitalization: TextCapitalization.sentences,
+            inputFormatters: const [CapitalizeFirstLetterFormatter(words: false)],
             style: GoogleFonts.inter(
               fontSize: 14,
               color: AppColors.textPrimary,
@@ -92,6 +95,7 @@ class _Step5RegistrationState extends State<Step5Registration> {
           TextFormField(
             controller: _linkController,
             keyboardType: TextInputType.url,
+            textInputAction: TextInputAction.done,
             style: GoogleFonts.inter(
               fontSize: 14,
               color: AppColors.textPrimary,

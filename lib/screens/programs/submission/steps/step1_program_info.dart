@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme.dart';
+import '../../../../core/capitalization_formatter.dart';
 import '../../../../models/meta_models.dart';
 import '../../../../models/program_submission_model.dart';
 import '../../../../services/files_service.dart';
@@ -332,6 +333,9 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
           const SizedBox(height: 6),
           TextFormField(
             controller: _nameController,
+            textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.words,
+            inputFormatters: const [CapitalizeFirstLetterFormatter(words: true)],
             decoration: const InputDecoration(
               hintText: 'e.g. Global Walk for Diabetes 2026',
             ),
@@ -600,6 +604,8 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
           TextFormField(
             controller: _descriptionController,
             maxLines: 4,
+            textCapitalization: TextCapitalization.sentences,
+            inputFormatters: const [CapitalizeFirstLetterFormatter(words: false)],
             decoration: const InputDecoration(
               hintText: 'Describe the program and its physical activity goals...',
               alignLabelWithHint: true,

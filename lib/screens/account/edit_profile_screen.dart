@@ -1,11 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../bloc/app_bloc.dart';
 import '../../bloc/app_event.dart';
 import '../../core/theme.dart';
+import '../../core/capitalization_formatter.dart';
 import '../../data/countries_data.dart';
 import '../../models/meta_models.dart';
 import '../../services/account_service.dart';
@@ -350,6 +352,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       _buildTextField(
                         controller: _nameController,
                         hintText: 'Full Name',
+                        capitalizeWords: true,
+                        textInputAction: TextInputAction.next,
                         validator: (val) {
                           if (val == null || val.trim().isEmpty) {
                             return 'Please enter your full name';
@@ -366,6 +370,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         controller: _emailController,
                         hintText: 'Email Address',
                         keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
                         validator: (val) => Validators.validateEmail(
                           val,
                           fieldName: 'email address',
@@ -380,6 +385,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         hintText: 'Mobile Number',
                         controller: _phoneController,
                         initialCountry: _selectedCountry,
+                        textInputAction: TextInputAction.done,
                         onCountryChanged: (c) {
                           setState(() {
                             _selectedCountry = c;
@@ -450,10 +456,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     required String hintText,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    TextInputAction textInputAction = TextInputAction.next,
+    TextCapitalization? textCapitalization,
+    bool capitalizeWords = false,
+    List<TextInputFormatter>? inputFormatters,
   }) {
+    final isEmail = keyboardType == TextInputType.emailAddress;
+    final isNumber = keyboardType == TextInputType.number || keyboardType == TextInputType.phone;
+    final isUrl = keyboardType == TextInputType.url;
+    final shouldAutoCapitalize = !isEmail && !isNumber && !isUrl;
+
+    final effectiveCapitalization = textCapitalization ??
+        (shouldAutoCapitalize
+            ? (capitalizeWords ? TextCapitalization.words : TextCapitalization.sentences)
+            : TextCapitalization.none);
+
+    final effectiveFormatters = <TextInputFormatter>[
+      if (inputFormatters != null) ...inputFormatters,
+      if (shouldAutoCapitalize)
+        CapitalizeFirstLetterFormatter(words: capitalizeWords),
+    ];
+
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      textCapitalization: effectiveCapitalization,
+      inputFormatters: effectiveFormatters.isNotEmpty ? effectiveFormatters : null,
       validator: validator,
       style: GoogleFonts.inter(
         fontSize: 14.0,

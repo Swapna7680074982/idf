@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/theme.dart';
+import '../core/capitalization_formatter.dart';
 import 'country_phone_input_field.dart';
 
 export 'country_phone_input_field.dart';
+export '../core/capitalization_formatter.dart';
 
 class CustomTextField extends StatelessWidget {
   final String label;
@@ -16,6 +19,11 @@ class CustomTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final FormFieldValidator<String>? validator;
   final int maxLines;
+  final TextInputAction? textInputAction;
+  final TextCapitalization? textCapitalization;
+  final List<TextInputFormatter>? inputFormatters;
+  final bool capitalizeWords;
+  final bool? autoCapitalize;
 
   const CustomTextField({
     super.key,
@@ -29,10 +37,38 @@ class CustomTextField extends StatelessWidget {
     this.onChanged,
     this.validator,
     this.maxLines = 1,
+    this.textInputAction,
+    this.textCapitalization,
+    this.inputFormatters,
+    this.capitalizeWords = false,
+    this.autoCapitalize,
   });
 
   @override
   Widget build(BuildContext context) {
+    final shouldAutoCapitalize = autoCapitalize ??
+        (!obscureText &&
+            keyboardType != TextInputType.emailAddress &&
+            keyboardType != TextInputType.phone &&
+            keyboardType != TextInputType.number &&
+            keyboardType != TextInputType.url);
+
+    final effectiveAction = textInputAction ??
+        (maxLines > 1 ? TextInputAction.newline : TextInputAction.next);
+
+    final effectiveCapitalization = textCapitalization ??
+        (shouldAutoCapitalize
+            ? (capitalizeWords
+                ? TextCapitalization.words
+                : TextCapitalization.sentences)
+            : TextCapitalization.none);
+
+    final effectiveFormatters = <TextInputFormatter>[
+      if (inputFormatters != null) ...inputFormatters!,
+      if (shouldAutoCapitalize)
+        CapitalizeFirstLetterFormatter(words: capitalizeWords),
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -54,6 +90,10 @@ class CustomTextField extends StatelessWidget {
           onChanged: onChanged,
           validator: validator,
           maxLines: maxLines,
+          textInputAction: effectiveAction,
+          textCapitalization: effectiveCapitalization,
+          inputFormatters:
+              effectiveFormatters.isNotEmpty ? effectiveFormatters : null,
           style: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -80,6 +120,7 @@ class PasswordTextField extends StatefulWidget {
   final TextEditingController? controller;
   final ValueChanged<String>? onChanged;
   final FormFieldValidator<String>? validator;
+  final TextInputAction textInputAction;
 
   const PasswordTextField({
     super.key,
@@ -88,6 +129,7 @@ class PasswordTextField extends StatefulWidget {
     this.controller,
     this.onChanged,
     this.validator,
+    this.textInputAction = TextInputAction.next,
   });
 
   @override
@@ -116,6 +158,7 @@ class _PasswordTextFieldState extends State<PasswordTextField> {
           obscureText: _obscure,
           onChanged: widget.onChanged,
           validator: widget.validator,
+          textInputAction: widget.textInputAction,
           style: GoogleFonts.inter(
             fontSize: 14,
             fontWeight: FontWeight.w500,

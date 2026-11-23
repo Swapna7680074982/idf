@@ -380,6 +380,8 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
                     label: 'Organization / Institution Name',
                     hintText: 'World Health Centre',
                     controller: _orgNameController,
+                    capitalizeWords: true,
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
 
@@ -538,6 +540,8 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
                       label: 'City',
                       hintText: 'Enter City',
                       controller: _cityController,
+                      capitalizeWords: true,
+                      textInputAction: TextInputAction.next,
                     ),
                   const SizedBox(height: 16),
 
@@ -545,6 +549,7 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
                     label: 'Address',
                     hintText: 'Street address',
                     controller: _addressController,
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
 
@@ -552,6 +557,8 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
                     label: 'Contact Person',
                     hintText: 'Full name',
                     controller: _contactPersonController,
+                    capitalizeWords: true,
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
 
@@ -560,6 +567,7 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
                     hintText: 'contact@org.com',
                     keyboardType: TextInputType.emailAddress,
                     controller: _contactEmailController,
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
 
@@ -568,6 +576,7 @@ class _SignUpStep2ScreenState extends State<SignUpStep2Screen> {
                     hintText: 'Enter contact phone',
                     controller: _contactPhoneController,
                     initialCountry: _selectedContactCountry ?? _selectedCountry,
+                    textInputAction: TextInputAction.done,
                     onCountryChanged: (c) {
                       setState(() {
                         _selectedContactCountry = c;

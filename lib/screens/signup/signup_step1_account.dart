@@ -139,6 +139,8 @@ class _SignUpStep1ScreenState extends State<SignUpStep1Screen> {
                     label: 'Full Name',
                     hintText: 'Dr. Jane Smith',
                     controller: _fullNameController,
+                    capitalizeWords: true,
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
 
@@ -147,6 +149,7 @@ class _SignUpStep1ScreenState extends State<SignUpStep1Screen> {
                     hintText: 'your@email.com',
                     keyboardType: TextInputType.emailAddress,
                     controller: _emailController,
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
 
@@ -155,6 +158,7 @@ class _SignUpStep1ScreenState extends State<SignUpStep1Screen> {
                     hintText: 'Enter mobile number',
                     controller: _phoneController,
                     initialCountry: _selectedCountry,
+                    textInputAction: TextInputAction.next,
                     onCountryChanged: (c) {
                       setState(() {
                         _selectedCountry = c;
@@ -167,6 +171,7 @@ class _SignUpStep1ScreenState extends State<SignUpStep1Screen> {
                     label: 'Password',
                     hintText: 'Min. 8 characters',
                     controller: _passwordController,
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 16),
 
@@ -174,6 +179,7 @@ class _SignUpStep1ScreenState extends State<SignUpStep1Screen> {
                     label: 'Confirm Password',
                     hintText: 'Repeat password',
                     controller: _confirmPasswordController,
+                    textInputAction: TextInputAction.done,
                   ),
                   const SizedBox(height: 28),
 

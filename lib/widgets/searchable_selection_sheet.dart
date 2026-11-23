@@ -1,6 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../core/theme.dart';
+import '../core/capitalization_formatter.dart';
 
 class SearchableDropdownField<T> extends StatelessWidget {
   final String? label;
@@ -255,6 +256,9 @@ class _SearchableSelectionSheetState<T>
               ),
               child: TextField(
                 controller: _searchController,
+                textCapitalization: TextCapitalization.words,
+                inputFormatters: const [CapitalizeFirstLetterFormatter(words: true)],
+                textInputAction: TextInputAction.search,
                 onChanged: _onSearchChanged,
                 style: GoogleFonts.inter(fontSize: 14, color: const Color(0xFF0F172A)),
                 decoration: InputDecoration(

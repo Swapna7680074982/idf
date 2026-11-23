@@ -121,6 +121,7 @@ class _ResetPasswordStep1ScreenState extends State<ResetPasswordStep1Screen> {
                     hintText: 'your@email.com',
                     keyboardType: TextInputType.emailAddress,
                     controller: _emailController,
+                    textInputAction: TextInputAction.done,
                   ),
                   const SizedBox(height: 28),
                   PrimaryButton(
@@ -293,6 +294,7 @@ class _ResetPasswordStep2ScreenState extends State<ResetPasswordStep2Screen> {
                     hintText: '${widget.codeLength}-digit code',
                     keyboardType: TextInputType.number,
                     controller: _codeController,
+                    textInputAction: TextInputAction.done,
                   ),
                   const SizedBox(height: 28),
                   PrimaryButton(
@@ -459,6 +461,7 @@ class _ResetPasswordStep3ScreenState extends State<ResetPasswordStep3Screen> {
                     label: 'New Password',
                     hintText: 'Min. 8 characters',
                     controller: _newPasswordController,
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 18),
 
@@ -466,6 +469,7 @@ class _ResetPasswordStep3ScreenState extends State<ResetPasswordStep3Screen> {
                     label: 'Confirm Password',
                     hintText: 'Repeat password',
                     controller: _confirmPasswordController,
+                    textInputAction: TextInputAction.done,
                   ),
                   const SizedBox(height: 32),
 

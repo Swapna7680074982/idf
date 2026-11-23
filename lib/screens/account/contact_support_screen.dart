@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme.dart';
+import '../../core/capitalization_formatter.dart';
 import '../../models/support_models.dart';
 import '../../services/api_client.dart';
 import '../../services/support_service.dart';
@@ -413,6 +414,8 @@ class _ContactSupportScreenState extends State<ContactSupportScreen> {
     return TextFormField(
       controller: _messageController,
       maxLines: 7,
+      textCapitalization: TextCapitalization.sentences,
+      inputFormatters: const [CapitalizeFirstLetterFormatter(words: false)],
       style: GoogleFonts.inter(
         fontSize: 14.0,
         fontWeight: FontWeight.w400,

@@ -250,6 +250,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         hintText: 'Re-enter your new password',
                         isObscured: _obscureConfirm,
                         prefixIcon: Icons.verified_user_outlined,
+                        textInputAction: TextInputAction.done,
                         onToggleVisibility: () {
                           setState(() => _obscureConfirm = !_obscureConfirm);
                         },
@@ -326,10 +327,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     required bool isObscured,
     required IconData prefixIcon,
     required VoidCallback onToggleVisibility,
+    TextInputAction textInputAction = TextInputAction.next,
   }) {
     return TextFormField(
       controller: controller,
       obscureText: isObscured,
+      textInputAction: textInputAction,
       style: GoogleFonts.inter(
         fontSize: 14.0,
         fontWeight: FontWeight.w400,

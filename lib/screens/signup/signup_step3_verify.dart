@@ -201,6 +201,7 @@ class _SignUpStep3ScreenState extends State<SignUpStep3Screen> {
             TextField(
               controller: newEmailController,
               keyboardType: TextInputType.emailAddress,
+              textInputAction: TextInputAction.done,
               decoration: const InputDecoration(
                 hintText: 'new.email@org.com',
                 contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -357,6 +358,7 @@ class _SignUpStep3ScreenState extends State<SignUpStep3Screen> {
                       TextFormField(
                         controller: _codeController,
                         keyboardType: TextInputType.number,
+                        textInputAction: TextInputAction.done,
                         textAlign: TextAlign.left,
                         maxLength: widget.codeLength,
                         style: GoogleFonts.inter(

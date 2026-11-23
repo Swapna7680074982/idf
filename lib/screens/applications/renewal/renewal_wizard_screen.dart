@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../core/theme.dart';
+import '../../../core/capitalization_formatter.dart';
 import '../../../models/application_item_model.dart';
 import '../../../models/certification_model.dart';
 import '../../../data/countries_data.dart';
@@ -754,6 +755,9 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 const SizedBox(height: 4),
                 TextField(
                   controller: nameCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  inputFormatters: const [CapitalizeFirstLetterFormatter(words: true)],
+                  textInputAction: TextInputAction.next,
                   decoration: InputDecoration(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
@@ -767,6 +771,9 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 const SizedBox(height: 4),
                 TextField(
                   controller: contactCtrl,
+                  textCapitalization: TextCapitalization.words,
+                  inputFormatters: const [CapitalizeFirstLetterFormatter(words: true)],
+                  textInputAction: TextInputAction.next,
                   decoration: InputDecoration(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
@@ -781,6 +788,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 TextField(
                   controller: emailCtrl,
                   keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
                   decoration: InputDecoration(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
@@ -797,6 +805,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                   controller: phoneCtrl,
                   initialCountry: renewalPhoneCountry,
                   isRequired: false,
+                  textInputAction: TextInputAction.next,
                   onCountryChanged: (c) => renewalPhoneCountry = c,
                 ),
                 const SizedBox(height: 12),
@@ -807,6 +816,9 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 const SizedBox(height: 4),
                 TextField(
                   controller: addressCtrl,
+                  textCapitalization: TextCapitalization.sentences,
+                  inputFormatters: const [CapitalizeFirstLetterFormatter(words: false)],
+                  textInputAction: TextInputAction.next,
                   decoration: InputDecoration(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),
@@ -820,6 +832,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 const SizedBox(height: 4),
                 TextField(
                   controller: pincodeCtrl,
+                  textInputAction: TextInputAction.done,
                   decoration: InputDecoration(
                     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFCBD5E1))),

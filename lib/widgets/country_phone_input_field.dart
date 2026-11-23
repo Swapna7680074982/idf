@@ -418,6 +418,7 @@ class CountryPhoneInputField extends StatefulWidget {
   final bool showHelperNearField;
   final String? Function(String?)? validator;
   final AutovalidateMode autovalidateMode;
+  final TextInputAction? textInputAction;
 
   const CountryPhoneInputField({
     super.key,
@@ -435,6 +436,7 @@ class CountryPhoneInputField extends StatefulWidget {
     this.showHelperNearField = true,
     this.validator,
     this.autovalidateMode = AutovalidateMode.onUserInteraction,
+    this.textInputAction,
   });
 
   @override
@@ -659,6 +661,7 @@ class CountryPhoneInputFieldState extends State<CountryPhoneInputField> {
                           controller: widget.controller,
                           enabled: widget.enabled,
                           keyboardType: TextInputType.phone,
+                          textInputAction: widget.textInputAction ?? TextInputAction.next,
                           inputFormatters: [
                             FilteringTextInputFormatter.digitsOnly,
                             LengthLimitingTextInputFormatter(rule.maxLength),

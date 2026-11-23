@@ -138,6 +138,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     hintText: 'Enter your email address',
                     keyboardType: TextInputType.emailAddress,
                     controller: _emailController,
+                    textInputAction: TextInputAction.next,
                   ),
                   const SizedBox(height: 18),
 
@@ -145,6 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     label: 'Password',
                     hintText: 'Enter your password',
                     controller: _passwordController,
+                    textInputAction: TextInputAction.done,
                   ),
                   const SizedBox(height: 12),
 

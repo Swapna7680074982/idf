@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/date_time_utils.dart';
 import '../../../../core/theme.dart';
+import '../../../../core/capitalization_formatter.dart';
 import '../../../../models/meta_models.dart';
 import '../../../../models/program_submission_model.dart';
 import '../../../../services/metadata_service.dart';
@@ -540,6 +541,9 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
           else
             TextFormField(
               controller: _regionController,
+              textInputAction: TextInputAction.next,
+              textCapitalization: TextCapitalization.words,
+              inputFormatters: const [CapitalizeFirstLetterFormatter(words: true)],
               decoration: const InputDecoration(
                 hintText: 'e.g. Maharashtra, Nairobi County, Texas',
               ),
@@ -597,6 +601,9 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
           else
             TextFormField(
               controller: _cityController,
+              textInputAction: TextInputAction.next,
+              textCapitalization: TextCapitalization.words,
+              inputFormatters: const [CapitalizeFirstLetterFormatter(words: true)],
               decoration: const InputDecoration(
                 hintText: 'e.g. Mumbai, Nairobi, London',
               ),
@@ -610,6 +617,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
           TextFormField(
             controller: _pincodeController,
             keyboardType: TextInputType.text,
+            textInputAction: TextInputAction.next,
             decoration: const InputDecoration(
               hintText: 'e.g. 400001 or W1A 1AA',
             ),
@@ -623,6 +631,9 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
           const SizedBox(height: 6),
           TextFormField(
             controller: _venueController,
+            textInputAction: TextInputAction.done,
+            textCapitalization: TextCapitalization.sentences,
+            inputFormatters: const [CapitalizeFirstLetterFormatter(words: false)],
             decoration: const InputDecoration(
               hintText: 'Full venue address or online location',
             ),

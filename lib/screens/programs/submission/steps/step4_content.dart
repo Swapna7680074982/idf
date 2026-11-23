@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/date_time_utils.dart';
 import '../../../../core/theme.dart';
+import '../../../../core/capitalization_formatter.dart';
 import '../../../../models/program_submission_model.dart';
 import '../../../../widgets/custom_button.dart';
 
@@ -375,6 +376,9 @@ class _Step4ContentState extends State<Step4Content> {
                   // Session Title Field
                   TextFormField(
                     controller: session.titleController,
+                    textInputAction: TextInputAction.next,
+                    textCapitalization: TextCapitalization.words,
+                    inputFormatters: const [CapitalizeFirstLetterFormatter(words: true)],
                     onChanged: (_) {
                       if (_agendaError != null) setState(() => _agendaError = null);
                     },

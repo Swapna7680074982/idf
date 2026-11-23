@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../bloc/app_bloc.dart';
 import '../../bloc/app_event.dart';
 import '../../core/theme.dart';
+import '../../core/capitalization_formatter.dart';
 import '../../data/countries_data.dart';
 import '../../models/meta_models.dart';
 import '../../services/account_service.dart';
@@ -401,6 +403,8 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                       _buildTextField(
                         controller: _orgNameController,
                         hintText: 'Organization / Institution Name',
+                        capitalizeWords: true,
+                        textInputAction: TextInputAction.next,
                         validator: (val) => val == null || val.trim().isEmpty
                             ? 'Please enter organization name'
                             : null,
@@ -419,6 +423,8 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                       _buildTextField(
                         controller: _countryController,
                         hintText: 'Country',
+                        capitalizeWords: true,
+                        textInputAction: TextInputAction.next,
                         validator: (val) => val == null || val.trim().isEmpty
                             ? 'Please enter country'
                             : null,
@@ -431,6 +437,8 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                       _buildTextField(
                         controller: _stateController,
                         hintText: 'Region / State',
+                        capitalizeWords: true,
+                        textInputAction: TextInputAction.next,
                       ),
                       const SizedBox(height: 20),
 
@@ -440,6 +448,8 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                       _buildTextField(
                         controller: _cityController,
                         hintText: 'City',
+                        capitalizeWords: true,
+                        textInputAction: TextInputAction.next,
                       ),
                       const SizedBox(height: 20),
 
@@ -449,6 +459,7 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                       _buildTextField(
                         controller: _addressController,
                         hintText: 'Street address',
+                        textInputAction: TextInputAction.next,
                       ),
                       const SizedBox(height: 20),
 
@@ -458,6 +469,8 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                       _buildTextField(
                         controller: _contactPersonController,
                         hintText: 'Full name of contact person',
+                        capitalizeWords: true,
+                        textInputAction: TextInputAction.next,
                       ),
                       const SizedBox(height: 20),
 
@@ -468,6 +481,7 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                         controller: _contactEmailController,
                         hintText: 'contact@org.com',
                         keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
                         validator: (val) => Validators.validateEmail(
                           val,
                           isRequired: false,
@@ -484,6 +498,7 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
                         controller: _contactPhoneController,
                         initialCountry: _contactCountry,
                         isRequired: false,
+                        textInputAction: TextInputAction.done,
                         onCountryChanged: (c) {
                           setState(() {
                             _contactCountry = c;
@@ -596,10 +611,33 @@ class _OrganizationDetailsScreenState extends State<OrganizationDetailsScreen> {
     required String hintText,
     TextInputType keyboardType = TextInputType.text,
     String? Function(String?)? validator,
+    TextInputAction textInputAction = TextInputAction.next,
+    TextCapitalization? textCapitalization,
+    bool capitalizeWords = false,
+    List<TextInputFormatter>? inputFormatters,
   }) {
+    final isEmail = keyboardType == TextInputType.emailAddress;
+    final isNumber = keyboardType == TextInputType.number || keyboardType == TextInputType.phone;
+    final isUrl = keyboardType == TextInputType.url;
+    final shouldAutoCapitalize = !isEmail && !isNumber && !isUrl;
+
+    final effectiveCapitalization = textCapitalization ??
+        (shouldAutoCapitalize
+            ? (capitalizeWords ? TextCapitalization.words : TextCapitalization.sentences)
+            : TextCapitalization.none);
+
+    final effectiveFormatters = <TextInputFormatter>[
+      if (inputFormatters != null) ...inputFormatters,
+      if (shouldAutoCapitalize)
+        CapitalizeFirstLetterFormatter(words: capitalizeWords),
+    ];
+
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      textCapitalization: effectiveCapitalization,
+      inputFormatters: effectiveFormatters.isNotEmpty ? effectiveFormatters : null,
       validator: validator,
       style: GoogleFonts.inter(
         fontSize: 14.0,

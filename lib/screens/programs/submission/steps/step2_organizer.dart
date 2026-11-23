@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/theme.dart';
+import '../../../../core/capitalization_formatter.dart';
 import '../../../../data/countries_data.dart';
 import '../../../../models/meta_models.dart';
 import '../../../../models/program_submission_model.dart';
@@ -148,6 +149,9 @@ class _Step2OrganizerState extends State<Step2Organizer> {
           const SizedBox(height: 6),
           TextFormField(
             controller: _entityNameController,
+            textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.words,
+            inputFormatters: const [CapitalizeFirstLetterFormatter(words: true)],
             decoration: const InputDecoration(
               hintText: 'e.g. World Health Centre / University Campus',
             ),
@@ -240,6 +244,9 @@ class _Step2OrganizerState extends State<Step2Organizer> {
           const SizedBox(height: 6),
           TextFormField(
             controller: _contactPersonController,
+            textInputAction: TextInputAction.next,
+            textCapitalization: TextCapitalization.words,
+            inputFormatters: const [CapitalizeFirstLetterFormatter(words: true)],
             decoration: const InputDecoration(
               hintText: 'Full name',
             ),
@@ -255,6 +262,7 @@ class _Step2OrganizerState extends State<Step2Organizer> {
             hintText: 'Enter phone number',
             controller: _phoneController,
             initialCountry: _selectedCountry,
+            textInputAction: TextInputAction.next,
             onCountryChanged: (c) {
               setState(() {
                 _selectedCountry = c;
@@ -269,6 +277,7 @@ class _Step2OrganizerState extends State<Step2Organizer> {
           TextFormField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.done,
             decoration: const InputDecoration(
               hintText: 'organizer@institution.org',
             ),

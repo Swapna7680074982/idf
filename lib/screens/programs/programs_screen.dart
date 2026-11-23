@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme.dart';
+import '../../core/capitalization_formatter.dart';
 import '../../models/application_item_model.dart';
 import '../../models/program_api_models.dart';
 import '../../models/program_model.dart';
@@ -874,6 +875,9 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                       ),
                       child: TextField(
                         controller: _searchController,
+                        textCapitalization: TextCapitalization.words,
+                        inputFormatters: const [CapitalizeFirstLetterFormatter(words: true)],
+                        textInputAction: TextInputAction.search,
                         onChanged: _onSearchChanged,
                         style: GoogleFonts.inter(
                           fontSize: 13.5,

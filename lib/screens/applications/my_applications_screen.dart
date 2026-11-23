@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/date_time_utils.dart';
 import '../../core/theme.dart';
+import '../../core/capitalization_formatter.dart';
 import '../../models/application_item_model.dart';
 import '../../models/certification_model.dart';
 import '../certification/certification_details_screen.dart';
@@ -373,6 +374,9 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       ),
       child: TextField(
         controller: controller,
+        textCapitalization: TextCapitalization.words,
+        inputFormatters: const [CapitalizeFirstLetterFormatter(words: true)],
+        textInputAction: TextInputAction.search,
         onChanged: (val) {
           setState(() {
             if (isPrograms) {
