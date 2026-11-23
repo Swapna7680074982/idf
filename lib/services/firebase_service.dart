@@ -143,6 +143,11 @@ class FirebaseService {
         options: DefaultFirebaseOptions.currentPlatform,
       );
 
+      if (kIsWeb) {
+        developer.log('Firebase messaging service worker not active on Web. Skipping push init.', name: 'FirebaseService');
+        return null;
+      }
+
       // Register background messaging handler
       FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
@@ -237,8 +242,7 @@ class FirebaseService {
   /// Called on app launch, login, or when HomeScreen opens.
   static Future<bool> syncTokenWithBackend({String? deviceName}) async {
     try {
-      if (!TokenStorage.isAuthenticated) {
-        developer.log('Skipping FCM sync: User not authenticated', name: 'FirebaseService');
+      if (kIsWeb || !TokenStorage.isAuthenticated) {
         return false;
       }
 

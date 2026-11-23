@@ -11,9 +11,12 @@ class NotificationService {
     String? deviceName,
   }) async {
     try {
+      final String defaultDeviceName = kIsWeb
+          ? 'Web Browser'
+          : (Platform.isIOS ? 'iOS Device' : 'Android Device');
       final body = <String, dynamic>{
         'push_token': pushToken,
-        'device_name': deviceName ?? (Platform.isIOS ? 'iOS Device' : 'Android Device'),
+        'device_name': deviceName ?? defaultDeviceName,
       };
 
       try {

@@ -1,0 +1,24 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "idf_diaspa (Chrome - No CORS)",
+      "request": "launch",
+      "type": "dart",
+      "deviceId": "chrome",
+      "args": [
+        "--web-browser-flag",
+        "--disable-web-security",
+        "--web-browser-flag",
+        "--user-data-dir=C:/temp/chrome_dev",
+        "--web-browser-flag",
+        "--ignore-certificate-errors"
+      ]
+    },
+    {
+      "name": "idf_diaspa (Default)",
+      "request": "launch",
+      "type": "dart"
+    }
+  ]
+}
