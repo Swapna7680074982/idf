@@ -108,7 +108,7 @@ class _AccountScreenState extends State<AccountScreen> {
 
                 // Subtitle
                 Text(
-                  'Are you sure you want to log out of your IDF Active account?',
+                  'Are you sure you want to log out of your IDF Activate account?',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 13.5,

@@ -113,13 +113,13 @@ class _SplashScreenState extends State<SplashScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   const DrMohansLogo(
-                    size: 52,
+                    size: 96,
                     withWhiteBackground: true,
-                    borderRadius: 18,
+                    borderRadius: 24,
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   Text(
-                    "IDF Active",
+                    "IDF Activate",
                     style: GoogleFonts.inter(
                       fontSize: 26,
                       fontWeight: FontWeight.w700,

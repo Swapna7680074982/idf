@@ -307,7 +307,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Validating eligibility & queuing IDF Active AI audit',
+                  'Validating eligibility & queuing IDF Activate AI audit',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 12,
@@ -517,7 +517,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                             child: Padding(
                               padding: const EdgeInsets.only(top: 8.0),
                               child: Text(
-                                'I accept the IDF Active declaration and confirm that all previous institution details, facilities, and questionnaire answers remain accurate and unchanged.',
+                                'I accept the IDF Activate declaration and confirm that all previous institution details, facilities, and questionnaire answers remain accurate and unchanged.',
                                 style: GoogleFonts.inter(
                                   fontSize: 12,
                                   color: const Color(0xFF475569),
@@ -616,7 +616,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Please review your updated application before submitting. Once submitted, it will be queued for IDF Active accreditation AI audit and committee review.',
+                  'Please review your updated application before submitting. Once submitted, it will be queued for IDF Activate accreditation AI audit and committee review.',
                   textAlign: TextAlign.center,
                   style: GoogleFonts.inter(
                     fontSize: 13,
@@ -2016,7 +2016,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Please review your renewal submission before submitting. Once submitted, it will be transferred directly to IDF Active review.',
+                  'Please review your renewal submission before submitting. Once submitted, it will be transferred directly to IDF Activate review.',
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     color: const Color(0xFF1D4ED8),

@@ -701,7 +701,7 @@ class _CertificationDetailsScreenState
     final comment = _detail?.effectiveComment ??
         manualStage?.comment ??
         (isRejected
-            ? 'Application did not meet the IDF Active accreditation requirements.'
+            ? 'Application did not meet the IDF Activate accreditation requirements.'
             : (isChangesRequired
                 ? 'Auditor requested modifications before certification can be granted.'
                 : null));
@@ -1884,7 +1884,7 @@ class _CertificationDetailsScreenState
 
     final comment = detail.effectiveComment ??
         (isRejected
-            ? 'Application did not meet the IDF Active accreditation requirements.'
+            ? 'Application did not meet the IDF Activate accreditation requirements.'
             : '');
 
     if (comment.isEmpty) return const SizedBox.shrink();

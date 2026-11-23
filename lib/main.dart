@@ -42,7 +42,7 @@ class IDFDigitalHubApp extends StatelessWidget {
       create: (context) => AppBloc(),
       child: MaterialApp(
         navigatorKey: rootNavigatorKey,
-        title: 'IDF Active',
+        title: 'IDF Activate',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.lightTheme,
         home: const SplashScreen(),

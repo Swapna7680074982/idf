@@ -82,7 +82,7 @@ class AuthHeader extends StatelessWidget {
 
           // Optional Logo
           if (showLogo) ...[
-            const GlobeLogo(size: 54, showBackgroundGlow: false),
+            const GlobeLogo(size: 74, showBackgroundGlow: true),
             const SizedBox(height: 14),
           ],
 

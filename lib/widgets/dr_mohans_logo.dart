@@ -30,16 +30,18 @@ class DrMohansLogo extends StatelessWidget {
     );
 
     if (withWhiteBackground) {
-      final cardSize = size * 1.5;
+      final cardPadding = size * 0.12;
+      final cardSize = size + (cardPadding * 2);
       return Container(
         width: cardSize,
         height: cardSize,
+        padding: EdgeInsets.all(cardPadding),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(borderRadius),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withAlpha(20),
+              color: Colors.black.withAlpha(25),
               blurRadius: 18,
               offset: const Offset(0, 6),
             ),
@@ -49,7 +51,10 @@ class DrMohansLogo extends StatelessWidget {
         child: SizedBox(
           width: size,
           height: size,
-          child: logoWidget,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(borderRadius > 4 ? borderRadius - 4 : borderRadius),
+            child: logoWidget,
+          ),
         ),
       );
     }

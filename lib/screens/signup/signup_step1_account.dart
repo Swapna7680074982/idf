@@ -124,7 +124,7 @@ class _SignUpStep1ScreenState extends State<SignUpStep1Screen> {
             // Top Header
             const AuthHeader(
               title: 'Account Details',
-              subtitle: 'Create your IDF Active account',
+              subtitle: 'Create your IDF Activate account',
               currentStep: 1,
               totalSteps: 4,
             ),

@@ -78,7 +78,7 @@ class AccountCreatedScreen extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16.0),
                   child: Text(
-                    'Welcome to IDF Active. Your account has been successfully created.',
+                    'Welcome to IDF Activate. Your account has been successfully created.',
                     textAlign: TextAlign.center,
                     style: GoogleFonts.inter(
                       fontSize: 14,
@@ -112,7 +112,7 @@ class AccountCreatedScreen extends StatelessWidget {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'You can now submit physical activity programs and apply for IDF ACTIVE certification.',
+                          'You can now submit physical activity programs and apply for IDF ACTIVATE certification.',
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             fontWeight: FontWeight.w500,

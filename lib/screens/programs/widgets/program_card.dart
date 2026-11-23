@@ -110,7 +110,7 @@ class ProgramCard extends StatelessWidget {
 
                     // Row 3: Organizer Subtitle
                     Text(
-                      program.organizer.isNotEmpty ? program.organizer : 'IDF Active Africa Region',
+                      program.organizer.isNotEmpty ? program.organizer : 'IDF Activate Africa Region',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(

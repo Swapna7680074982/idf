@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.azista.idf" "\0"
-            VALUE "FileDescription", "IDF Active" "\0"
+            VALUE "FileDescription", "IDF Activate" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "IDF Active" "\0"
+            VALUE "InternalName", "IDF Activate" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.azista.idf. All rights reserved." "\0"
-            VALUE "OriginalFilename", "IDF Active.exe" "\0"
-            VALUE "ProductName", "IDF Active" "\0"
+            VALUE "OriginalFilename", "IDF Activate.exe" "\0"
+            VALUE "ProductName", "IDF Activate" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

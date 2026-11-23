@@ -133,6 +133,7 @@ class _HomeScreenState extends State<HomeScreen> {
         // Remove active certification programs from dashboard
         final isCertificationProgram = prog.title.toLowerCase().contains('certification') ||
             prog.title.toLowerCase().contains('mdrf active') ||
+            prog.title.toLowerCase().contains('idf activate') ||
             prog.title.toLowerCase().contains('idf active') ||
             prog.tag.toLowerCase().contains('certification') ||
             (prog.category?.toLowerCase() ?? '').contains('certification') ||
@@ -347,7 +348,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 index: 2,
                 icon: Icons.star_outline_rounded,
                 activeIcon: Icons.star_rounded,
-                label: 'IDF Active',
+                label: 'IDF Activate',
               ),
               _buildWhatsAppNavItem(
                 index: 3,
@@ -564,7 +565,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: _buildQuickActionCard(
                       emoji: '🏅',
                       iconBg: const Color(0xFFE0F2FE),
-                      title: 'Apply for IDF Active Certificate',
+                      title: 'Apply for IDF Activate Certificate',
                       subtitle: 'Get certified today',
                       onTap: () {
                         Navigator.of(context).push(
@@ -611,7 +612,7 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildMyApplicationsCard(state),
             const SizedBox(height: 20),
 
-            // Explore Initiatives (Programs & IDF Active Certification Info)
+            // Explore Initiatives (Programs & IDF Activate Certification Info)
             _buildExploreInitiativesSection(),
             const SizedBox(height: 16),
           ],
@@ -627,7 +628,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final card = _homeSummary?.idfActivateCard;
     final tag = card != null && card.tag.isNotEmpty
         ? card.tag
-        : (card != null && card.badge.isNotEmpty ? card.badge : 'IDF ACTIVE INITIATIVE');
+        : (card != null && card.badge.isNotEmpty ? card.badge : 'IDF ACTIVATE INITIATIVE');
     final title = card != null && card.title.isNotEmpty
         ? card.title
         : 'Promoting Physical Activity for a Healthier World';
@@ -940,7 +941,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // -------------------------------------------------------------
-  // Explore Initiatives (Programs & IDF Active Certification Info)
+  // Explore Initiatives (Programs & IDF Activate Certification Info)
   // -------------------------------------------------------------
   Widget _buildExploreInitiativesSection() {
     return Column(
@@ -1077,7 +1078,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              'Explore community initiatives across IDF Active',
+              'Explore community initiatives across IDF Activate',
               textAlign: TextAlign.center,
               style: GoogleFonts.inter(
                 fontSize: 12,
@@ -1281,7 +1282,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // -------------------------------------------------------------
-  // IDF Active Certification Card
+  // IDF Activate Certification Card
   // -------------------------------------------------------------
   // ignore: unused_element
   Widget _buildCertificationCard(UserModel user) {
@@ -1356,7 +1357,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'IDF Active Certification',
+                      'IDF Activate Certification',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.inter(
@@ -1667,7 +1668,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
   // -------------------------------------------------------------
-  // IDF Active Tab
+  // IDF Activate Tab
   // -------------------------------------------------------------
   Widget _buildIDFActiveTab(AppState state) {
     return CertificationTabScreen(

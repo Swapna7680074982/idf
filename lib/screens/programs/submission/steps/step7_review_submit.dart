@@ -545,7 +545,7 @@ class Step7ReviewSubmit extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Ready for Official IDF Active Review',
+                      'Ready for Official IDF Activate Review',
                       style: GoogleFonts.inter(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -554,7 +554,7 @@ class Step7ReviewSubmit extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Upon submitting, your proposal will undergo automated validation followed by IDF Active chapter evaluation. You can monitor status under Applications.',
+                      'Upon submitting, your proposal will undergo automated validation followed by IDF Activate chapter evaluation. You can monitor status under Applications.',
                       style: GoogleFonts.inter(
                         fontSize: 11.5,
                         height: 1.35,

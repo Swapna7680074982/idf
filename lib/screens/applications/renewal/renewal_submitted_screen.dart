@@ -78,7 +78,7 @@ class RenewalSubmittedScreen extends StatelessWidget {
 
               // Subtitle
               Text(
-                'Your renewal application has been submitted and queued for AI audit and IDF Active review.',
+                'Your renewal application has been submitted and queued for AI audit and IDF Activate review.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.inter(
                   fontSize: 13,

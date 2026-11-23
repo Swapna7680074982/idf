@@ -88,7 +88,7 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
           children: [
             // Header
             Text(
-              'IDF Active',
+              'IDF Activate',
               style: GoogleFonts.inter(
                 fontSize: 24,
                 fontWeight: FontWeight.w800,
@@ -188,7 +188,7 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
                 ),
                 const SizedBox(height: 14),
                 Text(
-                  'IDF Active Certification',
+                  'IDF Activate Certification',
                   style: GoogleFonts.inter(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -641,7 +641,7 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
       {
         'num': '3',
         'title': 'Get Certified',
-        'desc': 'Receive your accredited IDF Active status & certificate.',
+        'desc': 'Receive your accredited IDF Activate status & certificate.',
       },
     ];
 
@@ -727,7 +727,7 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
 
   Widget _buildSimpleHighlights() {
     final highlights = [
-      'Official IDF Active accreditation badge',
+      'Official IDF Activate accreditation badge',
       'Encourages daily physical activity & ergonomics',
       'Downloadable certificate & annual renewal',
     ];

@@ -188,14 +188,14 @@ class _CertificateViewScreenState extends State<CertificateViewScreen> {
     final verifyUrl =
         '${ApiConfig.baseUrl}/api/applications/certificates/$certId/download';
 
-    final shareText = '''🏆 *IDF ACTIVE CERTIFICATION*
+    final shareText = '''🏆 *IDF ACTIVATE CERTIFICATION*
 🏛 *Institution:* $instName
 📜 *Certificate No:* $certNo
 ⭐ *Score:* $score
 📅 *Issued On:* $issued
 ⏳ *Expires On:* $expires
 
-Verified by IDF Active Accreditation Program.
+Verified by IDF Activate Accreditation Program.
 Download / Verify: $verifyUrl''';
 
     final encoded = Uri.encodeComponent(shareText);
@@ -508,7 +508,7 @@ Download / Verify: $verifyUrl''';
                               ),
                               const SizedBox(width: 10),
                               Text(
-                                'IDF ACTIVE CERTIFICATION',
+                                'IDF ACTIVATE CERTIFICATION',
                                 style: GoogleFonts.inter(
                                   fontSize: 10.5,
                                   fontWeight: FontWeight.w700,

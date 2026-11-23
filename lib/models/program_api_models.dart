@@ -112,7 +112,7 @@ class ProgramApiItem {
           ? json['program_type_id'] as int
           : int.tryParse(json['program_type_id']?.toString() ?? ''),
       organizerName: (json['organizer_name'] ?? json['organization_entity_name'])?.toString() ??
-          (isOrg ? 'You (Organizer)' : 'IDF Active'),
+          (isOrg ? 'You (Organizer)' : 'IDF Activate'),
       coverImageUrl: effectiveCover?.toString(),
       bannerImageUrl: effectiveBanner?.toString(),
       banner: json['banner']?.toString(),

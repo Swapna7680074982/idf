@@ -12,7 +12,7 @@ class GlobeLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.asset(
+    final logoImage = Image.asset(
       'assets/images/app_logo.png',
       width: size,
       height: size,
@@ -25,6 +25,29 @@ class GlobeLogo extends StatelessWidget {
           fit: BoxFit.contain,
         );
       },
+    );
+
+    return Container(
+      width: size,
+      height: size,
+      padding: EdgeInsets.all(size * 0.08),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: showBackgroundGlow
+            ? [
+                BoxShadow(
+                  color: Colors.black.withAlpha(30),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ]
+            : null,
+      ),
+      alignment: Alignment.center,
+      child: ClipOval(
+        child: logoImage,
+      ),
     );
   }
 }

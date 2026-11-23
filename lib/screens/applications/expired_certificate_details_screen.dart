@@ -161,8 +161,8 @@ class _ExpiredCertificateDetailsScreenState
                         const SizedBox(height: 8),
                         Text(
                           cert.expiresDate.isNotEmpty
-                              ? 'This certificate expired on ${DateTimeUtils.formatDateTime(cert.expiresDate)}. Renew to maintain your IDF Active status.'
-                              : 'Renew your certificate to maintain your IDF Active accreditation status.',
+                              ? 'This certificate expired on ${DateTimeUtils.formatDateTime(cert.expiresDate)}. Renew to maintain your IDF Activate status.'
+                              : 'Renew your certificate to maintain your IDF Activate accreditation status.',
                           style: GoogleFonts.inter(
                             fontSize: 12.5,
                             color: const Color(0xFF78350F),

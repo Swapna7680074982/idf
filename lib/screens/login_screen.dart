@@ -123,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
             // Top Header
             AuthHeader(
               title: 'Welcome back',
-              subtitle: 'Sign in to your IDF Active account',
+              subtitle: 'Sign in to your IDF Activate account',
               onBack: () => Navigator.of(context).pop(),
             ),
 
