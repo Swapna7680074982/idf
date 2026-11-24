@@ -849,8 +849,6 @@ class _Step6MaterialsState extends State<Step6Materials> {
                       : 'PDF, DOC, DOCX, JPG, PNG (Max 10MB)',
                   style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                 ),
-                  style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF94A3B8)),
-                ),
               ],
             ),
           ),
