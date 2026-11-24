@@ -218,9 +218,7 @@ class _Step9ConfirmationState extends State<Step9Confirmation> {
                           );
                           return;
                         }
-                        if (widget.model.hasEvidenceOption &&
-                            (widget.model.hasMissingRequiredEvidence ||
-                                (widget.model.evidenceItems.isNotEmpty && !widget.model.hasAnyEvidenceUploaded))) {
+                        if (widget.model.hasMissingRequiredEvidence) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
                               content: Text('Please upload all required supporting documents before submitting.'),

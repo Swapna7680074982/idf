@@ -365,6 +365,41 @@ class ProgramsService {
     return <String, dynamic>{'success': true, 'message': 'Registration cancelled'};
   }
 
+  /// GET /api/programs/:id/attendees - Registered Participants of Program (Organizer only)
+  static Future<ProgramAttendeesData?> getProgramAttendees(
+    dynamic id, {
+    int page = 1,
+    int limit = 50,
+  }) async {
+    try {
+      final queryParams = <String, String>{
+        'page': page.toString(),
+        'limit': limit.toString(),
+      };
+
+      final response = await ApiClient.get(
+        ApiConfig.programAttendees(id),
+        queryParams: queryParams,
+      );
+
+      if (response is Map<String, dynamic>) {
+        final data = response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : response;
+        return ProgramAttendeesData.fromJson(data);
+      }
+      return null;
+    } on ApiException catch (e) {
+      // 403 Forbidden: "You can only view registered users for programs you organized"
+      if (e.statusCode == 403 || e.code == 'FORBIDDEN') {
+        return null;
+      }
+      rethrow;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// 7. GET /api/applications/programs - My Applications List ("My Programs" Tab)
   static Future<Map<String, dynamic>> getMyApplications({
     String status = 'all',

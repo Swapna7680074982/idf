@@ -471,3 +471,137 @@ class ProgramCreateRequest {
     'status': status,
   };
 }
+
+class ProgramAttendeeItem {
+  final int id;
+  final int registrationId;
+  final int programId;
+  final int? userId;
+  final String fullName;
+  final String email;
+  final String? phoneCountryCode;
+  final String? phoneNumber;
+  final String? phone;
+  final String? profileImageUrl;
+  final String? organizationName;
+  final String status;
+  final String? registrationStatus;
+  final String? registeredAt;
+  final String? cancelledAt;
+
+  const ProgramAttendeeItem({
+    required this.id,
+    required this.registrationId,
+    required this.programId,
+    this.userId,
+    required this.fullName,
+    required this.email,
+    this.phoneCountryCode,
+    this.phoneNumber,
+    this.phone,
+    this.profileImageUrl,
+    this.organizationName,
+    required this.status,
+    this.registrationStatus,
+    this.registeredAt,
+    this.cancelledAt,
+  });
+
+  factory ProgramAttendeeItem.fromJson(Map<String, dynamic> json) {
+    final regId = (json['registration_id'] as num?)?.toInt() ?? (json['id'] as num?)?.toInt() ?? 0;
+    final phoneCode = json['phone_country_code']?.toString();
+    final rawPhoneNum = json['phone_number']?.toString();
+    final rawPhone = json['phone']?.toString();
+    final effectivePhone = (rawPhone != null && rawPhone.trim().isNotEmpty)
+        ? rawPhone
+        : ((phoneCode != null && rawPhoneNum != null) ? '$phoneCode $rawPhoneNum' : rawPhoneNum);
+
+    return ProgramAttendeeItem(
+      id: (json['id'] as num?)?.toInt() ?? regId,
+      registrationId: regId,
+      programId: (json['program_id'] as num?)?.toInt() ?? 0,
+      userId: (json['user_id'] as num?)?.toInt(),
+      fullName: json['full_name']?.toString() ?? 'Attendee',
+      email: json['email']?.toString() ?? '',
+      phoneCountryCode: phoneCode,
+      phoneNumber: rawPhoneNum,
+      phone: effectivePhone,
+      profileImageUrl: json['profile_image_url']?.toString(),
+      organizationName: json['organization_name']?.toString(),
+      status: json['status']?.toString() ?? json['registration_status']?.toString() ?? 'confirmed',
+      registrationStatus: json['registration_status']?.toString() ?? json['status']?.toString(),
+      registeredAt: json['registered_at']?.toString(),
+      cancelledAt: json['cancelled_at']?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'registration_id': registrationId,
+    'program_id': programId,
+    'user_id': userId,
+    'full_name': fullName,
+    'email': email,
+    'phone_country_code': phoneCountryCode,
+    'phone_number': phoneNumber,
+    'phone': phone,
+    'profile_image_url': profileImageUrl,
+    'organization_name': organizationName,
+    'status': status,
+    'registration_status': registrationStatus,
+    'registered_at': registeredAt,
+    'cancelled_at': cancelledAt,
+  };
+}
+
+class ProgramAttendeesData {
+  final int programId;
+  final String? programNo;
+  final String? programTitle;
+  final int totalAttendees;
+  final int count;
+  final List<ProgramAttendeeItem> attendees;
+  final PaginationInfo? pagination;
+
+  const ProgramAttendeesData({
+    required this.programId,
+    this.programNo,
+    this.programTitle,
+    required this.totalAttendees,
+    required this.count,
+    required this.attendees,
+    this.pagination,
+  });
+
+  factory ProgramAttendeesData.fromJson(Map<String, dynamic> json) {
+    final list = json['attendees'] is List ? json['attendees'] as List : [];
+    final attendees = list
+        .whereType<Map<String, dynamic>>()
+        .map((item) => ProgramAttendeeItem.fromJson(item))
+        .toList();
+
+    return ProgramAttendeesData(
+      programId: (json['program_id'] as num?)?.toInt() ?? 0,
+      programNo: json['program_no']?.toString(),
+      programTitle: json['program_title']?.toString(),
+      totalAttendees: (json['total_attendees'] as num?)?.toInt() ??
+          (json['count'] as num?)?.toInt() ??
+          attendees.length,
+      count: (json['count'] as num?)?.toInt() ?? attendees.length,
+      attendees: attendees,
+      pagination: json['pagination'] is Map<String, dynamic>
+          ? PaginationInfo.fromJson(json['pagination'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+    'program_id': programId,
+    if (programNo != null) 'program_no': programNo,
+    if (programTitle != null) 'program_title': programTitle,
+    'total_attendees': totalAttendees,
+    'count': count,
+    'attendees': attendees.map((a) => a.toJson()).toList(),
+    if (pagination != null) 'pagination': pagination!.toJson(),
+  };
+}

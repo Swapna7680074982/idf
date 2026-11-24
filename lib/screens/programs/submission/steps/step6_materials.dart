@@ -479,7 +479,7 @@ class _Step6MaterialsState extends State<Step6Materials> {
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    'Upload Program Banner',
+                    _isUploadingBanner ? 'Loading image from gallery...' : 'Upload Program Banner',
                     style: GoogleFonts.inter(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
@@ -488,7 +488,9 @@ class _Step6MaterialsState extends State<Step6Materials> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Tap to choose image from Gallery or take with Camera',
+                    _isUploadingBanner
+                        ? 'Please wait while the image is being loaded'
+                        : 'Tap to choose image from Gallery or take with Camera',
                     style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
                   ),
                 ],
@@ -833,16 +835,20 @@ class _Step6MaterialsState extends State<Step6Materials> {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  'Add Documents or Photos',
+                  _isUploadingDoc ? 'Loading from gallery / files...' : 'Add Documents or Photos',
                   style: GoogleFonts.inter(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: const Color(0xFF334155),
+                    color: _isUploadingDoc ? AppColors.primaryBlue : const Color(0xFF334155),
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'PDF, DOC, DOCX, JPG, PNG (Max 10MB)',
+                  _isUploadingDoc
+                      ? 'Please wait while files are being loaded'
+                      : 'PDF, DOC, DOCX, JPG, PNG (Max 10MB)',
+                  style: GoogleFonts.inter(fontSize: 12, color: const Color(0xFF64748B)),
+                ),
                   style: GoogleFonts.inter(fontSize: 11.5, color: const Color(0xFF94A3B8)),
                 ),
               ],

@@ -50,6 +50,7 @@ class ApiConfig {
   static String get programBanner => '$baseUrl/api/programs/banner';
   static String get programsRegistered => '$baseUrl/api/programs/registered';
   static String programDetail(dynamic id) => '$baseUrl/api/programs/$id';
+  static String programAttendees(dynamic id) => '$baseUrl/api/programs/$id/attendees';
   static String programRegister(dynamic id) => '$baseUrl/api/programs/$id/register';
   static String programAiValidation(dynamic id) => '$baseUrl/api/programs/$id/ai-validation';
   static String programAiValidationV1(dynamic id) => '$baseUrl/api/v1/programs/$id/ai-validation';

@@ -504,6 +504,7 @@ class EvidenceItem {
   final String evidenceKind; // 'photo', 'document', 'either'
   final bool requiresGps;
   final int? sectionId;
+  bool willUpload;
   List<EvidenceAttachment> attachments;
 
   EvidenceItem({
@@ -515,6 +516,7 @@ class EvidenceItem {
     this.evidenceKind = 'photo',
     this.requiresGps = false,
     this.sectionId,
+    this.willUpload = false,
     String? filePath,
     String? fileName,
     String? fileUrl,
@@ -532,6 +534,10 @@ class EvidenceItem {
           fileUrl: fileUrl,
         ));
       }
+      willUpload = true;
+    }
+    if (this.attachments.isNotEmpty) {
+      willUpload = true;
     }
   }
 
@@ -600,6 +606,7 @@ class EvidenceItem {
   }
 
   void addAttachment({String? filePath, String? fileName, String? fileUrl}) {
+    willUpload = true;
     attachments.add(EvidenceAttachment(
       filePath: filePath,
       fileName: (fileName != null && fileName.isNotEmpty)
@@ -644,6 +651,7 @@ class EvidenceItem {
       evidenceKind: req.evidenceKind,
       requiresGps: req.requiresGps,
       sectionId: req.sectionId,
+      willUpload: willUpload,
       attachments: copyAttachments,
       filePath: filePath,
       fileName: (fileName != null && fileName!.isNotEmpty) ? fileName : (fileUrl?.split('/').last),
@@ -985,37 +993,17 @@ class CertificationApplicationModel {
 
   /// Checks if any evidence requirement exists for this certification
   bool get isEvidenceRequired {
-    if (!hasEvidenceOption) return false;
-    if (evidenceItems.any((e) => e.isRequired)) return true;
-    if (categoryConfig != null && categoryConfig!.evidenceRequirements.isNotEmpty) return true;
     return evidenceItems.isNotEmpty;
   }
 
-  /// Checks if mandatory evidence is missing (i.e. required but no files attached)
+  /// Checks if mandatory evidence is missing (i.e. user selected Yes to upload for an item, but has no files attached)
   bool get hasMissingRequiredEvidence {
-    if (!hasEvidenceOption) return false;
-    if (evidenceItems.isEmpty) {
-      if (categoryConfig != null && categoryConfig!.evidenceRequirements.isNotEmpty) {
-        return true;
-      }
-      return false;
-    }
-
-    final reqItems = evidenceItems.where((e) => e.isRequired).toList();
-    if (reqItems.isNotEmpty) {
-      return reqItems.any((e) => !e.hasAttachments);
-    }
-
-    if (categoryConfig != null && categoryConfig!.evidenceRequirements.isNotEmpty) {
-      return evidenceItems.any((e) => !e.hasAttachments);
-    }
-
-    return false;
+    return evidenceItems.any((e) => e.willUpload && !e.hasAttachments);
   }
 
   /// Checks if ANY evidence has been uploaded at all
   bool get hasAnyEvidenceUploaded {
-    return evidenceItems.any((e) => e.hasAttachments);
+    return evidenceItems.any((e) => e.willUpload && e.hasAttachments);
   }
 
   static CertificationApplicationModel prefilledForCertificate(
@@ -1351,6 +1339,7 @@ class CertificationApplicationModel {
 
     final validEvidence = <Map<String, dynamic>>[];
     for (final e in evidenceItems) {
+      if (!e.willUpload || !e.hasAttachments) continue;
       final reqId = int.tryParse(e.id) ?? int.tryParse(e.requirementId ?? '1') ?? 1;
       for (final att in e.attachments) {
         final effectiveUrl = (att.fileUrl != null && att.fileUrl!.isNotEmpty)

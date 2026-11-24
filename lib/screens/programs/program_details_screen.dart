@@ -5,6 +5,7 @@ import '../../bloc/app_bloc.dart';
 import '../../bloc/app_event.dart';
 import '../../core/date_time_utils.dart';
 import '../../core/theme.dart';
+import '../../models/program_api_models.dart';
 import '../../models/program_model.dart';
 import '../../services/api_client.dart';
 import '../../services/api_config.dart';

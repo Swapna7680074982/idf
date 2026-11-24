@@ -6,11 +6,9 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/theme.dart';
 import '../../../models/certification_model.dart';
 
-class EvidenceUploadTile extends StatelessWidget {
+class EvidenceUploadTile extends StatefulWidget {
   final EvidenceItem item;
   final VoidCallback onUpdated;
-
-  static bool _isPicking = false;
 
   const EvidenceUploadTile({
     super.key,
@@ -18,9 +16,22 @@ class EvidenceUploadTile extends StatelessWidget {
     required this.onUpdated,
   });
 
+  @override
+  State<EvidenceUploadTile> createState() => _EvidenceUploadTileState();
+}
+
+class _EvidenceUploadTileState extends State<EvidenceUploadTile> {
+  static bool _isPickingGlobal = false;
+  bool _isLoadingGallery = false;
+  bool _isLoadingCamera = false;
+  bool _isLoadingFiles = false;
+
+  bool get _isLoadingAny => _isLoadingGallery || _isLoadingCamera || _isLoadingFiles;
+
   Future<void> _pickCamera(BuildContext context) async {
-    if (_isPicking) return;
-    _isPicking = true;
+    if (_isPickingGlobal || _isLoadingAny) return;
+    _isPickingGlobal = true;
+    setState(() => _isLoadingCamera = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
       final picker = ImagePicker();
@@ -32,35 +43,43 @@ class EvidenceUploadTile extends StatelessWidget {
       );
 
       if (file != null) {
-        item.addAttachment(
+        widget.item.addAttachment(
           filePath: file.path,
           fileName: file.name,
         );
-        onUpdated();
+        widget.onUpdated();
       }
     } on PlatformException catch (e) {
       if (e.code == 'already_active') return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Could not access camera. Please check camera permissions.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Could not access camera. Please check camera permissions.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Could not open camera. Please try again.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Could not open camera. Please try again.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     } finally {
-      _isPicking = false;
+      _isPickingGlobal = false;
+      if (mounted) {
+        setState(() => _isLoadingCamera = false);
+      }
     }
   }
 
   Future<void> _pickGallery(BuildContext context) async {
-    if (_isPicking) return;
-    _isPicking = true;
+    if (_isPickingGlobal || _isLoadingAny) return;
+    _isPickingGlobal = true;
+    setState(() => _isLoadingGallery = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
       final picker = ImagePicker();
@@ -72,12 +91,12 @@ class EvidenceUploadTile extends StatelessWidget {
 
       if (files.isNotEmpty) {
         for (final file in files) {
-          item.addAttachment(
+          widget.item.addAttachment(
             filePath: file.path,
             fileName: file.name,
           );
         }
-        onUpdated();
+        widget.onUpdated();
       }
     } on PlatformException catch (e) {
       if (e.code == 'already_active') return;
@@ -92,32 +111,40 @@ class EvidenceUploadTile extends StatelessWidget {
           imageQuality: 85,
         );
         if (file != null) {
-          item.addAttachment(filePath: file.path, fileName: file.name);
-          onUpdated();
+          widget.item.addAttachment(filePath: file.path, fileName: file.name);
+          widget.onUpdated();
         }
       } catch (_) {
+        if (mounted) {
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text('Could not access gallery. Please check photo permissions in settings.'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    } catch (_) {
+      if (mounted) {
         messenger.showSnackBar(
           const SnackBar(
-            content: Text('Could not access gallery. Please check photo permissions in settings.'),
+            content: Text('Could not open gallery. Please try again.'),
             backgroundColor: Colors.redAccent,
           ),
         );
       }
-    } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Could not open gallery. Please try again.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
     } finally {
-      _isPicking = false;
+      _isPickingGlobal = false;
+      if (mounted) {
+        setState(() => _isLoadingGallery = false);
+      }
     }
   }
 
   Future<void> _pickFiles(BuildContext context) async {
-    if (_isPicking) return;
-    _isPicking = true;
+    if (_isPickingGlobal || _isLoadingAny) return;
+    _isPickingGlobal = true;
+    setState(() => _isLoadingFiles = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
       final List<PlatformFile> files = await FilePicker.pickFiles(
@@ -128,31 +155,38 @@ class EvidenceUploadTile extends StatelessWidget {
       if (files.isNotEmpty) {
         for (final file in files) {
           if (file.path != null) {
-            item.addAttachment(
+            widget.item.addAttachment(
               filePath: file.path!,
               fileName: file.name,
             );
           }
         }
-        onUpdated();
+        widget.onUpdated();
       }
     } on PlatformException catch (e) {
       if (e.code == 'already_active') return;
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Could not access files. Please check storage permissions in settings.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Could not access files. Please check storage permissions in settings.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     } catch (_) {
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Could not select files. Please try again.'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      if (mounted) {
+        messenger.showSnackBar(
+          const SnackBar(
+            content: Text('Could not select files. Please try again.'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     } finally {
-      _isPicking = false;
+      _isPickingGlobal = false;
+      if (mounted) {
+        setState(() => _isLoadingFiles = false);
+      }
     }
   }
 
@@ -198,6 +232,7 @@ class EvidenceUploadTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final item = widget.item;
     final attachments = item.attachments;
     final hasAttachments = attachments.isNotEmpty;
 
@@ -301,109 +336,282 @@ class EvidenceUploadTile extends StatelessWidget {
               ],
             ),
           ],
-          const SizedBox(height: 12),
 
-          // List of Attached Documents
-          if (hasAttachments) ...[
-            ...attachments.asMap().entries.map((entry) {
-              final index = entry.key;
-              final att = entry.value;
-              final name = (att.fileName != null && att.fileName!.isNotEmpty)
-                  ? att.fileName!
-                  : ((att.fileUrl != null && att.fileUrl!.isNotEmpty)
-                      ? att.fileUrl!.split('/').last
-                      : 'Attachment ${index + 1}');
+          // Yes / No Option for this photo upload option
+          Container(
+            margin: const EdgeInsets.only(top: 10, bottom: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Upload evidence for this?',
+                    style: GoogleFonts.inter(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w600,
+                      color: const Color(0xFF334155),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Yes Option
+                InkWell(
+                  onTap: _isLoadingAny
+                      ? null
+                      : () {
+                          item.willUpload = true;
+                          widget.onUpdated();
+                        },
+                  borderRadius: BorderRadius.circular(8),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: item.willUpload ? const Color(0xFFEFF6FF) : Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: item.willUpload ? AppColors.primaryBlue : const Color(0xFFCBD5E1),
+                        width: item.willUpload ? 1.6 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          item.willUpload ? Icons.check_circle_rounded : Icons.radio_button_unchecked,
+                          size: 14,
+                          color: item.willUpload ? AppColors.primaryBlue : const Color(0xFF94A3B8),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Yes',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: item.willUpload ? FontWeight.w700 : FontWeight.w500,
+                            color: item.willUpload ? AppColors.primaryBlue : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // No Option
+                InkWell(
+                  onTap: _isLoadingAny
+                      ? null
+                      : () {
+                          item.willUpload = false;
+                          item.attachments.clear();
+                          widget.onUpdated();
+                        },
+                  borderRadius: BorderRadius.circular(8),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: !item.willUpload ? const Color(0xFFF1F5F9) : Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: !item.willUpload ? const Color(0xFF64748B) : const Color(0xFFCBD5E1),
+                        width: !item.willUpload ? 1.6 : 1.0,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          !item.willUpload ? Icons.cancel_rounded : Icons.radio_button_unchecked,
+                          size: 14,
+                          color: !item.willUpload ? const Color(0xFF475569) : const Color(0xFF94A3B8),
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'No',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: !item.willUpload ? FontWeight.w700 : FontWeight.w500,
+                            color: !item.willUpload ? const Color(0xFF1E293B) : const Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
 
-              return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          if (item.willUpload) ...[
+            const SizedBox(height: 6),
+            // List of Attached Documents
+            if (hasAttachments) ...[
+              ...attachments.asMap().entries.map((entry) {
+                final index = entry.key;
+                final att = entry.value;
+                final name = (att.fileName != null && att.fileName!.isNotEmpty)
+                    ? att.fileName!
+                    : ((att.fileUrl != null && att.fileUrl!.isNotEmpty)
+                        ? att.fileUrl!.split('/').last
+                        : 'Attachment ${index + 1}');
+
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: _getAttachmentBgColor(name),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _getAttachmentBorderColor(name)),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _getAttachmentIcon(name),
+                        size: 18,
+                        color: _getAttachmentTextColor(name),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: _getAttachmentTextColor(name),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      InkWell(
+                        onTap: () {
+                          item.removeAttachmentAt(index);
+                          widget.onUpdated();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withAlpha(12),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close_rounded,
+                            size: 15,
+                            color: Color(0xFF475569),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+              const SizedBox(height: 4),
+            ],
+
+            // Active loading banner while picker is open until image comes
+            if (_isLoadingAny) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
-                  color: _getAttachmentBgColor(name),
+                  color: const Color(0xFFEFF6FF),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: _getAttachmentBorderColor(name)),
+                  border: Border.all(color: const Color(0xFFBFDBFE)),
                 ),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      _getAttachmentIcon(name),
-                      size: 18,
-                      color: _getAttachmentTextColor(name),
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppColors.primaryBlue,
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
+                    const SizedBox(width: 10),
+                    Flexible(
                       child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        _isLoadingGallery
+                            ? 'Loading image from gallery... Please wait'
+                            : _isLoadingCamera
+                                ? 'Opening camera... Please wait'
+                                : 'Selecting files... Please wait',
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: _getAttachmentTextColor(name),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    InkWell(
-                      onTap: () {
-                        item.removeAttachmentAt(index);
-                        onUpdated();
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withAlpha(12),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(
-                          Icons.close_rounded,
-                          size: 15,
-                          color: Color(0xFF475569),
+                          color: AppColors.primaryBlue,
                         ),
                       ),
                     ),
                   ],
                 ),
-              );
-            }),
-            const SizedBox(height: 4),
-          ],
-
-          // Action Buttons: [ + Photo ]  [ + Gallery ]  [ + PDF / Doc ]
-          Row(
-            children: [
-              Expanded(
-                child: _buildActionButton(
-                  icon: Icons.camera_alt_outlined,
-                  label: 'Camera',
-                  onTap: () => _pickCamera(context),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildActionButton(
-                  icon: Icons.photo_library_outlined,
-                  label: 'Gallery',
-                  onTap: () => _pickGallery(context),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _buildActionButton(
-                  icon: Icons.description_outlined,
-                  label: 'Files',
-                  onTap: () => _pickFiles(context),
-                ),
               ),
             ],
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'Upload multiple photos, PDFs, or Word documents (.doc, .docx)',
-            style: GoogleFonts.inter(
-              fontSize: 11,
-              color: const Color(0xFF94A3B8),
+
+            // Action Buttons: [ + Camera ]  [ + Gallery ]  [ + Files ]
+            Row(
+              children: [
+                Expanded(
+                  child: _buildActionButton(
+                    icon: Icons.camera_alt_outlined,
+                    label: 'Camera',
+                    isLoading: _isLoadingCamera,
+                    onTap: () => _pickCamera(context),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildActionButton(
+                    icon: Icons.photo_library_outlined,
+                    label: 'Gallery',
+                    isLoading: _isLoadingGallery,
+                    onTap: () => _pickGallery(context),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _buildActionButton(
+                    icon: Icons.description_outlined,
+                    label: 'Files',
+                    isLoading: _isLoadingFiles,
+                    onTap: () => _pickFiles(context),
+                  ),
+                ),
+              ],
             ),
-          ),
+            const SizedBox(height: 6),
+            Text(
+              'Upload multiple photos, PDFs, or Word documents (.doc, .docx)',
+              style: GoogleFonts.inter(
+                fontSize: 11,
+                color: const Color(0xFF94A3B8),
+              ),
+            ),
+          ] else ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const Icon(Icons.info_outline_rounded, size: 13, color: Color(0xFF94A3B8)),
+                const SizedBox(width: 5),
+                Text(
+                  'Upload skipped for this item.',
+                  style: GoogleFonts.inter(
+                    fontSize: 11.5,
+                    color: const Color(0xFF94A3B8),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -413,35 +621,51 @@ class EvidenceUploadTile extends StatelessWidget {
     required IconData icon,
     required String label,
     required VoidCallback onTap,
+    bool isLoading = false,
   }) {
     return InkWell(
-      onTap: onTap,
+      onTap: _isLoadingAny ? null : onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFFEFF6FF),
+          color: isLoading ? const Color(0xFFE0F2FE) : const Color(0xFFEFF6FF),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFDBEAFE), width: 1.0),
+          border: Border.all(
+            color: isLoading ? AppColors.primaryBlue : const Color(0xFFDBEAFE),
+            width: isLoading ? 1.4 : 1.0,
+          ),
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 16,
-              color: AppColors.primaryBlue,
-            ),
-            const SizedBox(width: 5),
+            if (isLoading) ...[
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primaryBlue,
+                ),
+              ),
+              const SizedBox(width: 6),
+            ] else ...[
+              Icon(
+                icon,
+                size: 16,
+                color: AppColors.primaryBlue,
+              ),
+              const SizedBox(width: 5),
+            ],
             Flexible(
               child: Text(
-                label,
+                isLoading ? 'Loading...' : label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.inter(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: const Color(0xFF1E293B),
+                  color: isLoading ? AppColors.primaryBlue : const Color(0xFF1E293B),
                 ),
               ),
             ),

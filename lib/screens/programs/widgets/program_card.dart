@@ -10,12 +10,14 @@ class ProgramCard extends StatelessWidget {
   final ProgramModel program;
   final VoidCallback onTap;
   final bool isMyPrograms;
+  final VoidCallback? onViewParticipants;
 
   const ProgramCard({
     super.key,
     required this.program,
     required this.onTap,
     this.isMyPrograms = false,
+    this.onViewParticipants,
   });
 
   @override
@@ -164,8 +166,8 @@ class ProgramCard extends StatelessWidget {
                       ],
                     ),
 
-                    // Optional Audit & Details Link for My Programs in Review
-                    if (isMyPrograms && isUnapproved) ...[
+                    // Optional Audit & Details Link for My Programs
+                    if (isMyPrograms) ...[
                       const SizedBox(height: 10),
                       const Divider(height: 1, color: Color(0xFFF1F5F9)),
                       const SizedBox(height: 8),
@@ -180,23 +182,64 @@ class ProgramCard extends StatelessWidget {
                                 fontWeight: FontWeight.w600,
                                 color: const Color(0xFF94A3B8),
                               ),
-                            ),
+                            )
+                          else
+                            const SizedBox(),
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Text(
-                                'View audit & details',
-                                style: GoogleFonts.inter(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.primaryBlue,
+                              if (onViewParticipants != null) ...[
+                                InkWell(
+                                  onTap: onViewParticipants,
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFEFF6FF),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Icon(
+                                          Icons.people_alt_outlined,
+                                          size: 13,
+                                          color: AppColors.primaryBlue,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          'Participants',
+                                          style: GoogleFonts.inter(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.primaryBlue,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.arrow_forward_rounded,
-                                size: 12,
-                                color: AppColors.primaryBlue,
+                                const SizedBox(width: 10),
+                              ],
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    isUnapproved ? 'View audit & details' : 'View details',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primaryBlue,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.arrow_forward_rounded,
+                                    size: 12,
+                                    color: AppColors.primaryBlue,
+                                  ),
+                                ],
                               ),
                             ],
                           ),

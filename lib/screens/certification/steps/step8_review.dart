@@ -71,9 +71,7 @@ class Step8Review extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMissingEvidence = model.hasEvidenceOption &&
-        (model.hasMissingRequiredEvidence ||
-            (model.isEvidenceRequired && !model.hasAnyEvidenceUploaded));
+    final isMissingEvidence = model.hasMissingRequiredEvidence;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -133,7 +131,7 @@ class Step8Review extends StatelessWidget {
                           'Evidence',
                           isDone: !isMissingEvidence,
                           isBadgeIncomplete: isMissingEvidence,
-                          incompleteLabel: !model.hasEvidenceOption ? 'Skipped' : 'Missing Evidence',
+                          incompleteLabel: 'Missing Evidence',
                           onEdit: () => onJumpToStep?.call(7),
                         ),
                       ],
@@ -288,9 +286,7 @@ class Step8Review extends StatelessWidget {
               height: 48,
               child: ElevatedButton(
                 onPressed: () {
-                  if (model.hasEvidenceOption &&
-                      (model.hasMissingRequiredEvidence ||
-                          (model.evidenceItems.isNotEmpty && !model.hasAnyEvidenceUploaded))) {
+                  if (model.hasMissingRequiredEvidence) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Please upload all required supporting documents before proceeding to submission.'),

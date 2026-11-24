@@ -159,6 +159,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _pickAndUploadPhoto(ImageSource source) async {
     if (_isPickingPhoto) return;
     _isPickingPhoto = true;
+    setState(() => _isPickingPhoto = true);
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
@@ -213,7 +214,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         );
       }
     } finally {
-      _isPickingPhoto = false;
+      if (mounted) {
+        setState(() => _isPickingPhoto = false);
+      }
     }
   }
 
@@ -328,30 +331,54 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                             return Column(
                               children: [
-                                CircleAvatar(
-                                  radius: 46,
-                                  backgroundColor: const Color(0xFFF1F5F9),
-                                  backgroundImage: imageProvider,
-                                  child: imageProvider == null
-                                      ? Text(
-                                          initialLetter,
-                                          style: GoogleFonts.inter(
-                                            fontSize: 32,
-                                            fontWeight: FontWeight.w700,
-                                            color: const Color(0xFF1E293B),
+                                Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 46,
+                                      backgroundColor: const Color(0xFFF1F5F9),
+                                      backgroundImage: imageProvider,
+                                      child: imageProvider == null
+                                          ? Text(
+                                              initialLetter,
+                                              style: GoogleFonts.inter(
+                                                fontSize: 32,
+                                                fontWeight: FontWeight.w700,
+                                                color: const Color(0xFF1E293B),
+                                              ),
+                                            )
+                                          : null,
+                                    ),
+                                    if (_isPickingPhoto)
+                                      Container(
+                                        width: 92,
+                                        height: 92,
+                                        decoration: const BoxDecoration(
+                                          color: Colors.black45,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Center(
+                                          child: SizedBox(
+                                            width: 28,
+                                            height: 28,
+                                            child: CircularProgressIndicator(
+                                              color: Colors.white,
+                                              strokeWidth: 2.5,
+                                            ),
                                           ),
-                                        )
-                                      : null,
+                                        ),
+                                      ),
+                                  ],
                                 ),
                                 const SizedBox(height: 12),
                                 GestureDetector(
-                                  onTap: _showChangePhotoBottomSheet,
+                                  onTap: _isPickingPhoto ? null : _showChangePhotoBottomSheet,
                                   child: Text(
-                                    'Change Photo',
+                                    _isPickingPhoto ? 'Loading photo...' : 'Change Photo',
                                     style: GoogleFonts.inter(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w600,
-                                      color: AppColors.primaryBlue,
+                                      color: _isPickingPhoto ? const Color(0xFF94A3B8) : AppColors.primaryBlue,
                                     ),
                                   ),
                                 ),

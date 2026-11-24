@@ -94,8 +94,8 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
   }
 
   Future<void> _pickBanner(ImageSource source) async {
-    if (_isPickingBanner) return;
-    _isPickingBanner = true;
+    if (_isPickingBanner || _isUploadingBanner) return;
+    setState(() => _isPickingBanner = true);
     try {
       final XFile? file = await _picker.pickImage(
         source: source,
@@ -151,7 +151,9 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
         );
       }
     } finally {
-      _isPickingBanner = false;
+      if (mounted) {
+        setState(() => _isPickingBanner = false);
+      }
     }
   }
 
@@ -454,7 +456,51 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
           // Program Banner / Cover Image
           _buildFieldLabel('Program Banner (Cover Image)'),
           const SizedBox(height: 6),
-          if (!hasBanner)
+          if (_isPickingBanner || _isUploadingBanner)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: const Color(0xFFCBD5E1),
+                  width: 1.2,
+                ),
+              ),
+              child: Column(
+                children: [
+                  const SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: AppColors.primaryBlue,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _isPickingBanner
+                        ? 'Loading image from gallery...'
+                        : 'Uploading banner image...',
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryBlue,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Please wait while the image is being processed',
+                    style: GoogleFonts.inter(
+                      fontSize: 11.5,
+                      color: const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (!hasBanner)
             InkWell(
               onTap: _showBannerPickerModal,
               borderRadius: BorderRadius.circular(14),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../core/theme.dart';
 import '../../core/capitalization_formatter.dart';
+import '../../core/date_time_utils.dart';
 import '../../models/application_item_model.dart';
 import '../../models/program_api_models.dart';
 import '../../models/program_model.dart';
@@ -1075,6 +1076,9 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                       program: program,
                       isMyPrograms: _selectedTab == 1,
                       onTap: () => _openProgramItem(program),
+                      onViewParticipants: (_selectedTab == 1 && program.isOrganizer)
+                          ? () => _showProgramParticipants(program)
+                          : null,
                     );
                   },
                 ),
@@ -1083,6 +1087,342 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showProgramParticipants(ProgramModel program) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ProgramAttendeesBottomSheet(program: program),
+    );
+  }
+}
+
+class _ProgramAttendeesBottomSheet extends StatefulWidget {
+  final ProgramModel program;
+
+  const _ProgramAttendeesBottomSheet({required this.program});
+
+  @override
+  State<_ProgramAttendeesBottomSheet> createState() => _ProgramAttendeesBottomSheetState();
+}
+
+class _ProgramAttendeesBottomSheetState extends State<_ProgramAttendeesBottomSheet> {
+  ProgramAttendeesData? _data;
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetch();
+  }
+
+  Future<void> _fetch() async {
+    try {
+      final res = await ProgramsService.getProgramAttendees(widget.program.id);
+      if (mounted) {
+        setState(() {
+          _data = res;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Could not load participants';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final attendees = _data?.attendees ?? [];
+    final count = _data?.totalAttendees ?? attendees.length;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Drag handle
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 8),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: const Color(0xFFCBD5E1),
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 6, 12, 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Registered Participants',
+                            style: GoogleFonts.inter(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          if (!_isLoading && _data != null) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: const Color(0xFFBFDBFE)),
+                              ),
+                              child: Text(
+                                '$count',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primaryBlue,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        widget.program.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close_rounded, size: 20),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          Expanded(
+            child: _isLoading
+                ? const Center(
+                    child: SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.primaryBlue),
+                    ),
+                  )
+                : (_errorMessage != null)
+                    ? Center(
+                        child: Text(
+                          _errorMessage!,
+                          style: GoogleFonts.inter(color: const Color(0xFF64748B)),
+                        ),
+                      )
+                    : attendees.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(Icons.people_outline_rounded, size: 40, color: Color(0xFF94A3B8)),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'No registered participants yet',
+                                  style: GoogleFonts.inter(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : ListView.separated(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: attendees.length,
+                            separatorBuilder: (_, __) => const Divider(height: 18, color: Color(0xFFF1F5F9)),
+                            itemBuilder: (_, index) => _buildAttendeeRow(attendees[index]),
+                          ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendeeRow(ProgramAttendeeItem att) {
+    final initials = att.fullName.trim().isNotEmpty
+        ? att.fullName.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
+        : '?';
+
+    final statusText = att.status.isNotEmpty
+        ? '${att.status[0].toUpperCase()}${att.status.substring(1)}'
+        : 'Confirmed';
+
+    final resolvedAvatar = ApiConfig.resolveImageUrl(att.profileImageUrl);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        ClipOval(
+          child: Container(
+            width: 38,
+            height: 38,
+            color: const Color(0xFFEFF6FF),
+            child: (resolvedAvatar != null && resolvedAvatar.isNotEmpty)
+                ? Image.network(
+                    resolvedAvatar,
+                    width: 38,
+                    height: 38,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => Center(
+                      child: Text(
+                        initials,
+                        style: GoogleFonts.inter(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primaryBlue,
+                        ),
+                      ),
+                    ),
+                  )
+                : Center(
+                    child: Text(
+                      initials,
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primaryBlue,
+                      ),
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      att.fullName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: GoogleFonts.inter(
+                        fontSize: 13.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: att.status.toLowerCase() == 'confirmed'
+                          ? const Color(0xFFDCFCE7)
+                          : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      statusText,
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: att.status.toLowerCase() == 'confirmed'
+                            ? const Color(0xFF16A34A)
+                            : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              if (att.organizationName != null && att.organizationName!.isNotEmpty) ...[
+                const SizedBox(height: 1),
+                Text(
+                  att.organizationName!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    color: const Color(0xFF64748B),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  if (att.email.isNotEmpty) ...[
+                    const Icon(Icons.mail_outline_rounded, size: 12, color: Color(0xFF94A3B8)),
+                    const SizedBox(width: 3),
+                    Flexible(
+                      child: Text(
+                        att.email,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: const Color(0xFF64748B),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (att.email.isNotEmpty && att.phone != null && att.phone!.isNotEmpty) ...[
+                    const SizedBox(width: 6),
+                    const Text('•', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
+                    const SizedBox(width: 6),
+                  ],
+                  if (att.phone != null && att.phone!.isNotEmpty) ...[
+                    const Icon(Icons.phone_outlined, size: 12, color: Color(0xFF94A3B8)),
+                    const SizedBox(width: 3),
+                    Text(
+                      att.phone!,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              if (att.registeredAt != null && att.registeredAt!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  'Registered: ${DateTimeUtils.formatDateTime(att.registeredAt)}',
+                  style: GoogleFonts.inter(
+                    fontSize: 10.5,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
