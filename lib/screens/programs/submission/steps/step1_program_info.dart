@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme.dart';
@@ -36,6 +37,7 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
 
   final ImagePicker _picker = ImagePicker();
   bool _isUploadingBanner = false;
+  bool _isPickingBanner = false;
 
   @override
   void initState() {
@@ -92,6 +94,8 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
   }
 
   Future<void> _pickBanner(ImageSource source) async {
+    if (_isPickingBanner) return;
+    _isPickingBanner = true;
     try {
       final XFile? file = await _picker.pickImage(
         source: source,
@@ -127,15 +131,27 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
           }
         }
       }
-    } catch (e) {
+    } on PlatformException catch (e) {
+      if (e.code == 'already_active') return;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not open image picker: $e'),
-            backgroundColor: const Color(0xFFEF4444),
+          const SnackBar(
+            content: Text('Could not access image. Please check permissions in settings.'),
+            backgroundColor: Color(0xFFEF4444),
           ),
         );
       }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open image picker. Please try again.'),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
+      }
+    } finally {
+      _isPickingBanner = false;
     }
   }
 

@@ -28,6 +28,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
   bool _isSaving = false;
+  bool _isPickingPhoto = false;
   String? _uploadedPhotoUrl;
 
   Country _selectedCountry = CountryData.defaultCountry;
@@ -156,6 +157,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Future<void> _pickAndUploadPhoto(ImageSource source) async {
+    if (_isPickingPhoto) return;
+    _isPickingPhoto = true;
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
@@ -188,16 +191,29 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           );
         }
       }
-    } catch (e) {
+    } on PlatformException catch (e) {
+      if (e.code == 'already_active') return;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Upload failed: ${e.toString()}'),
+          const SnackBar(
+            content: Text('Could not access photos. Please check app permissions in settings.'),
             backgroundColor: Colors.redAccent,
             behavior: SnackBarBehavior.floating,
           ),
         );
       }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to update profile photo. Please try again.'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      _isPickingPhoto = false;
     }
   }
 

@@ -1,6 +1,6 @@
 class ApiConfig {
   /// Base API URL set to user's server IP
-  static String baseUrl = 'https://apps.hhclservices.com/mdrf_activate';
+  static String baseUrl = 'https://apps.hhclservices.com/mdrf_staging';
   //static String baseUrl = 'http://192.168.215.179:4000';
   /// Helper to safely resolve media & file URLs whether relative or absolute
   static String resolveMediaUrl(String? path) {

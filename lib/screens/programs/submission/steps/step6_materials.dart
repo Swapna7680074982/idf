@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme.dart';
@@ -36,6 +37,7 @@ class _Step6MaterialsState extends State<Step6Materials> {
   }
 
   Future<void> _pickBanner(ImageSource source) async {
+    if (_isUploadingBanner) return;
     setState(() => _isUploadingBanner = true);
     try {
       final XFile? file = await _picker.pickImage(
@@ -67,12 +69,22 @@ class _Step6MaterialsState extends State<Step6Materials> {
           // Local path preserved for display
         }
       }
-    } catch (e) {
+    } on PlatformException catch (e) {
+      if (e.code == 'already_active') return;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not open image picker: $e'),
-            backgroundColor: const Color(0xFFEF4444),
+          const SnackBar(
+            content: Text('Could not access image. Please check permissions in settings.'),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open image picker. Please try again.'),
+            backgroundColor: Color(0xFFEF4444),
           ),
         );
       }
@@ -227,6 +239,7 @@ class _Step6MaterialsState extends State<Step6Materials> {
   }
 
   Future<void> _pickSupportingDocument(ImageSource source) async {
+    if (_isUploadingDoc) return;
     setState(() => _isUploadingDoc = true);
     try {
       final XFile? file = await _picker.pickImage(
@@ -255,12 +268,22 @@ class _Step6MaterialsState extends State<Step6Materials> {
           });
         } catch (_) {}
       }
-    } catch (e) {
+    } on PlatformException catch (e) {
+      if (e.code == 'already_active') return;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Picker error: $e'),
-            backgroundColor: const Color(0xFFEF4444),
+          const SnackBar(
+            content: Text('Could not access photos. Please check permissions in settings.'),
+            backgroundColor: Color(0xFFEF4444),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open image picker. Please try again.'),
+            backgroundColor: Color(0xFFEF4444),
           ),
         );
       }
@@ -270,6 +293,7 @@ class _Step6MaterialsState extends State<Step6Materials> {
   }
 
   Future<void> _pickMultiDocuments() async {
+    if (_isUploadingDoc) return;
     setState(() => _isUploadingDoc = true);
     try {
       final List<XFile> files = await _picker.pickMultiImage(
@@ -298,7 +322,10 @@ class _Step6MaterialsState extends State<Step6Materials> {
           } catch (_) {}
         }
       }
-    } catch (e) {
+    } on PlatformException catch (e) {
+      if (e.code == 'already_active') return;
+      _pickSupportingDocument(ImageSource.gallery);
+    } catch (_) {
       _pickSupportingDocument(ImageSource.gallery);
     } finally {
       if (mounted) setState(() => _isUploadingDoc = false);

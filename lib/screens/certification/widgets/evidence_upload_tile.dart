@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/theme.dart';
@@ -9,6 +10,8 @@ class EvidenceUploadTile extends StatelessWidget {
   final EvidenceItem item;
   final VoidCallback onUpdated;
 
+  static bool _isPicking = false;
+
   const EvidenceUploadTile({
     super.key,
     required this.item,
@@ -16,6 +19,8 @@ class EvidenceUploadTile extends StatelessWidget {
   });
 
   Future<void> _pickCamera(BuildContext context) async {
+    if (_isPicking) return;
+    _isPicking = true;
     final messenger = ScaffoldMessenger.of(context);
     try {
       final picker = ImagePicker();
@@ -33,17 +38,29 @@ class EvidenceUploadTile extends StatelessWidget {
         );
         onUpdated();
       }
-    } catch (e) {
+    } on PlatformException catch (e) {
+      if (e.code == 'already_active') return;
       messenger.showSnackBar(
-        SnackBar(
-          content: Text('Could not access camera: $e'),
+        const SnackBar(
+          content: Text('Could not access camera. Please check camera permissions.'),
           backgroundColor: Colors.redAccent,
         ),
       );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not open camera. Please try again.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      _isPicking = false;
     }
   }
 
   Future<void> _pickGallery(BuildContext context) async {
+    if (_isPicking) return;
+    _isPicking = true;
     final messenger = ScaffoldMessenger.of(context);
     try {
       final picker = ImagePicker();
@@ -62,8 +79,10 @@ class EvidenceUploadTile extends StatelessWidget {
         }
         onUpdated();
       }
-    } catch (e) {
-      // Fallback to single image pick
+    } on PlatformException catch (e) {
+      if (e.code == 'already_active') return;
+
+      // Fallback to single image pick for devices without multi-picker support
       try {
         final picker = ImagePicker();
         final XFile? file = await picker.pickImage(
@@ -76,18 +95,29 @@ class EvidenceUploadTile extends StatelessWidget {
           item.addAttachment(filePath: file.path, fileName: file.name);
           onUpdated();
         }
-      } catch (err) {
+      } catch (_) {
         messenger.showSnackBar(
-          SnackBar(
-            content: Text('Could not access gallery: $err'),
+          const SnackBar(
+            content: Text('Could not access gallery. Please check photo permissions in settings.'),
             backgroundColor: Colors.redAccent,
           ),
         );
       }
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not open gallery. Please try again.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      _isPicking = false;
     }
   }
 
   Future<void> _pickFiles(BuildContext context) async {
+    if (_isPicking) return;
+    _isPicking = true;
     final messenger = ScaffoldMessenger.of(context);
     try {
       final List<PlatformFile> files = await FilePicker.pickFiles(
@@ -99,31 +129,30 @@ class EvidenceUploadTile extends StatelessWidget {
         for (final file in files) {
           if (file.path != null) {
             item.addAttachment(
-              filePath: file.path,
+              filePath: file.path!,
               fileName: file.name,
             );
           }
         }
         onUpdated();
       }
-    } catch (e) {
-      try {
-        final PlatformFile? single = await FilePicker.pickFile(
-          type: FileType.custom,
-          allowedExtensions: ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'],
-        );
-        if (single != null && single.path != null) {
-          item.addAttachment(filePath: single.path, fileName: single.name);
-          onUpdated();
-        }
-      } catch (err) {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('Could not access files: $err'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
+    } on PlatformException catch (e) {
+      if (e.code == 'already_active') return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not access files. Please check storage permissions in settings.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } catch (_) {
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Could not select files. Please try again.'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    } finally {
+      _isPicking = false;
     }
   }
 
