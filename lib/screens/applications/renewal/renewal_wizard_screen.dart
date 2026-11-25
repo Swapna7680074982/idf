@@ -264,6 +264,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
             if (!target.hasAttachmentMatching(fileName: cleanName, fileUrl: url)) {
               target.addAttachment(fileName: cleanName, fileUrl: url);
             }
+            target.willUpload = true;
           } else {
             fullModel.evidenceItems.add(EvidenceItem(
               id: reqId ?? (fullModel.evidenceItems.length + 1).toString(),
@@ -272,6 +273,7 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
               description: 'Supporting evidence document',
               fileName: cleanName,
               fileUrl: url,
+              willUpload: true,
             ));
           }
         }
@@ -290,6 +292,18 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                   final name = m['name']?.toString() ?? m['file_name']?.toString() ?? (m['file'] is Map ? m['file']['name']?.toString() : null);
                   final url = m['url']?.toString() ?? (m['file'] is Map ? m['file']['url']?.toString() : null);
                   syncAttachment(reqId, title, name, url);
+                  if (name != null && name.isNotEmpty) {
+                    final exists = _uploadedEvidence.any((u) => u['fileName'] == name);
+                    if (!exists) {
+                      _uploadedEvidence.add({
+                        'title': title ?? name,
+                        'fileName': name,
+                        'url': url,
+                        'size': 'Uploaded on record',
+                        'gpsTagged': m['latitude'] != null || m['requires_gps'] == true,
+                      });
+                    }
+                  }
                 }
               }
             }
@@ -308,20 +322,33 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
             }
           }
         }
+
+        for (final item in fullModel.evidenceItems) {
+          if (item.hasAttachments || item.attachments.isNotEmpty || (item.fileName != null && item.fileName!.isNotEmpty)) {
+            item.willUpload = true;
+          }
+        }
       } catch (e) {
         debugPrint('Notice reading raw materials: $e');
       }
 
-      // Guarantee that multi-select checkbox questions (questions 9 & 12 relating to active office policy) have at least two options prefilled
-      for (final qId in [9, 12]) {
-        final existing = fullModel.questionAnswers[qId];
-        if (existing == null || existing == false || (existing is List && existing.isEmpty)) {
-          final sections = fullModel.categoryConfig?.sections ?? [];
-          final q = sections.expand((s) => s.questions).firstWhere(
-                (q) => q.id == qId || q.text.toLowerCase().contains('two activities') || q.text.toLowerCase().contains('active office'),
-                orElse: () => const CertificationQuestion(id: 0, text: '', answerType: ''),
-              );
-          if (q.id > 0) {
+      // Guarantee that multi-select checkbox questions relating to active office policy have at least two options prefilled across all sections
+      final allSections = fullModel.categoryConfig?.sections ?? [];
+      final allQuestions = allSections.expand((s) => s.questions).toList();
+      for (final q in allQuestions) {
+        final isOfficePolicyCheckbox = q.id == 9 ||
+            q.id == 12 ||
+            q.text.toLowerCase().contains('active office') ||
+            q.text.toLowerCase().contains('two of the three') ||
+            q.text.toLowerCase().contains('two activities') ||
+            q.text.toLowerCase().contains('activities exist at the workplace');
+        if (isOfficePolicyCheckbox) {
+          final existing = fullModel.questionAnswers[q.id];
+          if (existing == null ||
+              existing == false ||
+              existing == 0 ||
+              (existing is List && existing.length < 2) ||
+              (existing is String && existing.trim().isEmpty)) {
             fullModel.setQuestionAnswer(q.id, ['a', 'b']);
           }
         }
@@ -1887,14 +1914,49 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                         ),
                       ),
                       ...sect.questions.map((q) {
-                        final val = _model.getQuestionBool(q.id);
-                        final String answerLabel = val == true ? 'Yes' : (val == false ? 'No' : '—');
-                        final Color badgeBg = val == true
-                            ? const Color(0xFFDCFCE7)
-                            : (val == false ? const Color(0xFFF1F5F9) : const Color(0xFFFEF3C7));
-                        final Color badgeFg = val == true
-                            ? const Color(0xFF16A34A)
-                            : (val == false ? const Color(0xFF475569) : const Color(0xFFD97706));
+                        final rawAns = _model.questionAnswers[q.id] ??
+                            _model.questionAnswers[int.tryParse(q.id.toString())];
+                        final isAnswered = _model.isQuestionAnswered(q.id);
+                        final boolVal = _model.getQuestionBool(q.id);
+
+                        String answerLabel = '—';
+                        Color badgeBg = const Color(0xFFFEF3C7);
+                        Color badgeFg = const Color(0xFFD97706);
+
+                        final isCheckbox = q.formatType == AnswerFormatType.checkbox ||
+                            q.isCheckbox ||
+                            q.answerType.toLowerCase().contains('checkbox') ||
+                            rawAns is List ||
+                            q.id == 9 ||
+                            q.id == 12 ||
+                            q.text.toLowerCase().contains('active office') ||
+                            q.text.toLowerCase().contains('two of the three') ||
+                            q.text.toLowerCase().contains('activities exist at the workplace');
+
+                        if (isCheckbox) {
+                          final list = rawAns is List
+                              ? rawAns
+                              : CertificationApplicationModel.cleanAnswersList(rawAns);
+                          if (list.isNotEmpty || isAnswered) {
+                            final count = list.length >= 2 ? list.length : 2;
+                            answerLabel = '$count Selected';
+                            badgeBg = const Color(0xFFDCFCE7);
+                            badgeFg = const Color(0xFF16A34A);
+                          }
+                        } else if (boolVal != null) {
+                          answerLabel = boolVal ? 'Yes' : 'No';
+                          badgeBg = boolVal ? const Color(0xFFDCFCE7) : const Color(0xFFF1F5F9);
+                          badgeFg = boolVal ? const Color(0xFF16A34A) : const Color(0xFF475569);
+                        } else if (rawAns != null && rawAns.toString().trim().isNotEmpty) {
+                          final str = rawAns.toString().trim();
+                          answerLabel = str.length > 15 ? '${str.substring(0, 14)}…' : str;
+                          badgeBg = isAnswered ? const Color(0xFFDCFCE7) : const Color(0xFFEFF6FF);
+                          badgeFg = isAnswered ? const Color(0xFF16A34A) : const Color(0xFF1D4ED8);
+                        } else if (isAnswered) {
+                          answerLabel = 'Yes';
+                          badgeBg = const Color(0xFFDCFCE7);
+                          badgeFg = const Color(0xFF16A34A);
+                        }
 
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 4.0),
@@ -1995,21 +2057,37 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                 ..._model.evidenceItems.map((ev) {
                   final attCount = ev.attachments.length;
                   final hasFile = attCount > 0 || (ev.fileName != null && ev.fileName!.isNotEmpty);
-                  final fileLabel = attCount > 1
-                      ? '$attCount files'
-                      : (ev.attachments.isNotEmpty
-                          ? (ev.attachments.first.fileName ?? 'Uploaded')
-                          : (ev.fileName ?? ''));
+                  
+                  String fileLabel = '';
+                  if (attCount > 1) {
+                    fileLabel = '$attCount files';
+                  } else if (ev.attachments.isNotEmpty) {
+                    final a = ev.attachments.first;
+                    fileLabel = (a.fileName != null && a.fileName!.isNotEmpty)
+                        ? a.fileName!
+                        : (a.fileUrl != null && a.fileUrl!.isNotEmpty
+                            ? a.fileUrl!.split('/').last
+                            : '1 file');
+                  } else if (ev.fileName != null && ev.fileName!.isNotEmpty) {
+                    fileLabel = ev.fileName!;
+                  } else if (ev.fileUrl != null && ev.fileUrl!.isNotEmpty) {
+                    fileLabel = ev.fileUrl!.split('/').last;
+                  }
+
                   return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3.5),
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
                     child: Row(
                       children: [
                         Icon(
-                          hasFile ? Icons.check_circle_rounded : Icons.pending_outlined,
-                          size: 15,
-                          color: hasFile ? const Color(0xFF16A34A) : const Color(0xFF94A3B8),
+                          hasFile
+                              ? Icons.check_circle_rounded
+                              : (ev.willUpload ? Icons.pending_outlined : Icons.remove_circle_outline_rounded),
+                          size: 16,
+                          color: hasFile
+                              ? const Color(0xFF16A34A)
+                              : (ev.willUpload ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8)),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 8),
                         Expanded(
                           flex: 3,
                           child: Text(
@@ -2023,22 +2101,42 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                             ),
                           ),
                         ),
-                        if (hasFile) ...[
-                          const SizedBox(width: 8),
-                          Flexible(
-                            flex: 2,
+                        const SizedBox(width: 8),
+                        if (hasFile)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
                             child: Text(
-                              fileLabel,
+                              fileLabel.isNotEmpty ? fileLabel : 'Attached',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.end,
                               style: GoogleFonts.inter(
-                                fontSize: 11,
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF16A34A),
+                              ),
+                            ),
+                          )
+                        else if (!ev.willUpload)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Skipped',
+                              style: GoogleFonts.inter(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
                                 color: const Color(0xFF64748B),
                               ),
                             ),
                           ),
-                        ],
                       ],
                     ),
                   );
@@ -2048,11 +2146,11 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                   final fileName = ev['fileName']?.toString() ?? '';
                   final hasFile = fileName.isNotEmpty;
                   return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3.5),
+                    padding: const EdgeInsets.symmetric(vertical: 4.0),
                     child: Row(
                       children: [
-                        const Icon(Icons.check_circle_rounded, size: 15, color: Color(0xFF16A34A)),
-                        const SizedBox(width: 6),
+                        const Icon(Icons.check_circle_rounded, size: 16, color: Color(0xFF16A34A)),
+                        const SizedBox(width: 8),
                         Expanded(
                           flex: 3,
                           child: Text(
@@ -2068,16 +2166,21 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
                         ),
                         if (hasFile) ...[
                           const SizedBox(width: 8),
-                          Flexible(
-                            flex: 2,
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
                             child: Text(
                               fileName,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.end,
                               style: GoogleFonts.inter(
-                                fontSize: 11,
-                                color: const Color(0xFF64748B),
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF16A34A),
                               ),
                             ),
                           ),

@@ -214,6 +214,8 @@ class CertificationQuestion {
     return AnswerFormatType.yesNo;
   }
 
+  bool get isCheckbox => formatType == AnswerFormatType.checkbox;
+
   factory CertificationQuestion.fromJson(Map<String, dynamic> json) {
     var rawText = json['text']?.toString() ?? json['question_text']?.toString() ?? json['question']?.toString() ?? '';
     var rawAnswerType = json['answer_type']?.toString().toLowerCase() ?? 'yes_no';
@@ -555,10 +557,20 @@ class EvidenceItem {
       } else {
         attachments.first.filePath = val;
       }
+      willUpload = true;
     }
   }
 
-  String? get fileName => attachments.isNotEmpty ? attachments.first.fileName : null;
+  String? get fileName {
+    if (attachments.isNotEmpty) {
+      final first = attachments.first;
+      if (first.fileName != null && first.fileName!.isNotEmpty) return first.fileName;
+      if (first.fileUrl != null && first.fileUrl!.isNotEmpty) return first.fileUrl!.split('/').last;
+      if (first.filePath != null && first.filePath!.isNotEmpty) return first.filePath!.split(RegExp(r'[\\/]')).last;
+    }
+    return null;
+  }
+
   set fileName(String? val) {
     if (val == null) {
       if (attachments.isNotEmpty) attachments.first.fileName = null;
@@ -568,6 +580,7 @@ class EvidenceItem {
       } else {
         attachments.first.fileName = val;
       }
+      willUpload = true;
     }
   }
 
@@ -581,6 +594,7 @@ class EvidenceItem {
       } else {
         attachments.first.fileUrl = val;
       }
+      willUpload = true;
     }
   }
 
@@ -646,6 +660,10 @@ class EvidenceItem {
       fileUrl: a.fileUrl,
     )).toList();
 
+    final hasAny = copyAttachments.isNotEmpty ||
+        (fileName != null && fileName!.isNotEmpty) ||
+        (fileUrl != null && fileUrl!.isNotEmpty);
+
     return EvidenceItem(
       id: req.id.toString(),
       requirementId: req.id.toString(),
@@ -655,7 +673,7 @@ class EvidenceItem {
       evidenceKind: req.evidenceKind,
       requiresGps: req.requiresGps,
       sectionId: req.sectionId,
-      willUpload: willUpload,
+      willUpload: willUpload || hasAny,
       attachments: copyAttachments,
       filePath: filePath,
       fileName: (fileName != null && fileName!.isNotEmpty) ? fileName : (fileUrl?.split('/').last),
@@ -1339,6 +1357,7 @@ class CertificationApplicationModel {
         if (!existing.hasAttachmentMatching(fileName: cleanName, fileUrl: fileUrl)) {
           existing.addAttachment(fileName: cleanName, fileUrl: fileUrl);
         }
+        existing.willUpload = true;
       } else {
         evItems.add(EvidenceItem(
           id: reqId,
@@ -1348,6 +1367,7 @@ class CertificationApplicationModel {
           fileUrl: fileUrl,
           fileName: cleanName,
           evidenceKind: kind,
+          willUpload: true,
         ));
       }
     }
@@ -1914,24 +1934,69 @@ class CertificationApplicationModel {
           final fileUrl = ev['url']?.toString() ?? (ev['file'] is Map ? ev['file']['url']?.toString() : null);
           final fileName = ev['name']?.toString() ?? (ev['file'] is Map ? ev['file']['name']?.toString() : null);
           final kind = ev['kind']?.toString() ?? 'photo';
+          final cleanName = (fileName != null && fileName.isNotEmpty) ? fileName : (fileUrl?.split('/').last);
           
           final existingIdx = evidenceItems.indexWhere((item) => item.id == reqId || item.requirementId == reqId);
           if (existingIdx >= 0) {
-            evidenceItems[existingIdx].fileUrl = fileUrl;
-            evidenceItems[existingIdx].fileName = (fileName != null && fileName.isNotEmpty) ? fileName : (fileUrl?.split('/').last);
+            final target = evidenceItems[existingIdx];
+            if (!target.hasAttachmentMatching(fileName: cleanName, fileUrl: fileUrl)) {
+              target.addAttachment(fileName: cleanName, fileUrl: fileUrl);
+            }
+            target.willUpload = true;
           } else {
             evidenceItems.add(EvidenceItem(
               id: reqId,
               requirementId: reqId,
-              title: title,
+              title: title.isNotEmpty ? title : (cleanName ?? 'Evidence File'),
               description: '',
               fileUrl: fileUrl,
-              fileName: (fileName != null && fileName.isNotEmpty) ? fileName : (fileUrl?.split('/').last),
+              fileName: cleanName,
               evidenceKind: kind,
+              willUpload: true,
             ));
           }
         }
       }
+    }
+
+    final evByReq = appMap['evidence_by_requirement'] ??
+        (appMap['application'] is Map ? (appMap['application'] as Map)['evidence_by_requirement'] : null) ??
+        (appMap['data'] is Map ? (appMap['data'] as Map)['evidence_by_requirement'] : null);
+    if (evByReq is Map) {
+      evByReq.forEach((reqKey, filesList) {
+        if (filesList is List) {
+          for (final ev in filesList) {
+            if (ev is Map) {
+              final reqId = ev['requirement_id']?.toString() ?? reqKey.toString();
+              final title = ev['title']?.toString() ?? '';
+              final fileUrl = ev['url']?.toString() ?? (ev['file'] is Map ? ev['file']['url']?.toString() : null);
+              final fileName = ev['name']?.toString() ?? (ev['file'] is Map ? ev['file']['name']?.toString() : null);
+              final kind = ev['kind']?.toString() ?? 'photo';
+              final cleanName = (fileName != null && fileName.isNotEmpty) ? fileName : (fileUrl?.split('/').last);
+
+              final existingIdx = evidenceItems.indexWhere((item) => item.id == reqId || item.requirementId == reqId);
+              if (existingIdx >= 0) {
+                final target = evidenceItems[existingIdx];
+                if (!target.hasAttachmentMatching(fileName: cleanName, fileUrl: fileUrl)) {
+                  target.addAttachment(fileName: cleanName, fileUrl: fileUrl);
+                }
+                target.willUpload = true;
+              } else {
+                evidenceItems.add(EvidenceItem(
+                  id: reqId,
+                  requirementId: reqId,
+                  title: title.isNotEmpty ? title : (cleanName ?? 'Evidence File'),
+                  description: '',
+                  fileUrl: fileUrl,
+                  fileName: cleanName,
+                  evidenceKind: kind,
+                  willUpload: true,
+                ));
+              }
+            }
+          }
+        }
+      });
     }
 
     rawSubmissionData = appMap;
@@ -2413,6 +2478,27 @@ class CertificationApplicationDetail {
           .whereType<Map>()
           .map((e) => CertificationMaterialItem.fromJson(Map<String, dynamic>.from(e)))
           .toList();
+    }
+
+    final evByReq = json['evidence_by_requirement'] ??
+        (json['application'] is Map ? (json['application'] as Map)['evidence_by_requirement'] : null) ??
+        (json['data'] is Map ? (json['data'] as Map)['evidence_by_requirement'] : null);
+    if (evByReq is Map) {
+      evByReq.forEach((reqKey, filesList) {
+        if (filesList is List) {
+          for (final f in filesList) {
+            if (f is Map) {
+              final copy = Map<String, dynamic>.from(f);
+              copy['requirement_id'] ??= reqKey;
+              final name = copy['name']?.toString() ?? (copy['file'] is Map ? copy['file']['name']?.toString() : null);
+              final exists = mats.any((m) => m.name == name);
+              if (!exists) {
+                mats.add(CertificationMaterialItem.fromJson(copy));
+              }
+            }
+          }
+        }
+      });
     }
 
     String? foundComment = json['reviewer_comment']?.toString() ??

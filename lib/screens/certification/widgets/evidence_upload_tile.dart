@@ -10,6 +10,7 @@ class EvidenceUploadTile extends StatefulWidget {
   final EvidenceItem item;
   final VoidCallback onUpdated;
 
+
   const EvidenceUploadTile({
     super.key,
     required this.item,
@@ -235,6 +236,9 @@ class _EvidenceUploadTileState extends State<EvidenceUploadTile> {
     final item = widget.item;
     final attachments = item.attachments;
     final hasAttachments = attachments.isNotEmpty;
+    if (hasAttachments && !item.willUpload) {
+      item.willUpload = true;
+    }
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
