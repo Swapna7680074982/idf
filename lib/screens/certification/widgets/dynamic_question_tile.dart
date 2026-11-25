@@ -606,27 +606,106 @@ class _DynamicQuestionTileState extends State<DynamicQuestionTile> {
     if (options.isNotEmpty) {
       List<String> selectedKeys = [];
       if (widget.value is List) {
-        selectedKeys = (widget.value as List).map((e) {
-          if (e is Map) return (e['id'] ?? e['value'] ?? e['label'] ?? '').toString();
-          return e.toString();
-        }).toList();
+        selectedKeys = CertificationApplicationModel.cleanAnswersList(widget.value);
+      } else if (widget.value is Map) {
+        selectedKeys = CertificationApplicationModel.cleanAnswersList(widget.value);
       } else if (widget.value != null && widget.value.toString().isNotEmpty) {
-        selectedKeys = widget.value.toString().split(',').map((s) => s.trim()).toList();
+        final rawStr = widget.value.toString().trim();
+        final sLower = rawStr.toLowerCase();
+        if (sLower != 'false' && sLower != 'no' && sLower != '0') {
+          selectedKeys = CertificationApplicationModel.cleanAnswersList(rawStr);
+        }
       }
 
-      final requiresMoreThanOne = widget.question.id == 12 ||
+      // If value was boolean true, string 'true' / 'yes', or empty for mandatory multi-option questions
+      final isTwoActivitiesQuestion = widget.question.id == 12 ||
+          widget.question.id == 9 ||
           widget.question.text.toLowerCase().contains('two activities') ||
-          options.length > 1;
-      final selectedCount = selectedKeys.length;
+          widget.question.text.toLowerCase().contains('active office');
+      if (selectedKeys.isEmpty ||
+          (selectedKeys.length == 1 &&
+              (selectedKeys.first.toLowerCase() == 'true' || selectedKeys.first.toLowerCase() == 'yes'))) {
+        if (widget.value == true ||
+            widget.value == 'true' ||
+            widget.value == 'yes' ||
+            isTwoActivitiesQuestion ||
+            (selectedKeys.isNotEmpty &&
+                (selectedKeys.first.toLowerCase() == 'true' || selectedKeys.first.toLowerCase() == 'yes'))) {
+          // Pre-fill default options (first 2 options for Question 9/12, or options)
+          selectedKeys = options.take(2).map((o) => o.id.toString()).toList();
+        }
+      }
+
+      bool isOptionChecked(CertificationQuestionOption opt, int optIndex) {
+        final optIdStr = opt.id.toString().trim().toLowerCase();
+        final optLabel = opt.label.trim().toLowerCase();
+        final opt1BasedIdx = (optIndex + 1).toString();
+        final opt0BasedIdx = optIndex.toString();
+        final optLetter = optIndex < 26 ? String.fromCharCode(97 + optIndex) : ''; // 0 -> 'a', 1 -> 'b', 2 -> 'c'
+        final dbOffsetId = (optIndex + 4).toString(); // DB IDs 4, 5, 6 for active office policy
+
+        return selectedKeys.any((key) {
+          final cleanKey = key
+              .replaceAll('[', '')
+              .replaceAll(']', '')
+              .replaceAll('"', '')
+              .replaceAll("'", '')
+              .replaceAll(r'\', '')
+              .trim()
+              .toLowerCase();
+          if (cleanKey.isEmpty) return false;
+
+          // Direct match by ID, label, 1-based index, 0-based index, or DB offset ID
+          if (cleanKey == optIdStr || cleanKey == optLabel) return true;
+          if (cleanKey == opt1BasedIdx || cleanKey == opt0BasedIdx) return true;
+          if (cleanKey == dbOffsetId && (widget.question.id == 9 || widget.question.id == 12 || isTwoActivitiesQuestion)) {
+            return true;
+          }
+          if (optLetter.isNotEmpty && cleanKey == optLetter) return true;
+
+          // Matches "a.", "1.", "option a", "option 1"
+          if (cleanKey == '$optIdStr.' ||
+              (optLetter.isNotEmpty && cleanKey == '$optLetter.') ||
+              cleanKey == '$opt1BasedIdx.' ||
+              cleanKey == 'option $optIdStr' ||
+              (optLetter.isNotEmpty && cleanKey == 'option $optLetter') ||
+              cleanKey == 'option $opt1BasedIdx' ||
+              cleanKey == 'opt $optIdStr' ||
+              cleanKey == 'opt $opt1BasedIdx') {
+            return true;
+          }
+
+          // Option label starts with cleanKey e.g. "a. Ergonomic breaks..."
+          if (cleanKey.length == 1 &&
+              (optLabel.startsWith('$cleanKey.') ||
+                  optLabel.startsWith('$cleanKey ') ||
+                  optLabel.startsWith('($cleanKey)'))) {
+            return true;
+          }
+
+          // Substring / partial label match for long sentences (>= 5 chars)
+          if (cleanKey.length >= 5 && optLabel.contains(cleanKey)) return true;
+          if (optLabel.length >= 5 && cleanKey.contains(optLabel)) return true;
+
+          return false;
+        });
+      }
+
+      final requiresMoreThanOne = isTwoActivitiesQuestion || options.length > 1;
+      final selectedCount = options.asMap().entries.where((e) => isOptionChecked(e.value, e.key)).length;
       final hasEnough = selectedCount >= 2;
 
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ...options.map((opt) {
+          ...options.asMap().entries.map((entry) {
+            final optIndex = entry.key;
+            final opt = entry.value;
             final optIdStr = opt.id.toString();
-            final optLabel = opt.label;
-            final isChecked = selectedKeys.contains(optIdStr) || selectedKeys.contains(optLabel);
+            final isChecked = isOptionChecked(opt, optIndex);
+            final opt1BasedIdx = (optIndex + 1).toString();
+            final opt0BasedIdx = optIndex.toString();
+            final optLetter = optIndex < 26 ? String.fromCharCode(97 + optIndex) : '';
 
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
@@ -646,10 +725,24 @@ class _DynamicQuestionTileState extends State<DynamicQuestionTile> {
                   onTap: () {
                     final updated = List<String>.from(selectedKeys);
                     if (isChecked) {
-                      updated.remove(optIdStr);
-                      updated.remove(optLabel);
+                      updated.removeWhere((k) {
+                        final clean = k
+                            .replaceAll('[', '')
+                            .replaceAll(']', '')
+                            .replaceAll('"', '')
+                            .replaceAll("'", '')
+                            .replaceAll(r'\', '')
+                            .trim()
+                            .toLowerCase();
+                        return clean == optIdStr.toLowerCase() ||
+                            clean == opt.label.trim().toLowerCase() ||
+                            clean == opt1BasedIdx ||
+                            clean == opt0BasedIdx ||
+                            (optLetter.isNotEmpty && clean == optLetter) ||
+                            (clean.length >= 5 && opt.label.toLowerCase().contains(clean));
+                      });
                     } else {
-                      updated.add(optIdStr);
+                      if (!updated.contains(optIdStr)) updated.add(optIdStr);
                     }
                     widget.onChanged(updated);
                   },
@@ -669,8 +762,22 @@ class _DynamicQuestionTileState extends State<DynamicQuestionTile> {
                               if (val == true) {
                                 if (!updated.contains(optIdStr)) updated.add(optIdStr);
                               } else {
-                                updated.remove(optIdStr);
-                                updated.remove(optLabel);
+                                updated.removeWhere((k) {
+                                  final clean = k
+                                      .replaceAll('[', '')
+                                      .replaceAll(']', '')
+                                      .replaceAll('"', '')
+                                      .replaceAll("'", '')
+                                      .replaceAll(r'\', '')
+                                      .trim()
+                                      .toLowerCase();
+                                  return clean == optIdStr.toLowerCase() ||
+                                      clean == opt.label.trim().toLowerCase() ||
+                                      clean == opt1BasedIdx ||
+                                      clean == opt0BasedIdx ||
+                                      (optLetter.isNotEmpty && clean == optLetter) ||
+                                      (clean.length >= 5 && opt.label.toLowerCase().contains(clean));
+                                });
                               }
                               widget.onChanged(updated);
                             },
@@ -738,6 +845,10 @@ class _DynamicQuestionTileState extends State<DynamicQuestionTile> {
     bool isChecked = false;
     if (widget.value is bool) {
       isChecked = widget.value as bool;
+    } else if (widget.value is num) {
+      isChecked = (widget.value as num) == 1;
+    } else if (widget.value is List) {
+      isChecked = (widget.value as List).isNotEmpty;
     } else if (widget.value != null) {
       final s = widget.value.toString().toLowerCase().trim();
       isChecked = s == 'true' || s == '1' || s == 'yes' || s == 'checked';

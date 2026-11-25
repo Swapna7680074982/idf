@@ -216,6 +216,7 @@ class CertificateApplicationItem {
   final String address;
   final String city;
   final String pincode;
+  final Map<String, dynamic>? rawJson;
 
   const CertificateApplicationItem({
     required this.id,
@@ -238,6 +239,7 @@ class CertificateApplicationItem {
     this.address = '',
     this.city = '',
     this.pincode = '',
+    this.rawJson,
   });
 
   /// Primary certificate identifier for the renewal endpoint /api/certification/certificates/:id/renew
@@ -448,6 +450,7 @@ class CertificateApplicationItem {
       address: rawAddress,
       city: rawCity,
       pincode: rawPincode,
+      rawJson: json,
     );
   }
 

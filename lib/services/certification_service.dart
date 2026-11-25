@@ -203,51 +203,61 @@ class CertificationService {
   /// Fetches the complete status dossier matching the Programs format,
   /// including stage timeline, AI validation checks, and uploaded evidence.
   /// GET /api/applications/certificates/{id}
-  /// (Also accessible via GET /api/certification/applications/{id})
+  /// (Also accessible via GET /api/certification/applications/{id} and /api/certification/certificates/{id})
   /// Fetches the raw application Map from the server for complete data prefilling
   static Future<Map<String, dynamic>> getApplicationRawMap(dynamic id) async {
-    try {
-      final response = await ApiClient.get(ApiConfig.certificationApplicationDetail(id));
-      if (response is Map<String, dynamic>) {
-        final Map<String, dynamic> merged = {};
-        if (response['data'] is Map<String, dynamic>) {
-          final data = response['data'] as Map<String, dynamic>;
-          merged.addAll(data);
-          if (data['application'] is Map<String, dynamic>) {
-            merged.addAll(data['application'] as Map<String, dynamic>);
-          }
-        } else if (response['application'] is Map<String, dynamic>) {
-          merged.addAll(response);
-          merged.addAll(response['application'] as Map<String, dynamic>);
-        } else {
-          merged.addAll(response);
-        }
-        if (merged.isNotEmpty) return merged;
+    final candidateUrls = [
+      ApiConfig.certificationApplicationDetail(id), // /api/applications/certificates/$id
+      ApiConfig.certificationApplicationDetailAlt(id), // /api/certification/applications/$id
+      '${ApiConfig.baseUrl}/api/certification/certificates/$id',
+      '${ApiConfig.baseUrl}/api/applications/certificates/$id/details',
+      '${ApiConfig.baseUrl}/api/certification/certificates/$id/details',
+      '${ApiConfig.baseUrl}/api/certification/applications/$id/details',
+    ];
+
+    Map<String, dynamic> unpack(dynamic res) {
+      if (res is! Map) return {};
+      final Map<String, dynamic> merged = Map<String, dynamic>.from(res);
+      if (res['data'] is Map) {
+        final d = Map<String, dynamic>.from(res['data'] as Map);
+        merged.addAll(d);
+        if (d['application'] is Map) merged.addAll(Map<String, dynamic>.from(d['application'] as Map));
+        if (d['certificate'] is Map) merged.addAll(Map<String, dynamic>.from(d['certificate'] as Map));
+        if (d['details'] is Map) merged.addAll(Map<String, dynamic>.from(d['details'] as Map));
       }
-    } catch (e) {
-      debugPrint('⚠️ [CERTIFICATION SERVICE] Detail primary URL failed: $e. Trying alternative URL...');
+      if (res['application'] is Map) merged.addAll(Map<String, dynamic>.from(res['application'] as Map));
+      if (res['certificate'] is Map) merged.addAll(Map<String, dynamic>.from(res['certificate'] as Map));
+      if (res['details'] is Map) merged.addAll(Map<String, dynamic>.from(res['details'] as Map));
+      return merged;
+    }
+
+    Map<String, dynamic> bestMerged = {};
+
+    for (final url in candidateUrls) {
       try {
-        final altRes = await ApiClient.get(ApiConfig.certificationApplicationDetailAlt(id));
-        if (altRes is Map<String, dynamic>) {
-          final Map<String, dynamic> merged = {};
-          if (altRes['data'] is Map<String, dynamic>) {
-            final data = altRes['data'] as Map<String, dynamic>;
-            merged.addAll(data);
-            if (data['application'] is Map<String, dynamic>) {
-              merged.addAll(data['application'] as Map<String, dynamic>);
-            }
-          } else if (altRes['application'] is Map<String, dynamic>) {
-            merged.addAll(altRes);
-            merged.addAll(altRes['application'] as Map<String, dynamic>);
+        final response = await ApiClient.get(url);
+        final current = unpack(response);
+        if (current.isNotEmpty) {
+          if (bestMerged.isEmpty) {
+            bestMerged = current;
           } else {
-            merged.addAll(altRes);
+            current.forEach((k, v) {
+              if (v != null && (bestMerged[k] == null || (bestMerged[k] is List && (bestMerged[k] as List).isEmpty))) {
+                bestMerged[k] = v;
+              }
+            });
           }
-          if (merged.isNotEmpty) return merged;
+          final answers = bestMerged['answers'] ?? bestMerged['question_answers'] ?? bestMerged['submitted_answers'];
+          if (answers is List && answers.isNotEmpty) {
+            return bestMerged;
+          }
         }
-      } catch (_) {
-        rethrow;
+      } catch (e) {
+        debugPrint('Notice getApplicationRawMap URL $url: $e');
       }
     }
+
+    if (bestMerged.isNotEmpty) return bestMerged;
 
     throw const ApiException(
       code: 'INVALID_RESPONSE',
@@ -654,6 +664,8 @@ class CertificationService {
 
             if (val is bool) {
               ansBool = val;
+            } else if (val is List) {
+              ansText = val.map((e) => e.toString()).join(', ');
             } else if (val is Map) {
               if (val.containsKey('answer_bool')) ansBool = val['answer_bool'] as bool?;
               if (val.containsKey('answer_number')) ansNum = val['answer_number'] as num?;
@@ -685,6 +697,12 @@ class CertificationService {
               'answer_text': ansText,
               'answer_option_id': ansOptId,
             };
+            if (val is List) {
+              item['options'] = val;
+              item['selected_options'] = val;
+              item['answer_options'] = val;
+              item['answer'] = val;
+            }
             list.add(item);
           });
           if (list.isNotEmpty) {

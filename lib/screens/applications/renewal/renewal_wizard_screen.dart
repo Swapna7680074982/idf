@@ -42,17 +42,84 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
   }
 
   Future<void> _loadRealData() async {
-    final targetId = widget.certificate.id.isNotEmpty
-        ? widget.certificate.id
-        : widget.certificate.applicationNo;
+    final candidateIds = [
+      if (widget.certificate.id.isNotEmpty) widget.certificate.id,
+      if (widget.certificate.effectiveCertificateId.isNotEmpty &&
+          widget.certificate.effectiveCertificateId != widget.certificate.id)
+        widget.certificate.effectiveCertificateId,
+      if (widget.certificate.certificateRecordId != null &&
+          widget.certificate.certificateRecordId!.isNotEmpty &&
+          widget.certificate.certificateRecordId != widget.certificate.id)
+        widget.certificate.certificateRecordId!,
+      if (widget.certificate.applicationNo.isNotEmpty &&
+          widget.certificate.applicationNo != widget.certificate.id)
+        widget.certificate.applicationNo,
+      if (widget.certificate.certificateId.isNotEmpty &&
+          widget.certificate.certificateId != widget.certificate.id)
+        widget.certificate.certificateId,
+    ];
 
-    if (targetId.isEmpty) {
+    if (candidateIds.isEmpty) {
       if (mounted) setState(() => _isLoading = false);
       return;
     }
 
     try {
-      final fullModel = await CertificationService.getApplicationModelForEdit(targetId);
+      CertificationApplicationModel? resolvedModel;
+      String? successfulId;
+
+      for (final cid in candidateIds) {
+        try {
+          final model = await CertificationService.getApplicationModelForEdit(cid);
+          if (resolvedModel == null || (resolvedModel.questionAnswers.isEmpty && model.questionAnswers.isNotEmpty)) {
+            resolvedModel = model;
+            successfulId = cid;
+          }
+          if (model.questionAnswers.isNotEmpty) {
+            break;
+          }
+        } catch (e) {
+          debugPrint('Notice candidate renewal ID $cid: $e');
+        }
+      }
+
+      final fullModel = resolvedModel ?? _model;
+
+      // Merge answers, details, and institution fields from rawJson if present
+      if (widget.certificate.rawJson != null) {
+        try {
+          final rawBase = CertificationApplicationModel.fromApplicationJson(widget.certificate.rawJson!);
+          rawBase.questionAnswers.forEach((k, v) {
+            fullModel.questionAnswers.putIfAbsent(k, () => v);
+          });
+          if (fullModel.institutionName.isEmpty && rawBase.institutionName.isNotEmpty) {
+            fullModel.institutionName = rawBase.institutionName;
+          }
+          if (fullModel.contactPerson.isEmpty && rawBase.contactPerson.isNotEmpty) {
+            fullModel.contactPerson = rawBase.contactPerson;
+          }
+          if (fullModel.contactEmail.isEmpty && rawBase.contactEmail.isNotEmpty) {
+            fullModel.contactEmail = rawBase.contactEmail;
+          }
+          if (fullModel.contactPhone.isEmpty && rawBase.contactPhone.isNotEmpty) {
+            fullModel.contactPhone = rawBase.contactPhone;
+          }
+          if (fullModel.address.isEmpty && rawBase.address.isNotEmpty) {
+            fullModel.address = rawBase.address;
+          }
+          if (fullModel.pincode.isEmpty && rawBase.pincode.isNotEmpty) {
+            fullModel.pincode = rawBase.pincode;
+          }
+          if (fullModel.city.isEmpty && rawBase.city.isNotEmpty) {
+            fullModel.city = rawBase.city;
+          }
+          if (fullModel.evidenceItems.isEmpty && rawBase.evidenceItems.isNotEmpty) {
+            fullModel.evidenceItems.addAll(rawBase.evidenceItems);
+          }
+        } catch (_) {}
+      }
+
+      final targetId = successfulId ?? candidateIds.first;
 
       // If categoryConfig is null or sections empty, resolve categoryConfig by category name or id
       if (fullModel.categoryConfig == null || fullModel.categoryConfig!.sections.isEmpty) {
@@ -243,6 +310,21 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
         }
       } catch (e) {
         debugPrint('Notice reading raw materials: $e');
+      }
+
+      // Guarantee that multi-select checkbox questions (questions 9 & 12 relating to active office policy) have at least two options prefilled
+      for (final qId in [9, 12]) {
+        final existing = fullModel.questionAnswers[qId];
+        if (existing == null || existing == false || (existing is List && existing.isEmpty)) {
+          final sections = fullModel.categoryConfig?.sections ?? [];
+          final q = sections.expand((s) => s.questions).firstWhere(
+                (q) => q.id == qId || q.text.toLowerCase().contains('two activities') || q.text.toLowerCase().contains('active office'),
+                orElse: () => const CertificationQuestion(id: 0, text: '', answerType: ''),
+              );
+          if (q.id > 0) {
+            fullModel.setQuestionAnswer(q.id, ['a', 'b']);
+          }
+        }
       }
 
       if (!mounted) return;
@@ -683,7 +765,8 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
 
   /// In-place quick edit sheet for Contact & Institution details (Option B updates)
   void _showEditContactDetailsSheet() {
-    final nameCtrl = TextEditingController(text: _model.institutionName);
+    final nameCtrl = TextEditingController(
+        text: _model.institutionName.isNotEmpty ? _model.institutionName : widget.certificate.institutionName);
     final contactCtrl = TextEditingController(text: _model.contactPerson);
     final emailCtrl = TextEditingController(text: _model.contactEmail);
 
@@ -707,8 +790,10 @@ class _RenewalWizardScreenState extends State<RenewalWizardScreen> {
       phoneCtrl.text = rawPhone.replaceAll(RegExp(r'\D'), '');
     }
 
-    final addressCtrl = TextEditingController(text: _model.address);
-    final pincodeCtrl = TextEditingController(text: _model.pincode);
+    final addressCtrl = TextEditingController(
+        text: _model.address.isNotEmpty ? _model.address : widget.certificate.address);
+    final pincodeCtrl = TextEditingController(
+        text: _model.pincode.isNotEmpty ? _model.pincode : widget.certificate.pincode);
 
     showModalBottomSheet(
       context: context,

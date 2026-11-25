@@ -215,7 +215,7 @@ class CertificationQuestion {
   }
 
   factory CertificationQuestion.fromJson(Map<String, dynamic> json) {
-    var rawText = json['text']?.toString() ?? '';
+    var rawText = json['text']?.toString() ?? json['question_text']?.toString() ?? json['question']?.toString() ?? '';
     var rawAnswerType = json['answer_type']?.toString().toLowerCase() ?? 'yes_no';
 
     final optsRaw = json['options'] ?? json['choices'] ?? json['answer_options'];
@@ -229,30 +229,32 @@ class CertificationQuestion {
       }
     }
 
-    // 12Q. The question relating to active office policies: separate into three distinct options:
+    // Question 9 / 12 relating to active office policies: separate into three distinct options:
     // a. Ergonomic breaks, breaking sedentary time, or five-minute activity breaks.
     // b. Ten minutes of office time at any point during the day dedicated to music and active dance steps or other movements led by an instructor.
     // c. Weekly office sports activities in which employees hire a space or use an available workplace space to compete in teams.
+    final qIdStr = (json['id'] ?? json['question_id'])?.toString();
     final textLower = rawText.toLowerCase();
     final isOfficePolicyQuestion = textLower.contains('active office') ||
         textLower.contains('activities exist at the workplace') ||
         textLower.contains('ergonomic breaks') ||
-        (json['id'] != null && json['id'].toString() == '12');
+        (qIdStr != null && (qIdStr == '12' || qIdStr == '9'));
 
     if (isOfficePolicyQuestion) {
-      rawText = 'Do any of the following two activities exist at the workplace as an ACTIVE office policy?';
+      rawText = 'Do any of the following activities exist at the workplace as an ACTIVE office policy? (Select any TWO of the three options below)';
       rawAnswerType = 'checkbox';
-      parsedOptionItems = const [
+      final existingIds = parsedOptionItems.map((o) => o.id.toString()).toList();
+      parsedOptionItems = [
         CertificationQuestionOption(
-          id: 'a',
+          id: existingIds.isNotEmpty && existingIds[0].isNotEmpty ? existingIds[0] : 'a',
           label: 'Ergonomic breaks, breaking sedentary time, or five-minute activity breaks.',
         ),
         CertificationQuestionOption(
-          id: 'b',
+          id: existingIds.length > 1 && existingIds[1].isNotEmpty ? existingIds[1] : 'b',
           label: 'Ten minutes of office time at any point during the day dedicated to music and active dance steps or other movements led by an instructor.',
         ),
         CertificationQuestionOption(
-          id: 'c',
+          id: existingIds.length > 2 && existingIds[2].isNotEmpty ? existingIds[2] : 'c',
           label: 'Weekly office sports activities in which employees hire a space or use an available workplace space to compete in teams.',
         ),
       ];
@@ -262,7 +264,9 @@ class CertificationQuestion {
     return CertificationQuestion(
       id: json['id'] is int
           ? json['id'] as int
-          : int.tryParse(json['id']?.toString() ?? '0') ?? 0,
+          : (json['question_id'] is int
+              ? json['question_id'] as int
+              : int.tryParse(json['id']?.toString() ?? json['question_id']?.toString() ?? '0') ?? 0),
       text: rawText,
       answerType: rawAnswerType,
       placeholder: json['placeholder']?.toString(),
@@ -748,16 +752,6 @@ class CertificationSubmittedAnswerItem {
     String formatted = '';
     if (json['answer_option_label'] != null && json['answer_option_label'].toString().isNotEmpty) {
       formatted = json['answer_option_label'].toString();
-    } else if (json['answer_bool'] != null) {
-      formatted = (json['answer_bool'] == true || json['answer_bool'] == 1 || json['answer_bool'] == 'true') ? 'Yes' : 'No';
-    } else if (json['answer_number'] != null) {
-      if (aType == 'percentage') {
-        formatted = '${json['answer_number']}%';
-      } else {
-        formatted = '${json['answer_number']}';
-      }
-    } else if (json['answer_text'] != null && json['answer_text'].toString().isNotEmpty) {
-      formatted = json['answer_text'].toString();
     } else if (json['answer'] != null) {
       final ans = json['answer'];
       if (ans is bool) {
@@ -765,7 +759,7 @@ class CertificationSubmittedAnswerItem {
       } else if (ans is num) {
         formatted = aType == 'percentage' ? '$ans%' : '$ans';
       } else if (ans is List) {
-        formatted = ans.join(', ');
+        formatted = CertificationApplicationModel.cleanAnswersList(ans).join(', ');
       } else {
         final str = ans.toString().trim();
         if (str.toLowerCase() == 'true') {
@@ -775,6 +769,16 @@ class CertificationSubmittedAnswerItem {
         } else {
           formatted = str;
         }
+      }
+    } else if (json['answer_text'] != null && json['answer_text'].toString().isNotEmpty) {
+      formatted = json['answer_text'].toString();
+    } else if (json['answer_bool'] != null) {
+      formatted = (json['answer_bool'] == true || json['answer_bool'] == 1 || json['answer_bool'] == 'true') ? 'Yes' : 'No';
+    } else if (json['answer_number'] != null) {
+      if (aType == 'percentage') {
+        formatted = '${json['answer_number']}%';
+      } else {
+        formatted = '${json['answer_number']}';
       }
     } else {
       formatted = '—';
@@ -787,7 +791,14 @@ class CertificationSubmittedAnswerItem {
       sectionName: secName,
       sectionCode: secCode,
       answerType: aType,
-      rawAnswer: json['answer'] ?? json['answer_text'] ?? json['answer_number'] ?? json['answer_bool'],
+      rawAnswer: json['answer'] ??
+          json['answer_text'] ??
+          json['answer_options'] ??
+          json['answer_option_ids'] ??
+          json['answer_option_label'] ??
+          json['answer_option_id'] ??
+          json['answer_number'] ??
+          json['answer_bool'],
       formattedAnswer: formatted,
       score: sc,
       maxScore: maxSc,
@@ -958,7 +969,7 @@ class CertificationApplicationModel {
     final val = questionAnswers[intId];
     if (val == null) return false;
     if (val is bool) return true;
-    if (intId == 12) {
+    if (intId == 12 || intId == 9) {
       if (val is List) return val.length >= 2;
       if (val is String) {
         return val.split(',').where((s) => s.trim().isNotEmpty).length >= 2;
@@ -972,7 +983,7 @@ class CertificationApplicationModel {
       if (val.containsKey('options')) {
         final opts = val['options'];
         if (opts is List) {
-          if (intId == 12) return opts.length >= 2;
+          if (intId == 12 || intId == 9) return opts.length >= 2;
           return opts.isNotEmpty;
         }
       }
@@ -981,6 +992,80 @@ class CertificationApplicationModel {
       return val.isNotEmpty;
     }
     return true;
+  }
+
+  /// Deeply cleans and unpacks answer lists or string answers with nested JSON / brackets / quotes
+  static List<String> cleanAnswersList(dynamic raw) {
+    if (raw == null) return [];
+    final List<String> results = [];
+
+    void addClean(String s) {
+      final clean = s
+          .replaceAll('[', '')
+          .replaceAll(']', '')
+          .replaceAll('"', '')
+          .replaceAll("'", '')
+          .replaceAll(r'\', '')
+          .trim();
+      if (clean.isNotEmpty && !results.contains(clean)) {
+        results.add(clean);
+      }
+    }
+
+    if (raw is List) {
+      for (final item in raw) {
+        if (item == null) continue;
+        if (item is Map) {
+          final id = (item['id'] ??
+                  item['option_id'] ??
+                  item['value'] ??
+                  item['label'] ??
+                  item['name'] ??
+                  item['answer'] ??
+                  item['text'] ??
+                  '')
+              .toString();
+          addClean(id);
+        } else {
+          final str = item.toString();
+          if (str.contains(',')) {
+            for (final p in str.split(',')) {
+              addClean(p);
+            }
+          } else {
+            addClean(str);
+          }
+        }
+      }
+    } else if (raw is String) {
+      final str = raw.trim();
+      if (str.contains(',')) {
+        for (final p in str.split(',')) {
+          addClean(p);
+        }
+      } else {
+        addClean(str);
+      }
+    } else if (raw is Map) {
+      final candidate = raw['options'] ??
+          raw['selected_options'] ??
+          raw['selected_option_ids'] ??
+          raw['answer_options'] ??
+          raw['answer_option_ids'] ??
+          raw['selected_answers'] ??
+          raw['selected'] ??
+          raw['answers'];
+      if (candidate is List) {
+        return cleanAnswersList(candidate);
+      }
+      raw.forEach((k, v) {
+        if (v == true || v == 'true' || v == 1) {
+          addClean(k.toString());
+        }
+      });
+    }
+
+    return results;
   }
 
   /// Sets a question answer
@@ -1008,6 +1093,30 @@ class CertificationApplicationModel {
 
   static CertificationApplicationModel prefilledForCertificate(
       CertificateApplicationItem item) {
+    if (item.rawJson != null && item.rawJson!.isNotEmpty) {
+      try {
+        final base = CertificationApplicationModel.fromApplicationJson(item.rawJson!);
+        if (base.institutionName.isEmpty && item.institutionName.isNotEmpty) {
+          base.institutionName = item.institutionName;
+        }
+        if (base.institutionTypeTitle.isEmpty && item.institutionType.isNotEmpty) {
+          base.institutionTypeTitle = item.institutionType;
+        }
+        if (base.address.isEmpty && item.address.isNotEmpty) {
+          base.address = item.address;
+        }
+        if (base.city.isEmpty && item.city.isNotEmpty) {
+          base.city = item.city;
+        }
+        if (base.pincode.isEmpty && item.pincode.isNotEmpty) {
+          base.pincode = item.pincode;
+        }
+        return base;
+      } catch (_) {
+        // Ignored fallback
+      }
+    }
+
     int maxScore = 0;
     int pass = 0;
     if (item.score.contains('/')) {
@@ -1036,81 +1145,181 @@ class CertificationApplicationModel {
   }
 
   factory CertificationApplicationModel.fromApplicationJson(Map<String, dynamic> rawJson) {
-    // Merge nested 'data' and 'application' maps if present so all fields are accessible
+    // Merge nested 'data', 'certificate', 'details', and 'application' maps if present so all fields are accessible
     final Map<String, dynamic> appMap = Map<String, dynamic>.from(rawJson);
-    if (rawJson['data'] is Map<String, dynamic>) {
-      final dataMap = rawJson['data'] as Map<String, dynamic>;
+    if (rawJson['data'] is Map) {
+      final dataMap = Map<String, dynamic>.from(rawJson['data'] as Map);
       appMap.addAll(dataMap);
-      if (dataMap['application'] is Map<String, dynamic>) {
-        appMap.addAll(dataMap['application'] as Map<String, dynamic>);
+      if (dataMap['application'] is Map) {
+        appMap.addAll(Map<String, dynamic>.from(dataMap['application'] as Map));
       }
-    } else if (rawJson['application'] is Map<String, dynamic>) {
-      appMap.addAll(rawJson['application'] as Map<String, dynamic>);
+      if (dataMap['certificate'] is Map) {
+        appMap.addAll(Map<String, dynamic>.from(dataMap['certificate'] as Map));
+      }
+      if (dataMap['details'] is Map) {
+        appMap.addAll(Map<String, dynamic>.from(dataMap['details'] as Map));
+      }
+    }
+    if (rawJson['application'] is Map) {
+      appMap.addAll(Map<String, dynamic>.from(rawJson['application'] as Map));
+    }
+    if (rawJson['certificate'] is Map) {
+      appMap.addAll(Map<String, dynamic>.from(rawJson['certificate'] as Map));
+    }
+    if (rawJson['details'] is Map) {
+      appMap.addAll(Map<String, dynamic>.from(rawJson['details'] as Map));
     }
 
-    final inst = appMap['institution'] is Map<String, dynamic>
-        ? appMap['institution'] as Map<String, dynamic>
-        : (appMap['organization'] is Map<String, dynamic> ? appMap['organization'] as Map<String, dynamic> : null);
+    final inst = appMap['institution'] is Map
+        ? Map<String, dynamic>.from(appMap['institution'] as Map)
+        : (appMap['organization'] is Map ? Map<String, dynamic>.from(appMap['organization'] as Map) : null);
 
     final rawDetails = appMap['institution_details'] is Map
         ? Map<String, dynamic>.from(appMap['institution_details'] as Map)
         : (inst != null && inst['details'] is Map ? Map<String, dynamic>.from(inst['details'] as Map) : <String, dynamic>{});
 
     final Map<int, dynamic> qAnswers = {};
-    final rawAnswers = appMap['answers'] ??
-        (appMap['application'] is Map ? (appMap['application'] as Map)['answers'] : null) ??
-        (appMap['data'] is Map ? (appMap['data'] as Map)['answers'] : null);
 
-    if (rawAnswers is List) {
-      for (final a in rawAnswers) {
-        if (a is Map) {
-          final qId = int.tryParse(a['question_id']?.toString() ?? a['id']?.toString() ?? '');
-          if (qId != null) {
-            final dynamic val = a['answer_bool'] ??
-                a['answer_number'] ??
-                a['answer_text'] ??
-                a['answer_option_id'] ??
-                a['answer'] ??
-                a['value'];
-            if (val != null) {
-              if (val is bool) {
-                qAnswers[qId] = val;
-              } else if (val is num) {
-                qAnswers[qId] = val == 1;
-              } else {
-                final s = val.toString().trim().toLowerCase();
-                if (s == 'true' || s == '1' || s == 'yes') {
-                  qAnswers[qId] = true;
-                } else if (s == 'false' || s == '0' || s == 'no') {
-                  qAnswers[qId] = false;
-                } else {
-                  qAnswers[qId] = val;
-                }
-              }
-            }
+    void recordAnswer(dynamic rawQId, dynamic rawVal) {
+      final qId = int.tryParse(rawQId?.toString() ?? '');
+      if (qId == null) return;
+
+      dynamic val = rawVal;
+      if (val is Map) {
+        final aType = val['answer_type']?.toString().toLowerCase() ?? '';
+        final isCheckboxType = aType.contains('check') || aType.contains('multi') || aType.contains('box');
+
+        // Check if there are list/checkbox options in the answer map
+        final listCandidate = val['selected_option_ids'] ??
+            val['selected_options'] ??
+            val['answer_options'] ??
+            val['answer_option_ids'] ??
+            val['selected_answers'] ??
+            val['selected'] ??
+            (val['answer'] is List ? val['answer'] : null) ??
+            (val['raw_answer'] is List ? val['raw_answer'] : null);
+
+        final cleanedList = cleanAnswersList(listCandidate);
+        if (cleanedList.isNotEmpty) {
+          qAnswers[qId] = cleanedList;
+          return;
+        }
+
+        // If it's a checkbox type question, extract answer from text or labels before checking boolean/number
+        if (isCheckboxType) {
+          final fromAnswer = cleanAnswersList(val['answer'] ?? val['answer_text'] ?? val['raw_answer']);
+          if (fromAnswer.isNotEmpty) {
+            qAnswers[qId] = fromAnswer;
+            return;
           }
+          if (val['answer_option_label'] != null && val['answer_option_label'].toString().trim().isNotEmpty) {
+            qAnswers[qId] = [val['answer_option_label'].toString().trim()];
+            return;
+          }
+          if (val['answer_option_id'] != null && val['answer_option_id'].toString().trim().isNotEmpty) {
+            qAnswers[qId] = [val['answer_option_id'].toString().trim()];
+            return;
+          }
+        }
+
+        // For other types, evaluate answer / answer_text / options / numbers / bools
+        val = val['answer'] ??
+            val['answer_text'] ??
+            val['answer_option_label'] ??
+            val['answer_option_id'] ??
+            val['raw_answer'] ??
+            val['rawAnswer'] ??
+            val['selected_option_ids'] ??
+            val['selected_options'] ??
+            val['answer_options'] ??
+            val['answer_option_ids'] ??
+            val['options'] ??
+            val['choices'] ??
+            val['answer_number'] ??
+            val['answer_bool'] ??
+            val['value'] ??
+            val['text'];
+      }
+
+      if (val == null) return;
+
+      if (val is List) {
+        final cleaned = cleanAnswersList(val);
+        if (cleaned.isNotEmpty) {
+          qAnswers[qId] = cleaned;
+          return;
         }
       }
-    } else if (rawAnswers is Map) {
-      rawAnswers.forEach((key, val) {
-        final qId = int.tryParse(key.toString());
-        if (qId != null) {
-          if (val is bool) {
-            qAnswers[qId] = val;
-          } else if (val is num) {
-            qAnswers[qId] = val == 1;
-          } else {
-            final s = val.toString().trim().toLowerCase();
-            if (s == 'true' || s == '1' || s == 'yes') {
-              qAnswers[qId] = true;
-            } else if (s == 'false' || s == '0' || s == 'no') {
-              qAnswers[qId] = false;
-            } else {
-              qAnswers[qId] = val;
-            }
+
+      if (val is bool) {
+        qAnswers[qId] = val;
+        return;
+      }
+
+      if (val is num) {
+        qAnswers[qId] = val;
+        return;
+      }
+
+      final str = val.toString().trim();
+      final sLower = str.toLowerCase();
+
+      if (sLower == 'true' || sLower == 'yes') {
+        qAnswers[qId] = true;
+        return;
+      }
+      if (sLower == 'false' || sLower == 'no') {
+        qAnswers[qId] = false;
+        return;
+      }
+
+      final listFromStr = cleanAnswersList(str);
+      if (listFromStr.length > 1 || (listFromStr.length == 1 && (str.startsWith('[') || str.contains(',')))) {
+        qAnswers[qId] = listFromStr;
+        return;
+      }
+
+      final parsedNum = num.tryParse(str);
+      if (parsedNum != null && !str.startsWith('0') && !str.startsWith('+')) {
+        qAnswers[qId] = parsedNum;
+        return;
+      }
+
+      qAnswers[qId] = str;
+    }
+
+    final answerSources = [
+      appMap['answers'],
+      appMap['question_answers'],
+      appMap['questionnaire_answers'],
+      appMap['submitted_answers'],
+      appMap['responses'],
+      appMap['questions'],
+      if (appMap['data'] is Map) (appMap['data'] as Map)['answers'],
+      if (appMap['data'] is Map) (appMap['data'] as Map)['question_answers'],
+      if (appMap['application'] is Map) (appMap['application'] as Map)['answers'],
+      if (appMap['application'] is Map) (appMap['application'] as Map)['question_answers'],
+      if (appMap['certificate'] is Map) (appMap['certificate'] as Map)['answers'],
+      if (appMap['certificate'] is Map) (appMap['certificate'] as Map)['question_answers'],
+      if (appMap['details'] is Map) (appMap['details'] as Map)['answers'],
+      if (appMap['details'] is Map) (appMap['details'] as Map)['question_answers'],
+      if (appMap['submission'] is Map) (appMap['submission'] as Map)['answers'],
+      if (appMap['submission_details'] is Map) (appMap['submission_details'] as Map)['answers'],
+    ];
+
+    for (final src in answerSources) {
+      if (src is List) {
+        for (final item in src) {
+          if (item is Map) {
+            final qId = item['question_id'] ?? item['id'] ?? item['q_id'];
+            recordAnswer(qId, item);
           }
         }
-      });
+      } else if (src is Map) {
+        src.forEach((k, v) {
+          recordAnswer(k, v);
+        });
+      }
     }
 
     final List<EvidenceItem> evItems = [];
@@ -1508,30 +1717,140 @@ class CertificationApplicationModel {
     }
 
     // Extract questionnaire answers
-    if (appMap['answers'] is List) {
-      for (final a in appMap['answers']) {
-        if (a is Map) {
-          final qId = int.tryParse(a['question_id']?.toString() ?? '');
-          if (qId != null) {
-            final dynamic val = a['answer_bool'] ?? a['answer_number'] ?? a['answer_text'] ?? a['answer_option_id'];
-            if (val != null) {
-              if (val is bool) {
-                questionAnswers[qId] = val;
-              } else if (val is num) {
-                questionAnswers[qId] = val == 1;
-              } else {
-                final s = val.toString().trim().toLowerCase();
-                if (s == 'true' || s == '1' || s == 'yes') {
-                  questionAnswers[qId] = true;
-                } else if (s == 'false' || s == '0' || s == 'no') {
-                  questionAnswers[qId] = false;
-                } else {
-                  questionAnswers[qId] = val;
-                }
-              }
-            }
+    void recordAnswer(dynamic rawQId, dynamic rawVal) {
+      final qId = int.tryParse(rawQId?.toString() ?? '');
+      if (qId == null) return;
+
+      dynamic val = rawVal;
+      if (val is Map) {
+        final aType = val['answer_type']?.toString().toLowerCase() ?? '';
+        final isCheckboxType = aType.contains('check') || aType.contains('multi') || aType.contains('box');
+
+        final listCandidate = val['selected_option_ids'] ??
+            val['selected_options'] ??
+            val['answer_options'] ??
+            val['answer_option_ids'] ??
+            val['selected_answers'] ??
+            val['selected'] ??
+            (val['answer'] is List ? val['answer'] : null) ??
+            (val['raw_answer'] is List ? val['raw_answer'] : null);
+
+        final cleanedList = cleanAnswersList(listCandidate);
+        if (cleanedList.isNotEmpty) {
+          questionAnswers[qId] = cleanedList;
+          return;
+        }
+
+        if (isCheckboxType) {
+          final fromAnswer = cleanAnswersList(val['answer'] ?? val['answer_text'] ?? val['raw_answer']);
+          if (fromAnswer.isNotEmpty) {
+            questionAnswers[qId] = fromAnswer;
+            return;
+          }
+          if (val['answer_option_label'] != null && val['answer_option_label'].toString().trim().isNotEmpty) {
+            questionAnswers[qId] = [val['answer_option_label'].toString().trim()];
+            return;
+          }
+          if (val['answer_option_id'] != null && val['answer_option_id'].toString().trim().isNotEmpty) {
+            questionAnswers[qId] = [val['answer_option_id'].toString().trim()];
+            return;
           }
         }
+
+        val = val['answer'] ??
+            val['answer_text'] ??
+            val['answer_option_label'] ??
+            val['answer_option_id'] ??
+            val['raw_answer'] ??
+            val['rawAnswer'] ??
+            val['selected_option_ids'] ??
+            val['selected_options'] ??
+            val['answer_options'] ??
+            val['answer_option_ids'] ??
+            val['options'] ??
+            val['choices'] ??
+            val['answer_number'] ??
+            val['answer_bool'] ??
+            val['value'] ??
+            val['text'];
+      }
+
+      if (val == null) return;
+
+      if (val is List) {
+        final cleaned = cleanAnswersList(val);
+        if (cleaned.isNotEmpty) {
+          questionAnswers[qId] = cleaned;
+          return;
+        }
+      }
+
+      if (val is bool) {
+        questionAnswers[qId] = val;
+        return;
+      }
+
+      if (val is num) {
+        questionAnswers[qId] = val;
+        return;
+      }
+
+      final str = val.toString().trim();
+      final sLower = str.toLowerCase();
+
+      if (sLower == 'true' || sLower == 'yes') {
+        questionAnswers[qId] = true;
+        return;
+      }
+      if (sLower == 'false' || sLower == 'no') {
+        questionAnswers[qId] = false;
+        return;
+      }
+
+      final listFromStr = cleanAnswersList(str);
+      if (listFromStr.length > 1 || (listFromStr.length == 1 && (str.startsWith('[') || str.contains(',')))) {
+        questionAnswers[qId] = listFromStr;
+        return;
+      }
+
+      final parsedNum = num.tryParse(str);
+      if (parsedNum != null && !str.startsWith('0') && !str.startsWith('+')) {
+        questionAnswers[qId] = parsedNum;
+        return;
+      }
+
+      questionAnswers[qId] = str;
+    }
+
+    final answerSources = [
+      appMap['answers'],
+      appMap['question_answers'],
+      appMap['questionnaire_answers'],
+      appMap['submitted_answers'],
+      appMap['responses'],
+      appMap['questions'],
+      if (appMap['data'] is Map) (appMap['data'] as Map)['answers'],
+      if (appMap['data'] is Map) (appMap['data'] as Map)['question_answers'],
+      if (appMap['application'] is Map) (appMap['application'] as Map)['answers'],
+      if (appMap['application'] is Map) (appMap['application'] as Map)['question_answers'],
+      if (appMap['certificate'] is Map) (appMap['certificate'] as Map)['answers'],
+      if (appMap['certificate'] is Map) (appMap['certificate'] as Map)['question_answers'],
+      if (appMap['details'] is Map) (appMap['details'] as Map)['answers'],
+      if (appMap['details'] is Map) (appMap['details'] as Map)['question_answers'],
+    ];
+
+    for (final src in answerSources) {
+      if (src is List) {
+        for (final item in src) {
+          if (item is Map) {
+            final qId = item['question_id'] ?? item['id'] ?? item['q_id'];
+            recordAnswer(qId, item);
+          }
+        }
+      } else if (src is Map) {
+        src.forEach((k, v) {
+          recordAnswer(k, v);
+        });
       }
     }
 
@@ -1972,6 +2291,7 @@ class CertificationApplicationDetail {
   final CertificationScoreSummary? scores;
   final List<CertificationSectionScoreItem> sectionScores;
   final List<CertificationSubmittedAnswerItem> answers;
+  final Map<String, dynamic>? rawJson;
 
   const CertificationApplicationDetail({
     required this.id,
@@ -1999,6 +2319,7 @@ class CertificationApplicationDetail {
     this.scores,
     this.sectionScores = const [],
     this.answers = const [],
+    this.rawJson,
   });
 
   String? get effectiveComment {
@@ -2034,6 +2355,7 @@ class CertificationApplicationDetail {
     CertificationScoreSummary? scores,
     List<CertificationSectionScoreItem>? sectionScores,
     List<CertificationSubmittedAnswerItem>? answers,
+    Map<String, dynamic>? rawJson,
   }) {
     return CertificationApplicationDetail(
       id: id ?? this.id,
@@ -2061,6 +2383,7 @@ class CertificationApplicationDetail {
       scores: scores ?? this.scores,
       sectionScores: sectionScores ?? this.sectionScores,
       answers: answers ?? this.answers,
+      rawJson: rawJson ?? this.rawJson,
     );
   }
 
@@ -2178,11 +2501,13 @@ class CertificationApplicationDetail {
       reviewerComment: foundComment,
       adminComment: foundComment,
       aiValidationComment: json['ai_validation_comment']?.toString(),
-      institution: json['institution'] is Map<String, dynamic>
-          ? CertificationInstitution.fromJson(json['institution'] as Map<String, dynamic>)
-          : null,
-      submissionDetails: json['submission_details'] is Map<String, dynamic>
-          ? CertificationSubmissionDetails.fromJson(json['submission_details'] as Map<String, dynamic>)
+      institution: json['institution'] is Map
+          ? CertificationInstitution.fromJson(Map<String, dynamic>.from(json['institution'] as Map))
+          : (json['organization'] is Map
+              ? CertificationInstitution.fromJson(Map<String, dynamic>.from(json['organization'] as Map))
+              : null),
+      submissionDetails: json['submission_details'] is Map
+          ? CertificationSubmissionDetails.fromJson(Map<String, dynamic>.from(json['submission_details'] as Map))
           : null,
       timeline: stages,
       aiValidation: checks,
@@ -2190,6 +2515,7 @@ class CertificationApplicationDetail {
       scores: scores,
       sectionScores: sectionScores,
       answers: answers,
+      rawJson: json,
     );
   }
 }

@@ -1991,24 +1991,40 @@ class _CertificationDetailsScreenState
       height: 48,
       child: ElevatedButton.icon(
         onPressed: () {
-          final certItem = widget.certificateItem ??
-              CertificateApplicationItem(
-                id: detail.id.toString(),
-                institutionName: detail.institution?.name ?? '',
-                institutionType: detail.institution?.category ?? '',
-                certificateId: detail.applicationNo,
-                applicationNo: detail.applicationNo,
-                issuedDate: detail.submittedAt ?? '',
-                expiresDate: '',
-                status: detail.status,
-                reviewStatus: detail.reviewStatus,
-                displayStatus: detail.displayStatus,
-                score: widget.certificateItem?.score ?? '',
-                canRenew: true,
-                address: detail.institution?.address ?? '',
-                city: detail.institution?.city ?? '',
-                pincode: detail.institution?.pincode ?? '',
-              );
+          final baseItem = widget.certificateItem;
+          final inst = detail.institution;
+          final certItem = CertificateApplicationItem(
+            id: detail.id.toString(),
+            institutionName: (inst != null && inst.name.isNotEmpty)
+                ? inst.name
+                : (baseItem?.institutionName ?? ''),
+            institutionType: (inst != null && inst.category.isNotEmpty)
+                ? inst.category
+                : (baseItem?.institutionType ?? ''),
+            certificateId: detail.applicationNo.isNotEmpty
+                ? detail.applicationNo
+                : (baseItem?.certificateId ?? ''),
+            applicationNo: detail.applicationNo.isNotEmpty
+                ? detail.applicationNo
+                : (baseItem?.applicationNo ?? ''),
+            issuedDate: detail.submittedAt ?? (baseItem?.issuedDate ?? ''),
+            expiresDate: baseItem?.expiresDate ?? '',
+            status: detail.status,
+            reviewStatus: detail.reviewStatus,
+            displayStatus: detail.displayStatus,
+            score: baseItem?.score ?? (detail.scores != null ? '${detail.scores!.total}/${detail.scores!.max}' : ''),
+            canRenew: true,
+            address: (inst != null && inst.address.isNotEmpty)
+                ? inst.address
+                : (baseItem?.address ?? ''),
+            city: (inst != null && inst.city.isNotEmpty)
+                ? inst.city
+                : (baseItem?.city ?? ''),
+            pincode: (inst != null && inst.pincode.isNotEmpty)
+                ? inst.pincode
+                : (baseItem?.pincode ?? ''),
+            rawJson: detail.rawJson ?? baseItem?.rawJson,
+          );
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => RenewalWizardScreen(certificate: certItem),
