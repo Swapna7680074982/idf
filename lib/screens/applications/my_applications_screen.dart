@@ -46,6 +46,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   String _selectedCertFilter = 'All';
   final List<String> _certFilters = [
     'All',
+    'AI Audit',
     'Manual Review',
     'Approved',
     'Rejected',
@@ -188,7 +189,18 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         final stat = item.status.toLowerCase();
         final rev = item.reviewStatus.toLowerCase();
         final disp = item.displayReviewStatus.toLowerCase();
-        if (filter == 'manual review' || filter == 'manual_review') {
+        if (filter == 'ai audit' ||
+            filter == 'ai_audit' ||
+            filter == 'ai audit in progress' ||
+            filter == 'ai_audit_in_progress') {
+          final isAi = item.isAiAudit ||
+              stat.contains('ai audit') ||
+              stat == 'ai_audit' ||
+              rev == 'ai_audit' ||
+              disp.contains('ai audit');
+          if (!isAi) return false;
+        } else if (filter == 'manual review' || filter == 'manual_review') {
+          if (item.isAiAudit) return false;
           final isManual = stat == 'manual review' ||
               stat == 'manual_review' ||
               stat == 'submitted' ||
@@ -198,7 +210,6 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
               stat == 'pending' ||
               rev == 'manual_review' ||
               rev == 'manual review' ||
-              rev == 'ai_audit' ||
               disp.contains('review') ||
               disp.contains('submitted');
           if (!isManual) return false;
@@ -1078,6 +1089,11 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
       text = const Color(0xFF16A34A);
       border = const Color(0xFF86EFAC);
       displayLabel = 'Approved';
+    } else if (s.contains('ai audit') || s == 'ai_audit' || s == 'ai_audit_in_progress') {
+      bg = const Color(0xFFEFF6FF);
+      text = const Color(0xFF2563EB);
+      border = const Color(0xFF93C5FD);
+      displayLabel = 'AI Audit In Progress';
     } else if (s == 'renew in progress' || s == 'renew_in_progress' || s.contains('progress')) {
       bg = const Color(0xFFEFF6FF);
       text = const Color(0xFF2563EB);
@@ -1087,8 +1103,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         s.contains('review') ||
         s == 'pending' ||
         s == 'under_review' ||
-        s == 'submitted' ||
-        s == 'ai_audit') {
+        s == 'submitted') {
       bg = const Color(0xFFFEF3C7);
       text = const Color(0xFFB45309);
       border = const Color(0xFFFDE68A);

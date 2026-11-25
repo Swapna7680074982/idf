@@ -257,6 +257,11 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
       text = const Color(0xFF16A34A);
       border = const Color(0xFF86EFAC);
       displayLabel = 'Approved';
+    } else if (s.contains('ai audit') || s == 'ai_audit' || s == 'ai_audit_in_progress') {
+      bg = const Color(0xFFEFF6FF);
+      text = const Color(0xFF2563EB);
+      border = const Color(0xFF93C5FD);
+      displayLabel = 'AI Audit In Progress';
     } else if (s == 'renew in progress' || s == 'renew_in_progress' || s.contains('progress')) {
       bg = const Color(0xFFEFF6FF);
       text = const Color(0xFF2563EB);
@@ -266,8 +271,7 @@ class _CertificationTabScreenState extends State<CertificationTabScreen> {
         s.contains('review') ||
         s == 'pending' ||
         s == 'under_review' ||
-        s == 'submitted' ||
-        s == 'ai_audit') {
+        s == 'submitted') {
       bg = const Color(0xFFFEF3C7);
       text = const Color(0xFFB45309);
       border = const Color(0xFFFDE68A);

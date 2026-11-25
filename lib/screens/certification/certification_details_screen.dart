@@ -2093,7 +2093,10 @@ class _CertificationDetailsScreenState
       case 'submitted':
         return 'Submitted';
       case 'ai_audit':
-        return 'AI Audit';
+      case 'ai audit':
+      case 'ai audit in progress':
+      case 'ai_audit_in_progress':
+        return 'AI Audit In Progress';
       case 'in review':
       case 'in_review':
       case 'under_review':

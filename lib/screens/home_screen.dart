@@ -1625,12 +1625,15 @@ class _HomeScreenState extends State<HomeScreen> {
       bg = const Color(0xFFDCFCE7);
       text = const Color(0xFF16A34A);
       border = const Color(0xFF86EFAC);
+    } else if (s.contains('ai audit') || s == 'ai_audit' || s == 'ai_audit_in_progress') {
+      bg = const Color(0xFFEFF6FF);
+      text = const Color(0xFF2563EB);
+      border = const Color(0xFF93C5FD);
     } else if (s.contains('manual') ||
         s.contains('review') ||
         s == 'pending' ||
         s == 'under_review' ||
-        s == 'submitted' ||
-        s == 'ai_audit') {
+        s == 'submitted') {
       bg = const Color(0xFFFEF3C7);
       text = const Color(0xFFB45309);
       border = const Color(0xFFFDE68A);
@@ -1644,9 +1647,11 @@ class _HomeScreenState extends State<HomeScreen> {
       border = const Color(0xFFFCA5A5);
     }
 
-    final displayLabel = (s == 'submitted' || s == 'ai_audit' || s == 'under_review' || s == 'manual_review')
-        ? 'Manual Review'
-        : status;
+    final displayLabel = (s.contains('ai audit') || s == 'ai_audit' || s == 'ai_audit_in_progress')
+        ? 'AI Audit In Progress'
+        : (s == 'submitted' || s == 'under_review' || s == 'manual_review')
+            ? 'Manual Review'
+            : status;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),

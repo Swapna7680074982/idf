@@ -272,8 +272,26 @@ class CertificateApplicationItem {
             renewalApplicationId != 'null');
   }
 
+  bool get isAiAudit {
+    final s = status.trim().toLowerCase();
+    final d = displayStatus.trim().toLowerCase();
+    final r = reviewStatus.trim().toLowerCase();
+    return s == 'ai audit in progress' ||
+        s == 'ai_audit_in_progress' ||
+        s == 'ai_audit' ||
+        s == 'ai audit' ||
+        d == 'ai audit in progress' ||
+        d == 'ai_audit_in_progress' ||
+        d == 'ai_audit' ||
+        d == 'ai audit' ||
+        r == 'ai_audit' ||
+        r == 'ai audit' ||
+        r == 'ai audit in progress' ||
+        r == 'ai_audit_in_progress';
+  }
+
   bool get isExpiredOrRenewable {
-    if (isRenewInProgress) return false;
+    if (isRenewInProgress || isAiAudit) return false;
     if (canRenew || isExpiredStatus) return true;
     final s = status.trim().toLowerCase();
     final d = displayStatus.trim().toLowerCase();
@@ -290,7 +308,7 @@ class CertificateApplicationItem {
   }
 
   bool get isApproved {
-    if (isExpiredOrRenewable || isRenewInProgress) return false;
+    if (isExpiredOrRenewable || isRenewInProgress || isAiAudit) return false;
     final s = status.trim().toLowerCase();
     final d = displayStatus.trim().toLowerCase();
     final r = reviewStatus.trim().toLowerCase();
@@ -314,6 +332,12 @@ class CertificateApplicationItem {
       }
       return 'Expired';
     }
+    if (isAiAudit) {
+      return 'AI Audit In Progress';
+    }
+    if (displayStatus.isNotEmpty && displayStatus.toLowerCase() != 'null') {
+      return formatReviewStatus(displayStatus);
+    }
     if (reviewStatus.isNotEmpty) {
       return formatReviewStatus(reviewStatus);
     }
@@ -325,13 +349,18 @@ class CertificateApplicationItem {
     if (lower == 'renew in progress' || lower == 'renew_in_progress') {
       return 'Renew in Progress';
     }
+    if (lower == 'ai_audit' ||
+        lower == 'ai audit' ||
+        lower == 'ai audit in progress' ||
+        lower == 'ai_audit_in_progress') {
+      return 'AI Audit In Progress';
+    }
     if (lower == 'manual_review' ||
         lower == 'manual review' ||
         lower == 'under_review' ||
         lower == 'in review' ||
         lower == 'in_review' ||
-        lower == 'submitted' ||
-        lower == 'ai_audit') {
+        lower == 'submitted') {
       return 'Manual Review';
     }
     if (lower == 'approved' || lower == 'certified' || lower == 'active') return 'Approved';
@@ -350,9 +379,9 @@ class CertificateApplicationItem {
     final rawCertId = json['certificate_no'] ?? json['certificate_code'] ?? json['certificate_number'] ?? json['certificate_id'];
     final certIdStr = (rawCertId != null && rawCertId.toString() != 'null') ? rawCertId.toString().trim() : '';
     final appNoStr = (json['application_no'] ?? json['application_id'] ?? json['id'] ?? '').toString().trim();
-    final revStatus = (json['review_status'] ?? json['reviewStatus'] ?? '').toString().trim();
-    final dispStatus = (json['display_status'] ?? json['displayStatus'] ?? '').toString().trim();
-    final rawStatus = (json['status'] ?? 'Submitted').toString().trim();
+    final revStatus = (json['review_status'] ?? json['reviewStatus'] ?? json['application_status'] ?? '').toString().trim();
+    final dispStatus = (json['display_status'] ?? json['displayStatus'] ?? json['current_status'] ?? '').toString().trim();
+    final rawStatus = (json['status'] ?? json['application_status'] ?? 'Submitted').toString().trim();
     final reason = json['rejection_reason']?.toString() ??
         json['reason']?.toString() ??
         json['reviewer_comment']?.toString() ??
