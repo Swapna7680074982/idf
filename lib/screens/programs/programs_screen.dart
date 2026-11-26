@@ -1263,7 +1263,7 @@ class _ProgramAttendeesBottomSheetState extends State<_ProgramAttendeesBottomShe
                         : ListView.separated(
                             padding: const EdgeInsets.all(16),
                             itemCount: attendees.length,
-                            separatorBuilder: (_, __) => const Divider(height: 18, color: Color(0xFFF1F5F9)),
+                            separatorBuilder: (context, index) => const Divider(height: 18, color: Color(0xFFF1F5F9)),
                             itemBuilder: (_, index) => _buildAttendeeRow(attendees[index]),
                           ),
           ),
@@ -1297,7 +1297,7 @@ class _ProgramAttendeesBottomSheetState extends State<_ProgramAttendeesBottomShe
                     width: 38,
                     height: 38,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Center(
+                    errorBuilder: (context, error, stackTrace) => Center(
                       child: Text(
                         initials,
                         style: GoogleFonts.inter(
@@ -1373,13 +1373,29 @@ class _ProgramAttendeesBottomSheetState extends State<_ProgramAttendeesBottomShe
                   ),
                 ),
               ],
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  if (att.email.isNotEmpty) ...[
+              if (att.phone != null && att.phone!.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    const Icon(Icons.phone_outlined, size: 12, color: Color(0xFF94A3B8)),
+                    const SizedBox(width: 4),
+                    Text(
+                      att.phone!,
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (att.email.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Row(
+                  children: [
                     const Icon(Icons.mail_outline_rounded, size: 12, color: Color(0xFF94A3B8)),
-                    const SizedBox(width: 3),
-                    Flexible(
+                    const SizedBox(width: 4),
+                    Expanded(
                       child: Text(
                         att.email,
                         maxLines: 1,
@@ -1391,24 +1407,8 @@ class _ProgramAttendeesBottomSheetState extends State<_ProgramAttendeesBottomShe
                       ),
                     ),
                   ],
-                  if (att.email.isNotEmpty && att.phone != null && att.phone!.isNotEmpty) ...[
-                    const SizedBox(width: 6),
-                    const Text('•', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 10)),
-                    const SizedBox(width: 6),
-                  ],
-                  if (att.phone != null && att.phone!.isNotEmpty) ...[
-                    const Icon(Icons.phone_outlined, size: 12, color: Color(0xFF94A3B8)),
-                    const SizedBox(width: 3),
-                    Text(
-                      att.phone!,
-                      style: GoogleFonts.inter(
-                        fontSize: 11,
-                        color: const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+                ),
+              ],
               if (att.registeredAt != null && att.registeredAt!.isNotEmpty) ...[
                 const SizedBox(height: 2),
                 Text(

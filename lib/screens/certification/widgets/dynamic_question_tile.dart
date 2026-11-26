@@ -617,7 +617,7 @@ class _DynamicQuestionTileState extends State<DynamicQuestionTile> {
         }
       }
 
-      // If value was boolean true, string 'true' / 'yes', or empty for mandatory multi-option questions
+      // If value was explicitly passed as boolean true or string 'true' / 'yes' on an existing saved record
       final isTwoActivitiesQuestion = widget.question.id == 12 ||
           widget.question.id == 9 ||
           widget.question.text.toLowerCase().contains('two activities') ||
@@ -628,10 +628,9 @@ class _DynamicQuestionTileState extends State<DynamicQuestionTile> {
         if (widget.value == true ||
             widget.value == 'true' ||
             widget.value == 'yes' ||
-            isTwoActivitiesQuestion ||
             (selectedKeys.isNotEmpty &&
                 (selectedKeys.first.toLowerCase() == 'true' || selectedKeys.first.toLowerCase() == 'yes'))) {
-          // Pre-fill default options (first 2 options for Question 9/12, or options)
+          // Pre-fill default options only if an explicit true/yes answer exists on record
           selectedKeys = options.take(2).map((o) => o.id.toString()).toList();
         }
       }
