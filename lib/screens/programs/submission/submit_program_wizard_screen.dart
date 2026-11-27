@@ -18,7 +18,14 @@ import '../../../services/api_config.dart';
 import '../../../services/programs_service.dart';
 
 class SubmitProgramWizardScreen extends StatefulWidget {
-  const SubmitProgramWizardScreen({super.key});
+  final ProgramSubmissionModel? initialModel;
+  final String? applicationId;
+
+  const SubmitProgramWizardScreen({
+    super.key,
+    this.initialModel,
+    this.applicationId,
+  });
 
   @override
   State<SubmitProgramWizardScreen> createState() => _SubmitProgramWizardScreenState();
@@ -27,7 +34,7 @@ class SubmitProgramWizardScreen extends StatefulWidget {
 class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
   int _currentStep = 1;
   final int _totalSteps = 7;
-  final ProgramSubmissionModel _submissionModel = ProgramSubmissionModel();
+  late final ProgramSubmissionModel _submissionModel;
   bool _isSubmitting = false;
 
   final List<String> _stepTitles = [
@@ -43,6 +50,7 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
   @override
   void initState() {
     super.initState();
+    _submissionModel = widget.initialModel?.copyWith() ?? ProgramSubmissionModel();
   }
 
   void _nextStep() {

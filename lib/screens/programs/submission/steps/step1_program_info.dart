@@ -339,7 +339,8 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
 
   @override
   Widget build(BuildContext context) {
-    final hasBanner = widget.model.bannerPath != null && widget.model.bannerPath!.isNotEmpty;
+    final hasBanner = (widget.model.bannerPath != null && widget.model.bannerPath!.isNotEmpty) ||
+        (widget.model.bannerUrl != null && widget.model.bannerUrl!.isNotEmpty);
 
     return Form(
       key: _formKey,
@@ -571,6 +572,17 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
                                 File(widget.model.bannerPath!),
                                 fit: BoxFit.cover,
                               )
+                            : (widget.model.bannerUrl != null && widget.model.bannerUrl!.isNotEmpty)
+                                ? Image.network(
+                                    widget.model.bannerUrl!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Container(
+                                      color: const Color(0xFF00377B),
+                                      child: const Center(
+                                        child: Icon(Icons.image, color: Colors.white, size: 40),
+                                      ),
+                                    ),
+                                  )
                             : Container(
                                 color: const Color(0xFF006097),
                                 child: const Center(

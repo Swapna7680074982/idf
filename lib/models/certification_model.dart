@@ -964,6 +964,31 @@ class CertificationApplicationModel {
         questionAnswers = questionAnswers ?? {},
         evidenceItems = evidenceItems ?? [];
 
+  /// Clears answers, custom details, and evidence when the user switches categories
+  void clearCategoryAnswers() {
+    questionAnswers.clear();
+    detailFieldValues.clear();
+    evidenceItems.clear();
+    numberOfRooms = '';
+    distanceFromMainRoad = '';
+    parkingAvailability = '';
+    hasSafeExerciseArea = null;
+    hasStandingDesks = null;
+    hasDedicatedWalkingTrail = null;
+    hasCycleStands = null;
+    hasPaPromotionSignage = null;
+    hasAnnualHealthChecks = null;
+    sportsEventsCount = '';
+    hasFormalPaPolicy = null;
+    hasStructuredErgonomicBreaks = null;
+    hasPaChampions = null;
+    memberParticipationPercentage = '';
+    hasActivePlayIntegrated = null;
+    hasExternalPartnerships = null;
+    advocacyActivitiesDescription = '';
+    receivesSponsorship = null;
+  }
+
   /// Safely gets a boolean answer by int or string question id
   bool? getQuestionBool(dynamic questionId) {
     if (questionId == null) return null;
@@ -1123,6 +1148,12 @@ class CertificationApplicationModel {
         if (base.address.isEmpty && item.address.isNotEmpty) {
           base.address = item.address;
         }
+        if (base.country.isEmpty && item.country.isNotEmpty) {
+          base.country = item.country;
+        }
+        if (base.regionState.isEmpty && item.region.isNotEmpty) {
+          base.regionState = item.region;
+        }
         if (base.city.isEmpty && item.city.isNotEmpty) {
           base.city = item.city;
         }
@@ -1157,6 +1188,8 @@ class CertificationApplicationModel {
       submissionDate: DateTime.tryParse(item.issuedDate),
       status: item.status,
       address: item.address,
+      country: item.country,
+      regionState: item.region,
       city: item.city,
       pincode: item.pincode,
     );
@@ -2262,11 +2295,11 @@ class CertificationInstitution {
       category: json['category']?.toString() ?? '',
       address: json['address']?.toString() ?? '',
       countryId: json['country_id'] is int ? json['country_id'] as int : int.tryParse(json['country_id']?.toString() ?? ''),
-      country: json['country']?.toString() ?? '',
+      country: (json['country'] ?? json['country_text'] ?? '').toString(),
       regionId: json['region_id'] is int ? json['region_id'] as int : int.tryParse(json['region_id']?.toString() ?? ''),
-      region: json['region']?.toString() ?? '',
+      region: (json['region'] ?? json['region_text'] ?? json['region_state'] ?? json['state'] ?? '').toString(),
       cityId: json['city_id'] is int ? json['city_id'] as int : int.tryParse(json['city_id']?.toString() ?? ''),
-      city: json['city']?.toString() ?? '',
+      city: (json['city'] ?? json['city_text'] ?? '').toString(),
       pincode: json['pincode']?.toString() ??
           json['postal_code']?.toString() ??
           json['zip_code']?.toString() ??
@@ -2591,7 +2624,11 @@ class CertificationApplicationDetail {
           ? CertificationInstitution.fromJson(Map<String, dynamic>.from(json['institution'] as Map))
           : (json['organization'] is Map
               ? CertificationInstitution.fromJson(Map<String, dynamic>.from(json['organization'] as Map))
-              : null),
+              : (json['application'] is Map && (json['application'] as Map)['institution'] is Map
+                  ? CertificationInstitution.fromJson(Map<String, dynamic>.from((json['application'] as Map)['institution'] as Map))
+                  : (json['details'] is Map
+                      ? CertificationInstitution.fromJson(Map<String, dynamic>.from(json['details'] as Map))
+                      : null))),
       submissionDetails: json['submission_details'] is Map
           ? CertificationSubmissionDetails.fromJson(Map<String, dynamic>.from(json['submission_details'] as Map))
           : null,

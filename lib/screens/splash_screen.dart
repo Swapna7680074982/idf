@@ -10,7 +10,9 @@ import '../services/auth_service.dart';
 import '../services/firebase_service.dart';
 import '../services/token_storage.dart';
 import '../widgets/dr_mohans_logo.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'home_screen.dart';
+import 'onboarding/onboarding_screen.dart';
 import 'welcome_screen.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -77,10 +79,26 @@ class _SplashScreenState extends State<SplashScreen> {
     await minSplashDuration;
     if (!mounted) return;
 
-    final targetScreen = shouldNavigateToHome ? const HomeScreen() : const WelcomeScreen();
+    bool hasSeenOnboarding = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      hasSeenOnboarding = prefs.getBool('has_seen_onboarding') ?? false;
+    } catch (_) {}
+
+    final Widget targetScreen;
+    if (!hasSeenOnboarding) {
+      targetScreen = OnboardingScreen(isAuthenticated: shouldNavigateToHome);
+    } else if (shouldNavigateToHome) {
+      targetScreen = const HomeScreen();
+    } else {
+      targetScreen = const WelcomeScreen();
+    }
+
     if (shouldNavigateToHome) {
       FirebaseService.syncTokenWithBackend();
     }
+
+    if (!mounted) return;
 
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(

@@ -52,14 +52,14 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
           // If current selection is invalid or empty, pick the first
           final exists = _categories.any((c) => c.id == _selectedId || (c.categoryId != null && c.categoryId == widget.model.categoryId));
           if (!exists && _categories.isNotEmpty) {
-            _selectType(_categories.first);
+            _selectType(_categories.first, isInitial: true);
           } else {
             // Re-apply current selection to sync scores/titles
             final current = _categories.firstWhere(
               (c) => c.id == _selectedId || (c.categoryId != null && c.categoryId == widget.model.categoryId),
               orElse: () => _categories.first,
             );
-            _selectType(current);
+            _selectType(current, isInitial: true);
           }
         });
       }
@@ -73,7 +73,17 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
     }
   }
 
-  void _selectType(InstitutionTypeInfo type) {
+  void _selectType(InstitutionTypeInfo type, {bool isInitial = false}) {
+    if (!isInitial) {
+      final bool isDifferent = (_selectedId.isNotEmpty && _selectedId != type.id) ||
+          (widget.model.categoryId != null &&
+              type.categoryId != null &&
+              widget.model.categoryId != type.categoryId);
+      if (isDifferent) {
+        widget.model.clearCategoryAnswers();
+      }
+    }
+
     setState(() {
       _selectedId = type.id;
       widget.model.institutionTypeId = type.id;
@@ -105,6 +115,12 @@ class _Step1InstitutionTypeState extends State<Step1InstitutionType> {
     );
 
     final catId = currentType.categoryId ?? widget.model.categoryId ?? 1;
+
+    // If category changed from previously loaded config, clear previous category answers
+    if (widget.model.categoryConfig != null &&
+        widget.model.categoryConfig!.category.id != catId) {
+      widget.model.clearCategoryAnswers();
+    }
 
     setState(() {
       _isFetchingConfig = true;

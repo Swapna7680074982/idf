@@ -531,6 +531,10 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildHeroBanner(),
             const SizedBox(height: 20),
 
+            // Explore Initiatives (Programs & IDF Activate Certification Info)
+            _buildExploreInitiativesSection(),
+            const SizedBox(height: 20),
+
             // Quick Actions
             Text(
               'Quick Actions',
@@ -610,10 +614,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 12),
             _buildMyApplicationsCard(state),
-            const SizedBox(height: 20),
-
-            // Explore Initiatives (Programs & IDF Activate Certification Info)
-            _buildExploreInitiativesSection(),
             const SizedBox(height: 16),
           ],
         ),
@@ -999,7 +999,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Community Programs',
+                            'Join Programs',
                             style: GoogleFonts.inter(
                               fontSize: 14.5,
                               fontWeight: FontWeight.w700,

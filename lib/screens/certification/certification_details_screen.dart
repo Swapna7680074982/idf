@@ -317,6 +317,7 @@ class _CertificationDetailsScreenState
   Widget _buildContentView() {
     final detail = _detail!;
     final inst = detail.institution;
+    // ignore: unused_local_variable
     final isRejected = detail.status.toLowerCase().contains('reject') ||
         detail.displayStatus.toLowerCase().contains('reject') ||
         detail.reviewStatus.toLowerCase().contains('reject') ||
@@ -374,15 +375,18 @@ class _CertificationDetailsScreenState
               const SizedBox(height: 14),
             ],
 
-            // 7. Actions (Renew if renewable, Edit Application if editable/changes required)
+            // 7. Actions (Renew if renewable, Resubmit if rejected, Edit Application if editable/changes required)
             if (isRenewable) ...[
               _buildRenewButton(detail),
               const SizedBox(height: 20),
-            ] else if (!isRejected &&
-                (detail.editable ||
-                    detail.status.toLowerCase().contains('change') ||
-                    detail.displayStatus.toLowerCase().contains('change') ||
-                    detail.reviewStatus.toLowerCase().contains('change'))) ...[
+            // Commented out edit & resubmit button for now as requested
+            // ] else if (isRejected) ...[
+            //   _buildResubmitButton(detail),
+            //   const SizedBox(height: 20),
+            ] else if (detail.editable ||
+                detail.status.toLowerCase().contains('change') ||
+                detail.displayStatus.toLowerCase().contains('change') ||
+                detail.reviewStatus.toLowerCase().contains('change')) ...[
               _buildActionButtons(detail),
               const SizedBox(height: 20),
             ],
@@ -568,8 +572,13 @@ class _CertificationDetailsScreenState
           _buildInfoRow('Institution Name', inst.name),
           _buildInfoRow('Category', inst.category),
           _buildInfoRow('Address', inst.address),
-          _buildInfoRow('Location', [inst.city, inst.region, inst.country].where((s) => s.isNotEmpty && s != '—').join(', ')),
-          if (inst.pincode.isNotEmpty)
+          if (inst.country.isNotEmpty && inst.country != '—')
+            _buildInfoRow('Country', inst.country),
+          if (inst.region.isNotEmpty && inst.region != '—')
+            _buildInfoRow('Region / State', inst.region),
+          if (inst.city.isNotEmpty && inst.city != '—')
+            _buildInfoRow('City', inst.city),
+          if (inst.pincode.isNotEmpty && inst.pincode != '—')
             _buildInfoRow('Pincode / Postal Code', inst.pincode),
           if (inst.contactPerson.isNotEmpty)
             _buildInfoRow('Contact Person', inst.contactPerson),
@@ -1929,10 +1938,131 @@ class _CertificationDetailsScreenState
                     height: 1.35,
                   ),
                 ),
+                // Commented out edit & resubmit button for now as requested
+                // if (isRejected) ...[
+                //   const SizedBox(height: 10),
+                //   SizedBox(
+                //     width: double.infinity,
+                //     height: 38,
+                //     child: OutlinedButton.icon(
+                //       onPressed: () {
+                //         final appId = detail.applicationId.isNotEmpty
+                //             ? detail.applicationId
+                //             : (detail.id > 0 ? detail.id.toString() : detail.applicationNo);
+                //         Navigator.of(context).push(
+                //           MaterialPageRoute(
+                //             builder: (_) => CertificationWizardScreen(
+                //               applicationId: appId,
+                //               initialModel: CertificationApplicationModel(
+                //                 id: detail.id,
+                //                 applicationId: detail.applicationId,
+                //                 applicationNo: detail.applicationNo,
+                //                 institutionName: detail.institution?.name ?? '',
+                //                 institutionTypeTitle: detail.institution?.category ?? '',
+                //                 address: (detail.institution?.address != null && detail.institution!.address.isNotEmpty)
+                //                     ? detail.institution!.address
+                //                     : (widget.certificateItem?.address ?? ''),
+                //                 country: (detail.institution?.country != null && detail.institution!.country.isNotEmpty)
+                //                     ? detail.institution!.country
+                //                     : (widget.certificateItem?.country ?? ''),
+                //                 regionState: (detail.institution?.region != null && detail.institution!.region.isNotEmpty)
+                //                     ? detail.institution!.region
+                //                     : (widget.certificateItem?.region ?? ''),
+                //                 city: (detail.institution?.city != null && detail.institution!.city.isNotEmpty)
+                //                     ? detail.institution!.city
+                //                     : (widget.certificateItem?.city ?? ''),
+                //                 pincode: (detail.institution?.pincode != null && detail.institution!.pincode.isNotEmpty)
+                //                     ? detail.institution!.pincode
+                //                     : (widget.certificateItem?.pincode ?? ''),
+                //                 contactPerson: detail.institution?.contactPerson ?? '',
+                //                 contactEmail: detail.institution?.contactEmail ?? '',
+                //                 contactPhone: detail.institution?.contactPhone ?? '',
+                //                 status: detail.status,
+                //               ),
+                //             ),
+                //           ),
+                //         ).then((_) => _fetchApplicationDetail());
+                //       },
+                //       icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFFDC2626)),
+                //       label: Text(
+                //         'Edit & Resubmit Application',
+                //         style: GoogleFonts.inter(
+                //           fontSize: 13,
+                //           fontWeight: FontWeight.w700,
+                //           color: const Color(0xFFDC2626),
+                //         ),
+                //       ),
+                //       style: OutlinedButton.styleFrom(
+                //         side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.2),
+                //         backgroundColor: Colors.white,
+                //         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                //       ),
+                //     ),
+                //   ),
+                // ],
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // ignore: unused_element
+  Widget _buildResubmitButton(CertificationApplicationDetail detail) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton.icon(
+        onPressed: () {
+          final appId = detail.applicationId.isNotEmpty
+              ? detail.applicationId
+              : (detail.id > 0 ? detail.id.toString() : detail.applicationNo);
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => CertificationWizardScreen(
+                applicationId: appId,
+                initialModel: CertificationApplicationModel(
+                  id: detail.id,
+                  applicationId: detail.applicationId,
+                  applicationNo: detail.applicationNo,
+                  institutionName: detail.institution?.name ?? '',
+                  institutionTypeTitle: detail.institution?.category ?? '',
+                  address: (detail.institution?.address != null && detail.institution!.address.isNotEmpty)
+                      ? detail.institution!.address
+                      : (widget.certificateItem?.address ?? ''),
+                  country: (detail.institution?.country != null && detail.institution!.country.isNotEmpty)
+                      ? detail.institution!.country
+                      : (widget.certificateItem?.country ?? ''),
+                  regionState: (detail.institution?.region != null && detail.institution!.region.isNotEmpty)
+                      ? detail.institution!.region
+                      : (widget.certificateItem?.region ?? ''),
+                  city: (detail.institution?.city != null && detail.institution!.city.isNotEmpty)
+                      ? detail.institution!.city
+                      : (widget.certificateItem?.city ?? ''),
+                  pincode: (detail.institution?.pincode != null && detail.institution!.pincode.isNotEmpty)
+                      ? detail.institution!.pincode
+                      : (widget.certificateItem?.pincode ?? ''),
+                  contactPerson: detail.institution?.contactPerson ?? '',
+                  contactEmail: detail.institution?.contactEmail ?? '',
+                  contactPhone: detail.institution?.contactPhone ?? '',
+                  status: detail.status,
+                ),
+              ),
+            ),
+          ).then((_) => _fetchApplicationDetail());
+        },
+        icon: const Icon(Icons.refresh_rounded, size: 20),
+        label: Text(
+          'Edit & Resubmit Application',
+          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryBlue,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 1,
+        ),
       ),
     );
   }
@@ -1957,11 +2087,21 @@ class _CertificationDetailsScreenState
                   applicationNo: detail.applicationNo,
                   institutionName: detail.institution?.name ?? '',
                   institutionTypeTitle: detail.institution?.category ?? '',
-                  address: detail.institution?.address ?? '',
-                  country: detail.institution?.country ?? '',
-                  regionState: detail.institution?.region ?? '',
-                  city: detail.institution?.city ?? '',
-                  pincode: detail.institution?.pincode ?? '',
+                  address: (detail.institution?.address != null && detail.institution!.address.isNotEmpty)
+                      ? detail.institution!.address
+                      : (widget.certificateItem?.address ?? ''),
+                  country: (detail.institution?.country != null && detail.institution!.country.isNotEmpty)
+                      ? detail.institution!.country
+                      : (widget.certificateItem?.country ?? ''),
+                  regionState: (detail.institution?.region != null && detail.institution!.region.isNotEmpty)
+                      ? detail.institution!.region
+                      : (widget.certificateItem?.region ?? ''),
+                  city: (detail.institution?.city != null && detail.institution!.city.isNotEmpty)
+                      ? detail.institution!.city
+                      : (widget.certificateItem?.city ?? ''),
+                  pincode: (detail.institution?.pincode != null && detail.institution!.pincode.isNotEmpty)
+                      ? detail.institution!.pincode
+                      : (widget.certificateItem?.pincode ?? ''),
                   contactPerson: detail.institution?.contactPerson ?? '',
                   contactEmail: detail.institution?.contactEmail ?? '',
                   contactPhone: detail.institution?.contactPhone ?? '',
@@ -2017,6 +2157,12 @@ class _CertificationDetailsScreenState
             address: (inst != null && inst.address.isNotEmpty)
                 ? inst.address
                 : (baseItem?.address ?? ''),
+            country: (inst != null && inst.country.isNotEmpty)
+                ? inst.country
+                : (baseItem?.country ?? ''),
+            region: (inst != null && inst.region.isNotEmpty)
+                ? inst.region
+                : (baseItem?.region ?? ''),
             city: (inst != null && inst.city.isNotEmpty)
                 ? inst.city
                 : (baseItem?.city ?? ''),

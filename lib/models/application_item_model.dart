@@ -22,6 +22,13 @@ class ProgramApplicationItem {
   final String? contactPerson;
   final String? contactPhone;
   final String? contactEmail;
+  final String country;
+  final int? countryId;
+  final String region;
+  final int? regionId;
+  final String city;
+  final int? cityId;
+  final String pincode;
   final List<String> supportingMaterials;
   final List<Map<String, dynamic>> materials;
   final List<Map<String, dynamic>> agenda;
@@ -46,18 +53,35 @@ class ProgramApplicationItem {
     this.contactPerson,
     this.contactPhone,
     this.contactEmail,
+    this.country = '',
+    this.countryId,
+    this.region = '',
+    this.regionId,
+    this.city = '',
+    this.cityId,
+    this.pincode = '',
     this.supportingMaterials = const [],
     this.materials = const [],
     this.agenda = const [],
   });
 
   factory ProgramApplicationItem.fromJson(Map<String, dynamic> json) {
-    final rawMaterials = json['materials'] is List
-        ? (json['materials'] as List).whereType<Map<String, dynamic>>().toList()
-        : <Map<String, dynamic>>[];
-    final rawAgenda = json['agenda'] is List
-        ? (json['agenda'] as List).whereType<Map<String, dynamic>>().toList()
-        : <Map<String, dynamic>>[];
+    final rawMaterials = <Map<String, dynamic>>[];
+    final dynamic matSource = json['materials'] ?? json['supporting_material'] ?? json['supporting_materials'];
+    if (matSource is List) {
+      for (final m in matSource) {
+        if (m is Map) rawMaterials.add(Map<String, dynamic>.from(m));
+      }
+    }
+
+    final rawAgenda = <Map<String, dynamic>>[];
+    final dynamic agendaSource = json['program_agenda_schedule'] ?? json['agenda'] ?? json['schedule'];
+    if (agendaSource is List) {
+      for (final a in agendaSource) {
+        if (a is Map) rawAgenda.add(Map<String, dynamic>.from(a));
+      }
+    }
+
     final materialNames = rawMaterials
         .map((m) => (m['name'] ?? m['file_name'] ?? 'Document').toString())
         .toList();
@@ -67,6 +91,34 @@ class ProgramApplicationItem {
     String normalizedStatus = (decisionStr == 'rejected' || statusStr.toLowerCase() == 'rejected')
         ? 'Rejected'
         : _normalizeStatus(statusStr);
+
+    String parsedCountry = (json['country'] ?? json['country_text'] ?? '').toString();
+    int? parsedCountryId = json['country_id'] is int ? json['country_id'] as int : int.tryParse(json['country_id']?.toString() ?? '');
+    String parsedRegion = (json['region'] ?? json['region_text'] ?? json['state'] ?? '').toString();
+    int? parsedRegionId = json['region_id'] is int ? json['region_id'] as int : int.tryParse(json['region_id']?.toString() ?? '');
+    String parsedCity = (json['city_text'] ?? json['city'] ?? '').toString();
+    int? parsedCityId = json['city_id'] is int ? json['city_id'] as int : int.tryParse(json['city_id']?.toString() ?? '');
+    String parsedPincode = (json['pincode'] ?? json['postal_code'] ?? json['zip_code'] ?? '').toString();
+    final rawLocationStr = (json['location'] ?? json['city_text'] ?? json['city'] ?? '').toString();
+
+    // If city contains commas or country/region are empty, parse combined location parts
+    if (parsedCity.contains(',') || (rawLocationStr.contains(',') && (parsedCountry.isEmpty || parsedRegion.isEmpty))) {
+      final locToParse = parsedCity.contains(',') ? parsedCity : rawLocationStr;
+      final parts = locToParse.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      if (parts.length >= 4) {
+        if (parsedCity.isEmpty || parsedCity.contains(',')) parsedCity = parts[0];
+        if (parsedRegion.isEmpty) parsedRegion = parts[1];
+        if (parsedCountry.isEmpty) parsedCountry = parts[2];
+        if (parsedPincode.isEmpty) parsedPincode = parts[3];
+      } else if (parts.length == 3) {
+        if (parsedCity.isEmpty || parsedCity.contains(',')) parsedCity = parts[0];
+        if (parsedRegion.isEmpty) parsedRegion = parts[1];
+        if (parsedCountry.isEmpty) parsedCountry = parts[2];
+      } else if (parts.length == 2) {
+        if (parsedCity.isEmpty || parsedCity.contains(',')) parsedCity = parts[0];
+        if (parsedCountry.isEmpty) parsedCountry = parts[1];
+      }
+    }
 
     return ProgramApplicationItem(
       id: (json['id'] ?? '').toString(),
@@ -88,6 +140,13 @@ class ProgramApplicationItem {
       contactPerson: json['contact_person']?.toString(),
       contactPhone: json['phone']?.toString(),
       contactEmail: json['email']?.toString(),
+      country: parsedCountry,
+      countryId: parsedCountryId,
+      region: parsedRegion,
+      regionId: parsedRegionId,
+      city: parsedCity,
+      cityId: parsedCityId,
+      pincode: parsedPincode,
       supportingMaterials: materialNames,
       materials: rawMaterials,
       agenda: rawAgenda,
@@ -111,6 +170,8 @@ class ProgramApplicationItem {
       startDate: item.startDate ?? '',
       endDate: item.endDate ?? item.startDate,
       location: loc,
+      country: item.countryText ?? '',
+      city: item.cityText ?? '',
       organizer: item.organizerName,
       submittedDate: item.registeredAt ?? item.startDate ?? '',
       lastUpdatedDate: item.registeredAt ?? item.startDate ?? '',
@@ -151,6 +212,8 @@ class ProgramApplicationItem {
       endDate: model.endDate,
       location: model.location,
       venue: model.venue,
+      country: model.country,
+      city: model.city,
       organizer: model.organizer,
       submittedDate: model.startDate,
       lastUpdatedDate: model.startDate,
@@ -214,6 +277,8 @@ class CertificateApplicationItem {
   final String? certificateRecordId;
   final String? renewalApplicationId;
   final String address;
+  final String region;
+  final String country;
   final String city;
   final String pincode;
   final Map<String, dynamic>? rawJson;
@@ -237,6 +302,8 @@ class CertificateApplicationItem {
     this.certificateRecordId,
     this.renewalApplicationId,
     this.address = '',
+    this.region = '',
+    this.country = '',
     this.city = '',
     this.pincode = '',
     this.rawJson,
@@ -410,6 +477,28 @@ class CertificateApplicationItem {
     final instMap = json['institution'] is Map ? json['institution'] as Map : null;
     final detailsMap = json['details'] is Map ? json['details'] as Map : null;
     final rawAddress = (json['address'] ?? instMap?['address'] ?? detailsMap?['address'] ?? '').toString();
+    final rawRegion = (json['region'] ??
+            json['region_text'] ??
+            json['region_state'] ??
+            json['state'] ??
+            instMap?['region'] ??
+            instMap?['region_text'] ??
+            instMap?['region_state'] ??
+            instMap?['state'] ??
+            detailsMap?['region'] ??
+            detailsMap?['region_text'] ??
+            detailsMap?['region_state'] ??
+            detailsMap?['state'] ??
+            '')
+        .toString();
+    final rawCountry = (json['country'] ??
+            json['country_text'] ??
+            instMap?['country'] ??
+            instMap?['country_text'] ??
+            detailsMap?['country'] ??
+            detailsMap?['country_text'] ??
+            '')
+        .toString();
     final rawCity = (json['city'] ?? instMap?['city'] ?? detailsMap?['city'] ?? '').toString();
     final rawPincode = (json['pincode'] ??
             json['postal_code'] ??
@@ -448,6 +537,8 @@ class CertificateApplicationItem {
       certificateRecordId: certRecordIdStr,
       renewalApplicationId: renewalAppIdStr,
       address: rawAddress,
+      region: rawRegion,
+      country: rawCountry,
       city: rawCity,
       pincode: rawPincode,
       rawJson: json,

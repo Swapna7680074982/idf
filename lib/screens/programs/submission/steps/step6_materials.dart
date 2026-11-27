@@ -420,7 +420,8 @@ class _Step6MaterialsState extends State<Step6Materials> {
 
   @override
   Widget build(BuildContext context) {
-    final hasBanner = widget.model.bannerPath != null && widget.model.bannerPath!.isNotEmpty;
+    final hasBanner = (widget.model.bannerPath != null && widget.model.bannerPath!.isNotEmpty) ||
+        (widget.model.bannerUrl != null && widget.model.bannerUrl!.isNotEmpty);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -522,12 +523,23 @@ class _Step6MaterialsState extends State<Step6Materials> {
                       child: widget.model.bannerPath != null &&
                               File(widget.model.bannerPath!).existsSync()
                           ? Image.file(File(widget.model.bannerPath!), fit: BoxFit.cover)
-                          : Container(
-                              color: const Color(0xFF006097),
-                              child: const Center(
-                                child: Icon(Icons.image, color: Colors.white, size: 42),
-                              ),
-                            ),
+                          : (widget.model.bannerUrl != null && widget.model.bannerUrl!.isNotEmpty)
+                              ? Image.network(
+                                  widget.model.bannerUrl!,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) => Container(
+                                    color: const Color(0xFF006097),
+                                    child: const Center(
+                                      child: Icon(Icons.image, color: Colors.white, size: 42),
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  color: const Color(0xFF006097),
+                                  child: const Center(
+                                    child: Icon(Icons.image, color: Colors.white, size: 42),
+                                  ),
+                                ),
                     ),
                     Positioned(
                       top: 10,

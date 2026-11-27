@@ -45,22 +45,26 @@ class _Step4ContentState extends State<Step4Content> {
 
     if (widget.model.agendaItems.isNotEmpty) {
       for (final item in widget.model.agendaItems) {
-        _sessions.add(
-          _AgendaSession(
-            title: item['title'] ?? '',
-            time: item['start_time'] ?? '',
-          ),
-        );
+        final t = (item['start_time'] ?? item['time'] ?? '').trim();
+        final title = (item['title'] ?? '').trim();
+        if (t.isNotEmpty || title.isNotEmpty) {
+          _sessions.add(
+            _AgendaSession(
+              title: title,
+              time: t,
+            ),
+          );
+        }
       }
     } else if (widget.model.agenda.trim().isNotEmpty) {
       final lines = widget.model.agenda.split('\n').where((l) => l.trim().isNotEmpty);
       for (final line in lines) {
-        final match = RegExp(r'^(\d{1,2}:\d{2})\s*[-:]?\s*(.*)$').firstMatch(line.trim());
+        final match = RegExp(r'^(\d{1,2}:\d{2}(?:\s*[AaPp][Mm])?)\s*[-:]?\s*(.*)$').firstMatch(line.trim());
         if (match != null) {
           _sessions.add(
             _AgendaSession(
-              time: match.group(1)!,
-              title: match.group(2)!,
+              time: match.group(1)!.trim(),
+              title: match.group(2)!.trim(),
             ),
           );
         } else {
@@ -166,6 +170,7 @@ class _Step4ContentState extends State<Step4Content> {
         }
         validSessions.add({
           'start_time': time.isNotEmpty ? time : '09:00',
+          'time': time.isNotEmpty ? time : '09:00',
           'title': title,
         });
       }

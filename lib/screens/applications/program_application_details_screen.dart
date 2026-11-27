@@ -9,6 +9,8 @@ import '../../models/program_model.dart';
 import '../../services/api_config.dart';
 import '../../services/programs_service.dart';
 import '../../core/validators.dart';
+import '../programs/submission/submit_program_wizard_screen.dart';
+import '../../models/program_submission_model.dart';
 
 class ProgramApplicationDetailsScreen extends StatefulWidget {
   final ProgramApplicationItem item;
@@ -264,6 +266,84 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
         (_liveProgram != null && _liveProgram!.city.isNotEmpty ? '${_liveProgram!.city}, ${_liveProgram!.country}' : null) ??
         widget.item.location;
 
+    // Detailed location extraction
+    String rawCountry = (programInfo?['country'] ??
+        programInfo?['country_text'] ??
+        _liveDetail?['country'] ??
+        _liveDetail?['country_text'] ??
+        _liveProgram?.country ??
+        widget.item.country)
+        .toString().trim();
+
+    int? rawCountryId = programInfo?['country_id'] is int
+        ? programInfo!['country_id'] as int
+        : int.tryParse(programInfo?['country_id']?.toString() ??
+            _liveDetail?['country_id']?.toString() ??
+            widget.item.countryId?.toString() ??
+            '');
+
+    String rawRegion = (programInfo?['region'] ??
+        programInfo?['region_text'] ??
+        programInfo?['region_state'] ??
+        programInfo?['state'] ??
+        _liveDetail?['region'] ??
+        _liveDetail?['region_text'] ??
+        _liveDetail?['region_state'] ??
+        _liveDetail?['state'] ??
+        widget.item.region)
+        .toString().trim();
+
+    int? rawRegionId = programInfo?['region_id'] is int
+        ? programInfo!['region_id'] as int
+        : int.tryParse(programInfo?['region_id']?.toString() ??
+            _liveDetail?['region_id']?.toString() ??
+            widget.item.regionId?.toString() ??
+            '');
+
+    String rawCity = (programInfo?['city'] ??
+        programInfo?['city_text'] ??
+        _liveDetail?['city'] ??
+        _liveDetail?['city_text'] ??
+        _liveProgram?.city ??
+        widget.item.city)
+        .toString().trim();
+
+    int? rawCityId = programInfo?['city_id'] is int
+        ? programInfo!['city_id'] as int
+        : int.tryParse(programInfo?['city_id']?.toString() ??
+            _liveDetail?['city_id']?.toString() ??
+            widget.item.cityId?.toString() ??
+            '');
+
+    String rawPincode = (programInfo?['pincode'] ??
+        programInfo?['postal_code'] ??
+        programInfo?['zip_code'] ??
+        _liveDetail?['pincode'] ??
+        _liveDetail?['postal_code'] ??
+        _liveDetail?['zip_code'] ??
+        widget.item.pincode)
+        .toString().trim();
+
+    final stringToParse = rawCity.contains(',')
+        ? rawCity
+        : (location.contains(',') ? location : '');
+    if (stringToParse.isNotEmpty) {
+      final parts = stringToParse.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+      if (parts.length >= 4) {
+        if (rawCity.isEmpty || rawCity.contains(',')) rawCity = parts[0];
+        if (rawRegion.isEmpty) rawRegion = parts[1];
+        if (rawCountry.isEmpty) rawCountry = parts[2];
+        if (rawPincode.isEmpty) rawPincode = parts[3];
+      } else if (parts.length == 3) {
+        if (rawCity.isEmpty || rawCity.contains(',')) rawCity = parts[0];
+        if (rawRegion.isEmpty) rawRegion = parts[1];
+        if (rawCountry.isEmpty) rawCountry = parts[2];
+      } else if (parts.length == 2) {
+        if (rawCity.isEmpty || rawCity.contains(',')) rawCity = parts[0];
+        if (rawCountry.isEmpty) rawCountry = parts[1];
+      }
+    }
+
     final venue = programInfo?['venue']?.toString() ??
         (_liveProgram?.venue.isNotEmpty == true ? _liveProgram!.venue : null) ??
         widget.item.venue;
@@ -399,33 +479,50 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
 
     // Build real agenda list
     final List<Map<String, String>> realAgenda = [];
-    final rawAgendaList = programInfo?['program_agenda_schedule'] is List
-        ? programInfo!['program_agenda_schedule'] as List
-        : (_liveDetail?['agenda'] is List
-        ? _liveDetail!['agenda'] as List
-        : (_liveDetail?['schedule'] is List ? _liveDetail!['schedule'] as List : null));
+    final dynamic rawAgendaList = programInfo?['program_agenda_schedule'] ??
+        programInfo?['agenda'] ??
+        programInfo?['schedule'] ??
+        _liveDetail?['program_agenda_schedule'] ??
+        _liveDetail?['agenda'] ??
+        _liveDetail?['schedule'] ??
+        (_liveDetail?['data'] is Map ? (_liveDetail!['data'] as Map)['program_agenda_schedule'] : null) ??
+        widget.item.agenda;
 
-    if (rawAgendaList != null) {
+    if (rawAgendaList is List) {
       for (final a in rawAgendaList) {
         if (a is Map) {
-          realAgenda.add({
-            'time': (a['start_time'] ?? a['time'] ?? '').toString(),
-            'title': (a['title'] ?? '').toString(),
-          });
+          final t = (a['start_time'] ?? a['time'] ?? '').toString().trim();
+          final titleStr = (a['title'] ?? a['session_title'] ?? a['name'] ?? a['activity'] ?? '').toString().trim();
+          if (t.isNotEmpty || titleStr.isNotEmpty) {
+            realAgenda.add({'time': t, 'start_time': t, 'title': titleStr});
+          }
+        } else if (a is String && a.trim().isNotEmpty) {
+          realAgenda.add({'time': '', 'start_time': '', 'title': a.trim()});
         }
       }
     }
     if (realAgenda.isEmpty && _liveProgram != null && _liveProgram!.agenda.isNotEmpty) {
       for (final a in _liveProgram!.agenda) {
-        realAgenda.add({'time': a.time, 'title': a.title});
+        realAgenda.add({'time': a.time, 'start_time': a.time, 'title': a.title});
       }
     }
     if (realAgenda.isEmpty && widget.item.agenda.isNotEmpty) {
       for (final a in widget.item.agenda) {
-        realAgenda.add({
-          'time': (a['start_time'] ?? a['time'] ?? '').toString(),
-          'title': (a['title'] ?? '').toString(),
-        });
+        final t = (a['start_time'] ?? a['time'] ?? '').toString().trim();
+        final titleStr = (a['title'] ?? '').toString().trim();
+        realAgenda.add({'time': t, 'start_time': t, 'title': titleStr});
+      }
+    }
+    final dynamic strAgenda = programInfo?['agenda_text'] ?? programInfo?['program_agenda'] ?? _liveDetail?['agenda_text'];
+    if (realAgenda.isEmpty && strAgenda is String && strAgenda.trim().isNotEmpty) {
+      final lines = strAgenda.split('\n').where((l) => l.trim().isNotEmpty);
+      for (final line in lines) {
+        final match = RegExp(r'^(\d{1,2}:\d{2}(?:\s*[AaPp][Mm])?)\s*[-:]?\s*(.*)$').firstMatch(line.trim());
+        if (match != null) {
+          realAgenda.add({'time': match.group(1)!.trim(), 'start_time': match.group(1)!.trim(), 'title': match.group(2)!.trim()});
+        } else {
+          realAgenda.add({'time': '', 'start_time': '', 'title': line.trim()});
+        }
       }
     }
 
@@ -460,6 +557,36 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
       agendaCount: realAgenda.length,
       hasRegistration: hasRegistration,
       backendValidations: rawAiChecks,
+    );
+
+    // ignore: unused_local_variable
+    final submissionModel = _createSubmissionModel(
+      title: title,
+      programType: programType,
+      description: description ?? '',
+      organizer: organizer,
+      organizationType: organizationType,
+      contactPerson: contactPerson,
+      contactPhone: contactPhone,
+      contactEmail: contactEmail,
+      startDate: startDate,
+      endDate: endDate,
+      location: location,
+      country: rawCountry,
+      countryId: rawCountryId,
+      regionState: rawRegion,
+      regionId: rawRegionId,
+      city: rawCity,
+      cityId: rawCityId,
+      pincode: rawPincode,
+      venue: venue,
+      rawBanner: rawBanner,
+      resolvedBanner: resolvedBanner,
+      realAgenda: realAgenda,
+      registrationInstructions: registrationInstructions,
+      registrationLink: registrationLink,
+      materials: realMaterials,
+      supportingMaterials: widget.item.supportingMaterials,
     );
 
     return Scaffold(
@@ -660,37 +787,74 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: const Color(0xFFFCA5A5)),
                     ),
-                    child: Row(
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.cancel_outlined, color: Color(0xFFDC2626), size: 22),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Application Rejected',
-                                style: GoogleFonts.inter(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w700,
-                                  color: const Color(0xFFB91C1C),
-                                ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.cancel_outlined, color: Color(0xFFDC2626), size: 22),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Application Rejected',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: const Color(0xFFB91C1C),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    reviewerComment.isNotEmpty
+                                        ? reviewerComment
+                                        : 'This program application has been rejected by the review committee.',
+                                    style: GoogleFonts.inter(
+                                      fontSize: 12,
+                                      color: const Color(0xFF991B1B),
+                                      height: 1.3,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                reviewerComment.isNotEmpty
-                                    ? reviewerComment
-                                    : 'This program application has been rejected by the review committee.',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  color: const Color(0xFF991B1B),
-                                  height: 1.3,
-                                ),
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
+                        // Commented out edit & resubmit button for now as requested
+                        // const SizedBox(height: 12),
+                        // SizedBox(
+                        //   width: double.infinity,
+                        //   height: 38,
+                        //   child: OutlinedButton.icon(
+                        //     onPressed: () {
+                        //       Navigator.of(context).push(
+                        //         MaterialPageRoute(
+                        //           builder: (_) => SubmitProgramWizardScreen(
+                        //             initialModel: submissionModel,
+                        //             applicationId: widget.item.id,
+                        //           ),
+                        //         ),
+                        //       ).then((_) => _fetchDetail());
+                        //     },
+                        //     icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFFDC2626)),
+                        //     label: Text(
+                        //       'Edit & Resubmit Application',
+                        //       style: GoogleFonts.inter(
+                        //         fontSize: 13,
+                        //         fontWeight: FontWeight.w700,
+                        //         color: const Color(0xFFDC2626),
+                        //       ),
+                        //     ),
+                        //     style: OutlinedButton.styleFrom(
+                        //       side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.2),
+                        //       backgroundColor: Colors.white,
+                        //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        //     ),
+                        //   ),
+                        // ),
                       ],
                     ),
                   ),
@@ -1221,10 +1385,146 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                     ],
                   ],
                 ),
+                // Commented out edit & resubmit button for now as requested
+                // if (isRejected || isAiRejected) ...[
+                //   const SizedBox(height: 18),
+                //   _buildResubmitButton(submissionModel),
+                // ],
                 const SizedBox(height: 28),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  ProgramSubmissionModel _createSubmissionModel({
+    required String title,
+    required String programType,
+    required String description,
+    required String organizer,
+    String? organizationType,
+    String? contactPerson,
+    String? contactPhone,
+    String? contactEmail,
+    required String startDate,
+    String? endDate,
+    String? location,
+    String? country,
+    int? countryId,
+    String? regionState,
+    int? regionId,
+    String? city,
+    int? cityId,
+    String? pincode,
+    String? venue,
+    String? rawBanner,
+    String? resolvedBanner,
+    required List<Map<String, String>> realAgenda,
+    String? registrationInstructions,
+    String? registrationLink,
+    required List<Map<String, dynamic>> materials,
+    required List<String> supportingMaterials,
+  }) {
+    DateTime? parsedStart;
+    try {
+      parsedStart = DateTime.tryParse(startDate.trim());
+    } catch (_) {}
+
+    DateTime? parsedEnd;
+    try {
+      if (endDate != null && endDate.trim().isNotEmpty) {
+        parsedEnd = DateTime.tryParse(endDate.trim());
+      }
+    } catch (_) {}
+
+    final fileIds = <int>[];
+    for (final m in materials) {
+      final idVal = m['file_id'] ?? m['id'] ?? m['file']?['id'];
+      if (idVal != null) {
+        final parsedId = int.tryParse(idVal.toString());
+        if (parsedId != null && !fileIds.contains(parsedId)) {
+          fileIds.add(parsedId);
+        }
+      }
+    }
+
+    final fileNames = <String>[];
+    for (final f in supportingMaterials) {
+      if (f.isNotEmpty && !fileNames.contains(f)) {
+        fileNames.add(f);
+      }
+    }
+    for (final m in materials) {
+      final name = (m['name'] ?? m['file_name'] ?? m['title'] ?? '').toString();
+      if (name.isNotEmpty && !fileNames.contains(name)) {
+        fileNames.add(name);
+      }
+    }
+
+    return ProgramSubmissionModel(
+      programName: title,
+      programType: programType,
+      description: description,
+      programDescription: description,
+      organizingEntityName: organizer,
+      organizationType: organizationType ?? '',
+      contactPerson: contactPerson ?? '',
+      phone: contactPhone ?? '',
+      email: contactEmail ?? '',
+      startDate: parsedStart,
+      endDate: parsedEnd,
+      venueAddress: (venue != null && venue.isNotEmpty) ? venue : '',
+      country: country ?? '',
+      countryId: countryId,
+      regionState: regionState ?? '',
+      regionId: regionId,
+      city: (city != null && city.isNotEmpty) ? city : (location ?? ''),
+      cityId: cityId,
+      pincode: pincode ?? '',
+      agenda: realAgenda.map((a) => '${(a['time'] ?? a['start_time'] ?? '').isNotEmpty ? (a['time'] ?? a['start_time']) : '09:00'}: ${a['title'] ?? ''}').join('\n'),
+      agendaItems: realAgenda.map((a) => {
+        'start_time': (a['start_time'] ?? a['time'] ?? '').isNotEmpty ? (a['start_time'] ?? a['time']!) : '09:00',
+        'time': (a['time'] ?? a['start_time'] ?? '').isNotEmpty ? (a['time'] ?? a['start_time']!) : '09:00',
+        'title': a['title'] ?? '',
+      }).toList(),
+      registrationInstructions: registrationInstructions ?? '',
+      registrationLink: registrationLink ?? '',
+      bannerUrl: resolvedBanner,
+      bannerFileName: rawBanner?.split('/').last,
+      materials: materials,
+      uploadedFileNames: fileNames,
+      supportingFileIds: fileIds,
+    );
+  }
+
+  // ignore: unused_element
+  Widget _buildResubmitButton(ProgramSubmissionModel model) {
+    return SizedBox(
+      width: double.infinity,
+      height: 48,
+      child: ElevatedButton.icon(
+        onPressed: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => SubmitProgramWizardScreen(
+                initialModel: model,
+                applicationId: widget.item.id,
+              ),
+            ),
+          ).then((_) => _fetchDetail());
+        },
+        icon: const Icon(Icons.refresh_rounded, size: 20),
+        label: Text(
+          'Edit & Resubmit Program Proposal',
+          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryBlue,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 1,
         ),
       ),
     );

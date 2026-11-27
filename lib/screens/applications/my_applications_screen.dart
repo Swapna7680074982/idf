@@ -555,6 +555,14 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   }
 
   Widget _buildProgramCard(ProgramApplicationItem item) {
+    final statLower = item.status.toLowerCase();
+    final revLower = item.reviewStatus.toLowerCase();
+    // ignore: unused_local_variable
+    final isRejected = statLower == 'rejected' ||
+        revLower == 'rejected' ||
+        statLower == 'cancelled' ||
+        statLower == 'canceled';
+
     void openDetails() async {
       await Navigator.of(context).push(
         MaterialPageRoute(
@@ -834,6 +842,15 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         item.status.toLowerCase() == 'changes_required';
     final hasCert = item.certificateId.isNotEmpty && item.certificateId != 'null';
     final isApproved = (item.isApproved || isRenewInProgress) && hasCert;
+    final statLower = item.status.toLowerCase();
+    final revLower = item.reviewStatus.toLowerCase();
+    final dispLower = item.displayStatus.toLowerCase();
+    // ignore: unused_local_variable
+    final isRejected = statLower == 'rejected' ||
+        revLower == 'rejected' ||
+        dispLower.contains('rejected') ||
+        statLower == 'cancelled' ||
+        statLower == 'canceled';
 
     void openCert() {
       if (isRenewInProgress && hasCert) {
