@@ -44,7 +44,7 @@ class HomeRegisteredProgram {
   });
 
   factory HomeRegisteredProgram.fromJson(Map<String, dynamic> json) {
-    final effectiveCover = ApiConfig.extractBannerUrl(json);
+    final effectiveCover = ApiConfig.resolveImageUrl(ApiConfig.extractBannerUrl(json));
     final effectiveBanner = effectiveCover;
     final statusStr = (json['review_status'] ?? json['status'])?.toString().toLowerCase() ?? '';
     final isSubmittedOrDraft = statusStr == 'submitted' || statusStr == 'draft' || statusStr == 'in_review';

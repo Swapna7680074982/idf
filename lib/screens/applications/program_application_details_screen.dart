@@ -823,38 +823,37 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                             ),
                           ],
                         ),
-                        // Commented out edit & resubmit button for now as requested
-                        // const SizedBox(height: 12),
-                        // SizedBox(
-                        //   width: double.infinity,
-                        //   height: 38,
-                        //   child: OutlinedButton.icon(
-                        //     onPressed: () {
-                        //       Navigator.of(context).push(
-                        //         MaterialPageRoute(
-                        //           builder: (_) => SubmitProgramWizardScreen(
-                        //             initialModel: submissionModel,
-                        //             applicationId: widget.item.id,
-                        //           ),
-                        //         ),
-                        //       ).then((_) => _fetchDetail());
-                        //     },
-                        //     icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFFDC2626)),
-                        //     label: Text(
-                        //       'Edit & Resubmit Application',
-                        //       style: GoogleFonts.inter(
-                        //         fontSize: 13,
-                        //         fontWeight: FontWeight.w700,
-                        //         color: const Color(0xFFDC2626),
-                        //       ),
-                        //     ),
-                        //     style: OutlinedButton.styleFrom(
-                        //       side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.2),
-                        //       backgroundColor: Colors.white,
-                        //       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        //     ),
-                        //   ),
-                        // ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 38,
+                          child: OutlinedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => SubmitProgramWizardScreen(
+                                    initialModel: submissionModel,
+                                    applicationId: widget.item.id,
+                                  ),
+                                ),
+                              ).then((_) => _fetchDetail());
+                            },
+                            icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFFDC2626)),
+                            label: Text(
+                              'Edit & Resubmit Application',
+                              style: GoogleFonts.inter(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFFDC2626),
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.2),
+                              backgroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1385,11 +1384,15 @@ class _ProgramApplicationDetailsScreenState extends State<ProgramApplicationDeta
                     ],
                   ],
                 ),
-                // Commented out edit & resubmit button for now as requested
-                // if (isRejected || isAiRejected) ...[
-                //   const SizedBox(height: 18),
-                //   _buildResubmitButton(submissionModel),
-                // ],
+                if (isRejected ||
+                    isAiRejected ||
+                    isChangesRequired ||
+                    (_liveDetail?['editable'] == true) ||
+                    (_liveDetail?['can_resubmit'] == true) ||
+                    widget.item.isEditableOrResubmittable) ...[
+                  const SizedBox(height: 18),
+                  _buildResubmitButton(submissionModel),
+                ],
                 const SizedBox(height: 28),
               ],
             ),

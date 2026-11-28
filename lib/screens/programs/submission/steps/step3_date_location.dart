@@ -81,22 +81,49 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
           _isLoadingCountries = false;
 
           // Match by country_id only if user had previously chosen one
-          if (widget.model.countryId != null) {
+          if (widget.model.countryId != null && widget.model.countryId! > 0) {
             final matches = _countries.where((c) => c.id == widget.model.countryId);
             if (matches.isNotEmpty) {
               _selectedCountry = matches.first;
             }
-          } else if (widget.model.country.isNotEmpty) {
+          }
+          if (_selectedCountry == null && widget.model.country.trim().isNotEmpty) {
+            final target = widget.model.country.trim().toLowerCase();
             final matches = _countries.where(
-              (c) => c.name.toLowerCase() == widget.model.country.toLowerCase(),
+              (c) => c.name.trim().toLowerCase() == target,
             );
             if (matches.isNotEmpty) {
               _selectedCountry = matches.first;
             }
           }
+          if (_selectedCountry == null && widget.model.country.trim().isNotEmpty) {
+            final target = widget.model.country.trim().toLowerCase();
+            final matches = _countries.where(
+              (c) => c.name.trim().toLowerCase().contains(target) || target.contains(c.name.trim().toLowerCase()),
+            );
+            if (matches.isNotEmpty) {
+              _selectedCountry = matches.first;
+            }
+          }
+          if (_selectedCountry == null && widget.model.country.trim().isNotEmpty) {
+            final customCountry = Country(
+              id: widget.model.countryId != null && widget.model.countryId! > 0
+                  ? widget.model.countryId!
+                  : -1,
+              isoCode: '',
+              name: widget.model.country.trim(),
+              phoneCode: '',
+            );
+            _countries.insert(0, customCountry);
+            _selectedCountry = customCountry;
+          }
 
           if (_selectedCountry != null) {
-            _loadRegions(_selectedCountry!.id);
+            widget.model.country = _selectedCountry!.name;
+            if (_selectedCountry!.id > 0) {
+              widget.model.countryId = _selectedCountry!.id;
+              _loadRegions(_selectedCountry!.id);
+            }
           }
         });
       }
@@ -126,33 +153,67 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
           _regions = regions;
           _isLoadingRegions = false;
           if (_regions.isNotEmpty) {
-            // Match region strictly by region_id (e.g. region_id == 6)
-            if (widget.model.regionId != null) {
+            // Match region strictly by region_id
+            if (widget.model.regionId != null && widget.model.regionId! > 0) {
               final matches = _regions.where((r) => r.id == widget.model.regionId);
               if (matches.isNotEmpty) {
                 _selectedRegion = matches.first;
               }
             }
-            if (_selectedRegion == null && widget.model.regionState.isNotEmpty) {
+            if (_selectedRegion == null && widget.model.regionState.trim().isNotEmpty) {
+              final target = widget.model.regionState.trim().toLowerCase();
               final matches = _regions.where(
-                (r) => r.name.toLowerCase() == widget.model.regionState.toLowerCase(),
+                (r) => r.name.trim().toLowerCase() == target,
               );
               if (matches.isNotEmpty) {
                 _selectedRegion = matches.first;
               }
             }
+            if (_selectedRegion == null && widget.model.regionState.trim().isNotEmpty) {
+              final target = widget.model.regionState.trim().toLowerCase();
+              final matches = _regions.where((r) {
+                final rName = r.name.trim().toLowerCase();
+                return rName.contains(target) || target.contains(rName);
+              });
+              if (matches.isNotEmpty) {
+                _selectedRegion = matches.first;
+              }
+            }
+            if (_selectedRegion == null && widget.model.regionState.trim().isNotEmpty) {
+              final customRegion = Region(
+                id: widget.model.regionId != null && widget.model.regionId! > 0
+                    ? widget.model.regionId!
+                    : -1,
+                name: widget.model.regionState.trim(),
+              );
+              _regions.insert(0, customRegion);
+              _selectedRegion = customRegion;
+            }
 
             if (_selectedRegion != null) {
               widget.model.regionState = _selectedRegion!.name;
-              widget.model.regionId = _selectedRegion!.id;
               _regionController.text = _selectedRegion!.name;
-              _loadCities(_selectedRegion!.id);
+              if (_selectedRegion!.id > 0) {
+                widget.model.regionId = _selectedRegion!.id;
+                _loadCities(_selectedRegion!.id);
+              }
+            }
+          } else {
+            if (widget.model.regionState.trim().isNotEmpty) {
+              _regionController.text = widget.model.regionState.trim();
             }
           }
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _isLoadingRegions = false);
+      if (mounted) {
+        setState(() {
+          _isLoadingRegions = false;
+          if (widget.model.regionState.trim().isNotEmpty) {
+            _regionController.text = widget.model.regionState.trim();
+          }
+        });
+      }
     }
   }
 
@@ -170,32 +231,67 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
           _cities = cities;
           _isLoadingCities = false;
           if (_cities.isNotEmpty) {
-            // Match city strictly by city_id (e.g. city_id == 22)
-            if (widget.model.cityId != null) {
+            // Match city strictly by city_id
+            if (widget.model.cityId != null && widget.model.cityId! > 0) {
               final matches = _cities.where((c) => c.id == widget.model.cityId);
               if (matches.isNotEmpty) {
                 _selectedCity = matches.first;
               }
             }
-            if (_selectedCity == null && widget.model.city.isNotEmpty) {
+            if (_selectedCity == null && widget.model.city.trim().isNotEmpty) {
+              final target = widget.model.city.trim().toLowerCase();
               final matches = _cities.where(
-                (c) => c.name.toLowerCase() == widget.model.city.toLowerCase(),
+                (c) => c.name.trim().toLowerCase() == target,
               );
               if (matches.isNotEmpty) {
                 _selectedCity = matches.first;
               }
             }
+            if (_selectedCity == null && widget.model.city.trim().isNotEmpty) {
+              final target = widget.model.city.trim().toLowerCase();
+              final matches = _cities.where((c) {
+                final cName = c.name.trim().toLowerCase();
+                return cName.contains(target) || target.contains(cName);
+              });
+              if (matches.isNotEmpty) {
+                _selectedCity = matches.first;
+              }
+            }
+            if (_selectedCity == null && widget.model.city.trim().isNotEmpty) {
+              final customCity = City(
+                id: widget.model.cityId != null && widget.model.cityId! > 0
+                    ? widget.model.cityId!
+                    : -1,
+                name: widget.model.city.trim(),
+                pincode: widget.model.pincode.isNotEmpty ? widget.model.pincode : null,
+              );
+              _cities.insert(0, customCity);
+              _selectedCity = customCity;
+            }
 
             if (_selectedCity != null) {
               widget.model.city = _selectedCity!.name;
-              widget.model.cityId = _selectedCity!.id;
               _cityController.text = _selectedCity!.name;
+              if (_selectedCity!.id > 0) {
+                widget.model.cityId = _selectedCity!.id;
+              }
+            }
+          } else {
+            if (widget.model.city.trim().isNotEmpty) {
+              _cityController.text = widget.model.city.trim();
             }
           }
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _isLoadingCities = false);
+      if (mounted) {
+        setState(() {
+          _isLoadingCities = false;
+          if (widget.model.city.trim().isNotEmpty) {
+            _cityController.text = widget.model.city.trim();
+          }
+        });
+      }
     }
   }
 
@@ -523,6 +619,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
             )
           else if (_regions.isNotEmpty)
             SearchableDropdownField<Region>(
+              key: ValueKey('region_${_selectedCountry?.id}_${_selectedRegion?.id}_${_selectedRegion?.name}'),
               value: _selectedRegion,
               hintText: 'Select region / state',
               sheetTitle: 'Select Region / State',
@@ -532,8 +629,17 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
                 setState(() {
                   _selectedRegion = val;
                   if (val != null) {
+                    widget.model.regionState = val.name;
+                    widget.model.regionId = val.id > 0 ? val.id : null;
                     _regionController.text = val.name;
-                    _loadCities(val.id);
+                    if (val.id > 0) {
+                      _loadCities(val.id);
+                    } else {
+                      _cities = [];
+                    }
+                  } else {
+                    widget.model.regionState = '';
+                    widget.model.regionId = null;
                   }
                 });
               },
@@ -578,6 +684,7 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
             )
           else if (_cities.isNotEmpty)
             SearchableDropdownField<City>(
+              key: ValueKey('city_${_selectedRegion?.id}_${_selectedCity?.id}_${_selectedCity?.name}'),
               value: _selectedCity,
               hintText: 'Select city',
               sheetTitle: 'Select City',
@@ -587,11 +694,16 @@ class _Step3DateLocationState extends State<Step3DateLocation> {
                 setState(() {
                   _selectedCity = val;
                   if (val != null) {
+                    widget.model.city = val.name;
+                    widget.model.cityId = val.id > 0 ? val.id : null;
                     _cityController.text = val.name;
                     if (val.pincode != null && val.pincode!.isNotEmpty) {
                       _pincodeController.text = val.pincode!;
                       widget.model.pincode = val.pincode!;
                     }
+                  } else {
+                    widget.model.city = '';
+                    widget.model.cityId = null;
                   }
                 });
               },

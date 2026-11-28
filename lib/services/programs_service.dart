@@ -1,6 +1,8 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import '../models/program_api_models.dart';
 import '../models/program_model.dart';
+import '../models/program_submission_model.dart';
 import 'api_client.dart';
 import 'api_config.dart';
 
@@ -442,15 +444,123 @@ class ProgramsService {
       final data = response['data'] is Map<String, dynamic>
           ? response['data'] as Map<String, dynamic>
           : response;
-      final application = data['application'] is Map<String, dynamic>
-          ? data['application'] as Map<String, dynamic>
-          : data;
-      return application;
+      if (data['application'] is Map<String, dynamic>) {
+        return <String, dynamic>{
+          ...data,
+          ...(data['application'] as Map<String, dynamic>),
+        };
+      }
+      return data;
     }
     throw const ApiException(
       code: 'INVALID_RESPONSE',
       message: 'Failed to load application details.',
       statusCode: 200,
+    );
+  }
+
+  /// Fetches application and program detail to build a fully prefilled ProgramSubmissionModel ready for wizard edit & resubmit
+  static Future<ProgramSubmissionModel> getProgramModelForEdit(dynamic id) async {
+    Map<String, dynamic>? appDetail;
+    ProgramModel? programModel;
+
+    // 1. Try GET /api/applications/programs/:id
+    try {
+      appDetail = await getMyApplicationDetail(id);
+    } catch (e) {
+      debugPrint('getMyApplicationDetail($id) error: $e');
+    }
+
+    // 2. Try GET /api/programs/:id
+    try {
+      programModel = await getProgramDetail(id);
+    } catch (e) {
+      debugPrint('getProgramDetail($id) error: $e');
+    }
+
+    // 3. If appDetail has an underlying program_id or program object, try that program ID if different
+    if (appDetail != null && programModel == null) {
+      final underlyingProgramId = appDetail['program_id'] ??
+          appDetail['program']?['id'] ??
+          appDetail['submission_details']?['program_id'] ??
+          appDetail['event_details']?['id'] ??
+          appDetail['event_details']?['program_id'];
+      if (underlyingProgramId != null &&
+          underlyingProgramId.toString() != id.toString()) {
+        try {
+          programModel = await getProgramDetail(underlyingProgramId);
+        } catch (_) {}
+      }
+    }
+
+    // 4. If programModel was loaded but appDetail was not, try fetching application by programNo
+    if (appDetail == null && programModel?.programNo != null && programModel!.programNo!.isNotEmpty) {
+      try {
+        appDetail = await getMyApplicationDetail(programModel.programNo!);
+      } catch (_) {}
+    }
+
+    // 5. If banner is still not found in appDetail or programModel, try matching via getPrograms or registered programs!
+    final extractedBanner = ApiConfig.extractBannerUrl(appDetail) ?? programModel?.imageUrl;
+    if (extractedBanner == null || extractedBanner.isEmpty) {
+      final String? progNo = appDetail?['program_no']?.toString() ?? programModel?.programNo;
+      final String? title = appDetail?['title']?.toString() ??
+          appDetail?['program_name']?.toString() ??
+          programModel?.title;
+
+      try {
+        final progsRes = await getPrograms(search: title ?? progNo, limit: 10);
+        for (final p in progsRes.items) {
+          final matchesProgNo = progNo != null && progNo.isNotEmpty && p.programNo == progNo;
+          final matchesTitle = title != null && title.isNotEmpty && p.title.toLowerCase().trim() == title.toLowerCase().trim();
+          final matchesId = p.id.toString() == id.toString();
+          if (matchesProgNo || matchesTitle || matchesId) {
+            final pBanner = ApiConfig.extractBannerUrl({
+              'banner_image_url': p.bannerImageUrl,
+              'cover_image_url': p.coverImageUrl,
+              'banner': p.banner,
+            });
+            if (pBanner != null && pBanner.isNotEmpty) {
+              appDetail ??= <String, dynamic>{};
+              appDetail['banner_image_url'] = pBanner;
+              appDetail['cover_image_url'] = pBanner;
+              appDetail['banner'] = pBanner;
+              break;
+            }
+          }
+        }
+      } catch (_) {}
+
+      // Try registered programs if still not found
+      if (appDetail?['banner_image_url'] == null) {
+        try {
+          final regRes = await getRegisteredPrograms(limit: 20);
+          for (final p in regRes.items) {
+            final matchesProgNo = progNo != null && progNo.isNotEmpty && p.programNo == progNo;
+            final matchesTitle = title != null && title.isNotEmpty && p.title.toLowerCase().trim() == title.toLowerCase().trim();
+            final matchesId = p.id.toString() == id.toString();
+            if (matchesProgNo || matchesTitle || matchesId) {
+              final pBanner = ApiConfig.extractBannerUrl({
+                'banner_image_url': p.bannerImageUrl,
+                'cover_image_url': p.coverImageUrl,
+                'banner': p.banner,
+              });
+              if (pBanner != null && pBanner.isNotEmpty) {
+                appDetail ??= <String, dynamic>{};
+                appDetail['banner_image_url'] = pBanner;
+                appDetail['cover_image_url'] = pBanner;
+                appDetail['banner'] = pBanner;
+                break;
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    }
+
+    return ProgramSubmissionModel.fromDetailJson(
+      appDetail ?? {},
+      programModel: programModel,
     );
   }
 

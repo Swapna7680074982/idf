@@ -143,6 +143,7 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
 
       if (mounted) {
         setState(() {
+          
           _isSubmitting = false;
         });
 
@@ -203,51 +204,61 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
       );
     }
 
+    final stepKey = ValueKey('${_model.categoryId}_$_currentStep');
+
     switch (_currentStep) {
       case 1:
         return Step1InstitutionType(
+          key: stepKey,
           model: _model,
           onContinue: _nextStep,
           onBack: _previousStep,
         );
       case 2:
         return Step2InstitutionDetails(
+          key: stepKey,
           model: _model,
           onContinue: _nextStep,
           onBack: _previousStep,
         );
       case 3:
         return Step3Infrastructure(
+          key: stepKey,
           model: _model,
           onContinue: _nextStep,
           onBack: _previousStep,
         );
       case 4:
         return Step4Organizational(
+          key: stepKey,
           model: _model,
           onContinue: _nextStep,
           onBack: _previousStep,
         );
       case 5:
         return Step5Individual(
+          key: stepKey,
           model: _model,
           onContinue: _nextStep,
           onBack: _previousStep,
         );
       case 6:
         return Step6Scalability(
+          key: stepKey,
           model: _model,
           onContinue: _nextStep,
           onBack: _previousStep,
         );
       case 7:
         return Step7Evidence(
+          key: stepKey,
           model: _model,
           onContinue: _nextStep,
           onBack: _previousStep,
         );
       case 8:
         return Step8Review(
+          key: stepKey,
           model: _model,
           onContinue: _nextStep,
           onBack: _previousStep,
@@ -256,6 +267,7 @@ class _CertificationWizardScreenState extends State<CertificationWizardScreen> {
         );
       case 9:
         return Step9Confirmation(
+          key: stepKey,
           model: _model,
           onSubmit: _submitApplication,
           onBack: _previousStep,

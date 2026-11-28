@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../../core/date_time_utils.dart';
 import '../../../../core/theme.dart';
 import '../../../../models/program_submission_model.dart';
+import '../../../../services/api_config.dart';
 import '../../../../widgets/custom_button.dart';
 
 class Step7ReviewSubmit extends StatelessWidget {
@@ -29,7 +30,8 @@ class Step7ReviewSubmit extends StatelessWidget {
   Widget build(BuildContext context) {
     final String startDateStr = _formatDate(model.startDate);
     final String endDateStr = _formatDate(model.endDate ?? model.startDate);
-    final bool hasBanner = model.bannerPath != null && model.bannerPath!.isNotEmpty;
+    final bool hasBanner = (model.bannerPath != null && model.bannerPath!.isNotEmpty) ||
+        (model.bannerUrl != null && model.bannerUrl!.isNotEmpty);
     final String descriptionText = model.description.trim().isNotEmpty
         ? model.description.trim()
         : (model.programDescription.trim().isNotEmpty
@@ -108,12 +110,26 @@ class Step7ReviewSubmit extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Banner image or Branded Gradient
-              if (hasBanner && File(model.bannerPath!).existsSync())
+              if (model.bannerPath != null &&
+                  model.bannerPath!.isNotEmpty &&
+                  File(model.bannerPath!).existsSync())
                 AspectRatio(
                   aspectRatio: 16 / 9,
                   child: Image.file(
                     File(model.bannerPath!),
                     fit: BoxFit.cover,
+                  ),
+                )
+              else if (model.bannerUrl != null && model.bannerUrl!.isNotEmpty)
+                AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Image.network(
+                    ApiConfig.resolveMediaUrl(model.bannerUrl!),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      height: 110,
+                      color: const Color(0xFF00377B),
+                    ),
                   ),
                 )
               else

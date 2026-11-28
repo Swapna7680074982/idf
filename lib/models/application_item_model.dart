@@ -29,6 +29,10 @@ class ProgramApplicationItem {
   final String city;
   final int? cityId;
   final String pincode;
+  final bool editable;
+  final bool canResubmit;
+  final String? rejectionReason;
+  final Map<String, dynamic>? rawJson;
   final List<String> supportingMaterials;
   final List<Map<String, dynamic>> materials;
   final List<Map<String, dynamic>> agenda;
@@ -60,10 +64,38 @@ class ProgramApplicationItem {
     this.city = '',
     this.cityId,
     this.pincode = '',
+    this.editable = false,
+    this.canResubmit = false,
+    this.rejectionReason,
+    this.rawJson,
     this.supportingMaterials = const [],
     this.materials = const [],
     this.agenda = const [],
   });
+
+  /// True if the user can edit & resubmit the program application
+  bool get isEditableOrResubmittable {
+    if (editable || canResubmit) return true;
+    final r = reviewStatus.trim().toLowerCase();
+    final s = status.trim().toLowerCase();
+    return r == 'changes_required' ||
+        r == 'changes required' ||
+        r == 'rejected' ||
+        s == 'changes_required' ||
+        s == 'changes required' ||
+        s == 'rejected';
+  }
+
+  /// Program ID for editing or resubmitting in SubmitProgramWizardScreen
+  String get editProgramId {
+    final progId = rawJson?['program_id']?.toString() ?? rawJson?['program']?['id']?.toString();
+    if (progId != null && progId.isNotEmpty && progId != '0' && progId != 'null') {
+      return progId;
+    }
+    if (id.isNotEmpty && id != '0' && id != 'null') return id;
+    if (referenceNumber.isNotEmpty && referenceNumber != 'null') return referenceNumber;
+    return id;
+  }
 
   factory ProgramApplicationItem.fromJson(Map<String, dynamic> json) {
     final rawMaterials = <Map<String, dynamic>>[];
@@ -92,11 +124,21 @@ class ProgramApplicationItem {
         ? 'Rejected'
         : _normalizeStatus(statusStr);
 
-    String parsedCountry = (json['country'] ?? json['country_text'] ?? '').toString();
+    String parsedCountry = (json['country'] ?? json['country_text'] ?? json['country_name'] ?? '').toString();
     int? parsedCountryId = json['country_id'] is int ? json['country_id'] as int : int.tryParse(json['country_id']?.toString() ?? '');
-    String parsedRegion = (json['region'] ?? json['region_text'] ?? json['state'] ?? '').toString();
-    int? parsedRegionId = json['region_id'] is int ? json['region_id'] as int : int.tryParse(json['region_id']?.toString() ?? '');
-    String parsedCity = (json['city_text'] ?? json['city'] ?? '').toString();
+    String parsedRegion = (json['region'] ??
+            json['region_state'] ??
+            json['region_text'] ??
+            json['region_name'] ??
+            json['state'] ??
+            json['state_name'] ??
+            json['province'] ??
+            '')
+        .toString();
+    int? parsedRegionId = json['region_id'] is int
+        ? json['region_id'] as int
+        : int.tryParse((json['region_id'] ?? json['state_id'])?.toString() ?? '');
+    String parsedCity = (json['city_text'] ?? json['city_name'] ?? json['city'] ?? '').toString();
     int? parsedCityId = json['city_id'] is int ? json['city_id'] as int : int.tryParse(json['city_id']?.toString() ?? '');
     String parsedPincode = (json['pincode'] ?? json['postal_code'] ?? json['zip_code'] ?? '').toString();
     final rawLocationStr = (json['location'] ?? json['city_text'] ?? json['city'] ?? '').toString();
@@ -136,7 +178,7 @@ class ProgramApplicationItem {
       status: normalizedStatus,
       reviewStatus: (json['review_status'] ?? '').toString(),
       description: (json['description'] ?? json['about'] ?? '').toString(),
-      banner: ApiConfig.extractBannerUrl(json),
+      banner: ApiConfig.resolveImageUrl(ApiConfig.extractBannerUrl(json)),
       contactPerson: json['contact_person']?.toString(),
       contactPhone: json['phone']?.toString(),
       contactEmail: json['email']?.toString(),
@@ -147,6 +189,10 @@ class ProgramApplicationItem {
       city: parsedCity,
       cityId: parsedCityId,
       pincode: parsedPincode,
+      editable: json['editable'] == true,
+      canResubmit: json['can_resubmit'] == true || json['canResubmit'] == true,
+      rejectionReason: (json['rejection_reason'] ?? json['reviewer_comment'] ?? json['reason'] ?? json['comment'])?.toString(),
+      rawJson: json,
       supportingMaterials: materialNames,
       materials: rawMaterials,
       agenda: rawAgenda,
@@ -177,11 +223,13 @@ class ProgramApplicationItem {
       lastUpdatedDate: item.registeredAt ?? item.startDate ?? '',
       status: normalizedStatus,
       reviewStatus: item.reviewStatus ?? '',
-      banner: ApiConfig.extractBannerUrl({
-        'cover_image_url': item.coverImageUrl,
-        'banner_image_url': item.bannerImageUrl,
-        'banner': item.banner,
-      }) ?? item.coverImageUrl ?? item.bannerImageUrl ?? item.banner,
+      banner: ApiConfig.resolveImageUrl(
+        ApiConfig.extractBannerUrl({
+          'cover_image_url': item.coverImageUrl,
+          'banner_image_url': item.bannerImageUrl,
+          'banner': item.banner,
+        }) ?? item.coverImageUrl ?? item.bannerImageUrl ?? item.banner,
+      ),
       supportingMaterials: const [],
       materials: const [],
       agenda: const [],
@@ -274,12 +322,17 @@ class CertificateApplicationItem {
   final String? rejectionReason;
   final bool canRenew;
   final bool isExpiredStatus;
+  final bool editable;
+  final bool canResubmit;
   final String? certificateRecordId;
   final String? renewalApplicationId;
   final String address;
   final String region;
+  final int? regionId;
   final String country;
+  final int? countryId;
   final String city;
+  final int? cityId;
   final String pincode;
   final Map<String, dynamic>? rawJson;
 
@@ -299,15 +352,44 @@ class CertificateApplicationItem {
     this.rejectionReason,
     this.canRenew = false,
     this.isExpiredStatus = false,
+    this.editable = false,
+    this.canResubmit = false,
     this.certificateRecordId,
     this.renewalApplicationId,
     this.address = '',
     this.region = '',
+    this.regionId,
     this.country = '',
+    this.countryId,
     this.city = '',
+    this.cityId,
     this.pincode = '',
     this.rawJson,
   });
+
+  /// True if the user can edit & resubmit the application
+  bool get isEditableOrResubmittable {
+    if (editable || canResubmit) return true;
+    final r = reviewStatus.trim().toLowerCase();
+    final d = displayStatus.trim().toLowerCase();
+    final s = status.trim().toLowerCase();
+    return r == 'changes_required' ||
+        r == 'changes required' ||
+        r == 'rejected' ||
+        d == 'changes_required' ||
+        d == 'changes required' ||
+        d == 'rejected' ||
+        s == 'changes_required' ||
+        s == 'changes required' ||
+        s == 'rejected';
+  }
+
+  /// Application identifier for editing or resubmitting in CertificationWizardScreen
+  String get editApplicationId {
+    if (id.isNotEmpty && id != '0' && id != 'null') return id;
+    if (applicationNo.isNotEmpty && applicationNo != 'null') return applicationNo;
+    return id;
+  }
 
   /// Primary certificate identifier for the renewal endpoint /api/certification/certificates/:id/renew
   String get effectiveCertificateId {
@@ -459,6 +541,8 @@ class CertificateApplicationItem {
         (json['certificate'] is Map && (json['certificate'] as Map)['can_renew'] == true);
     final expiredVal = json['expired'] == true ||
         (json['certificate'] is Map && (json['certificate'] as Map)['expired'] == true);
+    final editableVal = json['editable'] == true;
+    final canResubmitVal = json['can_resubmit'] == true || json['canResubmit'] == true;
 
     final certMap = json['certificate'] is Map ? json['certificate'] as Map : null;
     final dynamic rawCertDbId = certMap?['id'] ??
@@ -480,26 +564,72 @@ class CertificateApplicationItem {
     final rawRegion = (json['region'] ??
             json['region_text'] ??
             json['region_state'] ??
+            json['region_name'] ??
             json['state'] ??
+            json['state_name'] ??
+            json['province'] ??
             instMap?['region'] ??
             instMap?['region_text'] ??
             instMap?['region_state'] ??
+            instMap?['region_name'] ??
             instMap?['state'] ??
+            instMap?['state_name'] ??
+            instMap?['province'] ??
             detailsMap?['region'] ??
             detailsMap?['region_text'] ??
             detailsMap?['region_state'] ??
+            detailsMap?['region_name'] ??
             detailsMap?['state'] ??
+            detailsMap?['state_name'] ??
+            detailsMap?['province'] ??
             '')
         .toString();
+    final dynamic rawRegionId = json['region_id'] ??
+        json['state_id'] ??
+        instMap?['region_id'] ??
+        instMap?['state_id'] ??
+        detailsMap?['region_id'] ??
+        detailsMap?['state_id'];
+    final parsedRegionId = rawRegionId is int
+        ? rawRegionId
+        : int.tryParse(rawRegionId?.toString() ?? '');
+
     final rawCountry = (json['country'] ??
             json['country_text'] ??
+            json['country_name'] ??
             instMap?['country'] ??
             instMap?['country_text'] ??
+            instMap?['country_name'] ??
             detailsMap?['country'] ??
             detailsMap?['country_text'] ??
+            detailsMap?['country_name'] ??
             '')
         .toString();
-    final rawCity = (json['city'] ?? instMap?['city'] ?? detailsMap?['city'] ?? '').toString();
+    final dynamic rawCountryId = json['country_id'] ??
+        instMap?['country_id'] ??
+        detailsMap?['country_id'];
+    final parsedCountryId = rawCountryId is int
+        ? rawCountryId
+        : int.tryParse(rawCountryId?.toString() ?? '');
+
+    final rawCity = (json['city'] ??
+            json['city_text'] ??
+            json['city_name'] ??
+            instMap?['city'] ??
+            instMap?['city_text'] ??
+            instMap?['city_name'] ??
+            detailsMap?['city'] ??
+            detailsMap?['city_text'] ??
+            detailsMap?['city_name'] ??
+            '')
+        .toString();
+    final dynamic rawCityId = json['city_id'] ??
+        instMap?['city_id'] ??
+        detailsMap?['city_id'];
+    final parsedCityId = rawCityId is int
+        ? rawCityId
+        : int.tryParse(rawCityId?.toString() ?? '');
+
     final rawPincode = (json['pincode'] ??
             json['postal_code'] ??
             json['zip_code'] ??
@@ -534,12 +664,17 @@ class CertificateApplicationItem {
       rejectionReason: reason,
       canRenew: canRenewVal,
       isExpiredStatus: expiredVal,
+      editable: editableVal,
+      canResubmit: canResubmitVal,
       certificateRecordId: certRecordIdStr,
       renewalApplicationId: renewalAppIdStr,
       address: rawAddress,
       region: rawRegion,
+      regionId: parsedRegionId,
       country: rawCountry,
+      countryId: parsedCountryId,
       city: rawCity,
+      cityId: parsedCityId,
       pincode: rawPincode,
       rawJson: json,
     );

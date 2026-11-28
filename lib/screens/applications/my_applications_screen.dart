@@ -11,6 +11,8 @@ import 'certificate_view_screen.dart';
 import 'expired_certificate_details_screen.dart';
 import 'renewal/renewal_wizard_screen.dart';
 import 'program_application_details_screen.dart';
+import '../../models/program_submission_model.dart';
+import '../programs/submission/submit_program_wizard_screen.dart';
 import '../../services/programs_service.dart';
 import '../../services/certification_service.dart';
 
@@ -555,18 +557,24 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   }
 
   Widget _buildProgramCard(ProgramApplicationItem item) {
-    final statLower = item.status.toLowerCase();
-    final revLower = item.reviewStatus.toLowerCase();
-    // ignore: unused_local_variable
-    final isRejected = statLower == 'rejected' ||
-        revLower == 'rejected' ||
-        statLower == 'cancelled' ||
-        statLower == 'canceled';
+    final isEditable = item.isEditableOrResubmittable;
 
     void openDetails() async {
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ProgramApplicationDetailsScreen(item: item),
+        ),
+      );
+      _fetchMyProgramApplications();
+    }
+
+    void openEdit() async {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => SubmitProgramWizardScreen(
+            initialModel: ProgramSubmissionModel.fromProgramApplicationItem(item),
+            applicationId: item.editProgramId,
+          ),
         ),
       );
       _fetchMyProgramApplications();
@@ -591,7 +599,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: openDetails,
+          onTap: isEditable ? openEdit : openDetails,
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -689,22 +697,52 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                           ),
                           const SizedBox(height: 10),
                           Row(
-                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(
-                                'View Application',
-                                style: GoogleFonts.inter(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.primaryBlue,
+                              InkWell(
+                                onTap: isEditable ? openEdit : openDetails,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      isEditable ? 'Edit & Resubmit' : 'View Application',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: isEditable
+                                            ? const Color(0xFFDC2626)
+                                            : AppColors.primaryBlue,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      isEditable
+                                          ? Icons.edit_note_rounded
+                                          : Icons.arrow_forward_rounded,
+                                      size: 14,
+                                      color: isEditable
+                                          ? const Color(0xFFDC2626)
+                                          : AppColors.primaryBlue,
+                                    ),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(width: 4),
-                              const Icon(
-                                Icons.arrow_forward_rounded,
-                                size: 13,
-                                color: AppColors.primaryBlue,
-                              ),
+                              if (isEditable)
+                                InkWell(
+                                  onTap: openDetails,
+                                  child: Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                    child: Text(
+                                      'Reviewer Notes',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: const Color(0xFF64748B),
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ),
+                                ),
                             ],
                           ),
                         ],
@@ -838,8 +876,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
   Widget _buildCertificateCard(CertificateApplicationItem item) {
     final isRenewInProgress = item.isRenewInProgress;
     final isExpired = item.isExpiredOrRenewable && !isRenewInProgress;
-    final isChangesRequired = item.status.toLowerCase() == 'changes required' ||
-        item.status.toLowerCase() == 'changes_required';
+    final isEditable = item.isEditableOrResubmittable;
     final hasCert = item.certificateId.isNotEmpty && item.certificateId != 'null';
     final isApproved = (item.isApproved || isRenewInProgress) && hasCert;
     final statLower = item.status.toLowerCase();
@@ -873,26 +910,26 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
             builder: (_) => CertificateViewScreen(certificate: item),
           ),
         );
-      } else if (isChangesRequired) {
+      } else if (isEditable) {
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => CertificationWizardScreen(
-              applicationId: item.id.isNotEmpty ? item.id : item.applicationNo,
+              applicationId: item.editApplicationId,
               initialModel:
                   CertificationApplicationModel.prefilledForCertificate(item),
             ),
           ),
-        );
+        ).then((_) => _fetchMyCertificateApplications());
       } else {
         // Submitted, In Review, AI Audit, etc. -> Show Application Details / Tracking screen!
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (_) => CertificationDetailsScreen(
-              applicationId: item.id.isNotEmpty ? item.id : item.applicationNo,
+              applicationId: item.editApplicationId,
               certificateItem: item,
             ),
           ),
-        );
+        ).then((_) => _fetchMyCertificateApplications());
       }
     }
 
@@ -1037,13 +1074,13 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                             ? 'View Certificate'
                                             : isExpired
                                                 ? 'Renew Certificate'
-                                                : isChangesRequired
-                                                    ? 'Edit Application'
+                                                : isEditable
+                                                    ? 'Edit & Resubmit'
                                                     : 'View Details',
                                         style: GoogleFonts.inter(
                                           fontSize: 12,
                                           fontWeight: FontWeight.w700,
-                                          color: isChangesRequired
+                                          color: isEditable
                                               ? const Color(0xFFDC2626)
                                               : (isExpired && !isRenewInProgress)
                                                   ? const Color(0xFFEA580C)
@@ -1052,9 +1089,11 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                       ),
                                       const SizedBox(width: 4),
                                       Icon(
-                                        Icons.arrow_forward_rounded,
-                                        size: 13,
-                                        color: isChangesRequired
+                                        isEditable
+                                            ? Icons.edit_note_rounded
+                                            : Icons.arrow_forward_rounded,
+                                        size: 14,
+                                        color: isEditable
                                             ? const Color(0xFFDC2626)
                                             : (isExpired && !isRenewInProgress)
                                                 ? const Color(0xFFEA580C)
@@ -1062,7 +1101,7 @@ class _MyApplicationsScreenState extends State<MyApplicationsScreen> {
                                       ),
                                     ],
                                   ),
-                                  if (!isRenewInProgress && ((isExpired && !isRenewInProgress) || isChangesRequired || isApproved))
+                                  if (!isRenewInProgress && ((isExpired && !isRenewInProgress) || isEditable || isApproved))
                                     InkWell(
                                       onTap: openDetailsRedirect,
                                       child: Padding(

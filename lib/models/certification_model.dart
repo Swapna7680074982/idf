@@ -1151,11 +1151,20 @@ class CertificationApplicationModel {
         if (base.country.isEmpty && item.country.isNotEmpty) {
           base.country = item.country;
         }
+        if (base.countryId == null && item.countryId != null) {
+          base.countryId = item.countryId;
+        }
         if (base.regionState.isEmpty && item.region.isNotEmpty) {
           base.regionState = item.region;
         }
+        if (base.regionId == null && item.regionId != null) {
+          base.regionId = item.regionId;
+        }
         if (base.city.isEmpty && item.city.isNotEmpty) {
           base.city = item.city;
+        }
+        if (base.cityId == null && item.cityId != null) {
+          base.cityId = item.cityId;
         }
         if (base.pincode.isEmpty && item.pincode.isNotEmpty) {
           base.pincode = item.pincode;
@@ -1189,8 +1198,11 @@ class CertificationApplicationModel {
       status: item.status,
       address: item.address,
       country: item.country,
+      countryId: item.countryId,
       regionState: item.region,
+      regionId: item.regionId,
       city: item.city,
+      cityId: item.cityId,
       pincode: item.pincode,
     );
   }
@@ -1459,6 +1471,81 @@ class CertificationApplicationModel {
 
     final parsedId = appMap['id'] is int ? appMap['id'] as int : int.tryParse(appMap['id']?.toString() ?? '');
 
+    final resolvedCountry = (inst?['country'] ??
+            inst?['country_name'] ??
+            inst?['country_text'] ??
+            appMap['country'] ??
+            appMap['country_name'] ??
+            appMap['country_text'] ??
+            rawDetails['country'] ??
+            rawDetails['country_name'] ??
+            rawDetails['country_text'] ??
+            '')
+        .toString()
+        .trim();
+
+    final dynamic rawCountryId = inst?['country_id'] ??
+        appMap['country_id'] ??
+        rawDetails['country_id'];
+    final resolvedCountryId = rawCountryId is int
+        ? rawCountryId
+        : int.tryParse(rawCountryId?.toString() ?? '');
+
+    final resolvedRegion = (inst?['region'] ??
+            inst?['region_state'] ??
+            inst?['region_text'] ??
+            inst?['region_name'] ??
+            inst?['state'] ??
+            inst?['state_name'] ??
+            inst?['province'] ??
+            appMap['region'] ??
+            appMap['region_state'] ??
+            appMap['region_text'] ??
+            appMap['region_name'] ??
+            appMap['state'] ??
+            appMap['state_name'] ??
+            appMap['province'] ??
+            rawDetails['region'] ??
+            rawDetails['region_state'] ??
+            rawDetails['region_text'] ??
+            rawDetails['region_name'] ??
+            rawDetails['state'] ??
+            rawDetails['state_name'] ??
+            rawDetails['province'] ??
+            '')
+        .toString()
+        .trim();
+
+    final dynamic rawRegionId = inst?['region_id'] ??
+        inst?['state_id'] ??
+        appMap['region_id'] ??
+        appMap['state_id'] ??
+        rawDetails['region_id'] ??
+        rawDetails['state_id'];
+    final resolvedRegionId = rawRegionId is int
+        ? rawRegionId
+        : int.tryParse(rawRegionId?.toString() ?? '');
+
+    final resolvedCity = (inst?['city'] ??
+            inst?['city_name'] ??
+            inst?['city_text'] ??
+            appMap['city'] ??
+            appMap['city_name'] ??
+            appMap['city_text'] ??
+            rawDetails['city'] ??
+            rawDetails['city_name'] ??
+            rawDetails['city_text'] ??
+            '')
+        .toString()
+        .trim();
+
+    final dynamic rawCityId = inst?['city_id'] ??
+        appMap['city_id'] ??
+        rawDetails['city_id'];
+    final resolvedCityId = rawCityId is int
+        ? rawCityId
+        : int.tryParse(rawCityId?.toString() ?? '');
+
     final model = CertificationApplicationModel(
       id: parsedId,
       applicationId: appMap['application_id']?.toString() ?? appMap['application_no']?.toString(),
@@ -1467,13 +1554,13 @@ class CertificationApplicationModel {
       institutionTypeId: catName,
       institutionTypeTitle: catName,
       institutionName: inst?['name']?.toString() ?? appMap['institution_name']?.toString() ?? '',
-      address: inst?['address']?.toString() ?? appMap['address']?.toString() ?? '',
-      country: inst?['country']?.toString() ?? appMap['country']?.toString() ?? '',
-      countryId: inst?['country_id'] is int ? inst!['country_id'] as int : int.tryParse(inst?['country_id']?.toString() ?? appMap['country_id']?.toString() ?? ''),
-      regionState: inst?['region']?.toString() ?? appMap['region']?.toString() ?? '',
-      regionId: inst?['region_id'] is int ? inst!['region_id'] as int : int.tryParse(inst?['region_id']?.toString() ?? appMap['region_id']?.toString() ?? ''),
-      city: inst?['city']?.toString() ?? appMap['city']?.toString() ?? '',
-      cityId: inst?['city_id'] is int ? inst!['city_id'] as int : int.tryParse(inst?['city_id']?.toString() ?? appMap['city_id']?.toString() ?? ''),
+      address: inst?['address']?.toString() ?? appMap['address']?.toString() ?? rawDetails['address']?.toString() ?? '',
+      country: resolvedCountry,
+      countryId: resolvedCountryId,
+      regionState: resolvedRegion,
+      regionId: resolvedRegionId,
+      city: resolvedCity,
+      cityId: resolvedCityId,
       pincode: inst?['pincode']?.toString() ??
           inst?['postal_code']?.toString() ??
           inst?['zip_code']?.toString() ??
@@ -1482,9 +1569,9 @@ class CertificationApplicationModel {
           rawDetails['pincode']?.toString() ??
           rawDetails['postal_code']?.toString() ??
           '',
-      contactPerson: inst?['contact_person']?.toString() ?? appMap['contact_person']?.toString() ?? '',
-      contactPhone: inst?['contact_phone']?.toString() ?? appMap['contact_phone']?.toString() ?? '',
-      contactEmail: inst?['contact_email']?.toString() ?? appMap['contact_email']?.toString() ?? '',
+      contactPerson: inst?['contact_person']?.toString() ?? appMap['contact_person']?.toString() ?? rawDetails['contact_person']?.toString() ?? '',
+      contactPhone: inst?['contact_phone']?.toString() ?? inst?['phone']?.toString() ?? appMap['contact_phone']?.toString() ?? appMap['phone']?.toString() ?? rawDetails['contact_phone']?.toString() ?? '',
+      contactEmail: inst?['contact_email']?.toString() ?? inst?['email']?.toString() ?? appMap['contact_email']?.toString() ?? appMap['email']?.toString() ?? rawDetails['contact_email']?.toString() ?? '',
       numberOfRooms: rawDetails['number_of_rooms']?.toString() ?? '',
       distanceFromMainRoad: rawDetails['distance_from_main_road_km']?.toString() ?? '',
       parkingAvailability: rawDetails['parking_availability']?.toString() ?? '',
@@ -2374,6 +2461,7 @@ class CertificationApplicationDetail {
   final String decision;
   final String? decisionText;
   final bool editable;
+  final bool canResubmit;
   final int currentStep;
   final int totalSteps;
   final String? submittedAt;
@@ -2402,6 +2490,7 @@ class CertificationApplicationDetail {
     required this.decision,
     this.decisionText,
     required this.editable,
+    this.canResubmit = false,
     required this.currentStep,
     required this.totalSteps,
     this.submittedAt,
@@ -2419,6 +2508,35 @@ class CertificationApplicationDetail {
     this.answers = const [],
     this.rawJson,
   });
+
+  /// True if the application can be edited & resubmitted
+  bool get isEditableOrResubmittable {
+    if (editable || canResubmit) return true;
+    final r = reviewStatus.trim().toLowerCase();
+    final d = displayStatus.trim().toLowerCase();
+    final s = status.trim().toLowerCase();
+    final dec = (decisionText ?? decision).trim().toLowerCase();
+    return r == 'changes_required' ||
+        r == 'changes required' ||
+        r == 'rejected' ||
+        d == 'changes_required' ||
+        d == 'changes required' ||
+        d == 'rejected' ||
+        s == 'changes_required' ||
+        s == 'changes required' ||
+        s == 'rejected' ||
+        dec == 'changes_required' ||
+        dec == 'changes required' ||
+        dec == 'rejected';
+  }
+
+  /// Identifier to pass to CertificationWizardScreen
+  String get editApplicationId {
+    if (applicationId.isNotEmpty && applicationId != 'null') return applicationId;
+    if (id > 0) return id.toString();
+    if (applicationNo.isNotEmpty && applicationNo != 'null') return applicationNo;
+    return id.toString();
+  }
 
   String? get effectiveComment {
     if (reviewerComment != null && reviewerComment!.isNotEmpty) return reviewerComment;
@@ -2438,6 +2556,7 @@ class CertificationApplicationDetail {
     String? decision,
     String? decisionText,
     bool? editable,
+    bool? canResubmit,
     int? currentStep,
     int? totalSteps,
     String? submittedAt,
@@ -2466,6 +2585,7 @@ class CertificationApplicationDetail {
       decision: decision ?? this.decision,
       decisionText: decisionText ?? this.decisionText,
       editable: editable ?? this.editable,
+      canResubmit: canResubmit ?? this.canResubmit,
       currentStep: currentStep ?? this.currentStep,
       totalSteps: totalSteps ?? this.totalSteps,
       submittedAt: submittedAt ?? this.submittedAt,
@@ -2534,7 +2654,8 @@ class CertificationApplicationDetail {
       });
     }
 
-    String? foundComment = json['reviewer_comment']?.toString() ??
+    String? foundComment = json['rejection_reason']?.toString() ??
+        json['reviewer_comment']?.toString() ??
         json['changes_required_reason']?.toString() ??
         json['comment']?.toString() ??
         json['comments']?.toString() ??
@@ -2613,6 +2734,7 @@ class CertificationApplicationDetail {
       decision: rawDecision,
       decisionText: rawDecisionText,
       editable: json['editable'] == true,
+      canResubmit: json['can_resubmit'] == true || json['canResubmit'] == true,
       currentStep: json['current_step'] is int ? json['current_step'] as int : 4,
       totalSteps: json['total_steps'] is int ? json['total_steps'] as int : 4,
       submittedAt: json['submitted_at']?.toString(),

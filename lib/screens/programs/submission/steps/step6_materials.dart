@@ -525,7 +525,7 @@ class _Step6MaterialsState extends State<Step6Materials> {
                           ? Image.file(File(widget.model.bannerPath!), fit: BoxFit.cover)
                           : (widget.model.bannerUrl != null && widget.model.bannerUrl!.isNotEmpty)
                               ? Image.network(
-                                  widget.model.bannerUrl!,
+                                  ApiConfig.resolveMediaUrl(widget.model.bannerUrl),
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) => Container(
                                     color: const Color(0xFF006097),
@@ -582,7 +582,9 @@ class _Step6MaterialsState extends State<Step6Materials> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              widget.model.bannerFileName ?? 'program_banner.png',
+                              widget.model.bannerFileName ??
+                                  widget.model.bannerUrl?.split('/').last ??
+                                  'program_banner.png',
                               style: GoogleFonts.inter(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
@@ -594,7 +596,9 @@ class _Step6MaterialsState extends State<Step6Materials> {
                             Text(
                               widget.model.bannerFileId != null
                                   ? 'Uploaded (ID: ${widget.model.bannerFileId})'
-                                  : 'Local ready',
+                                  : (widget.model.bannerUrl != null && widget.model.bannerUrl!.isNotEmpty)
+                                      ? 'Active on server'
+                                      : 'Local ready',
                               style: GoogleFonts.inter(
                                 fontSize: 11,
                                 color: widget.model.bannerFileId != null

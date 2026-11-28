@@ -93,42 +93,60 @@ class ApiConfig {
   static String get files => '$baseUrl/api/files';
 
   /// Extracts the first valid non-empty banner/cover image URL from a Map or dynamic data.
-  /// Safely handles empty strings "", nested maps (program_information, event_details, etc.) and all key aliases.
+  /// Safely handles empty strings "", nested maps (program_information, event_details, etc.),
+  /// list collections (materials, supporting_material), and all key aliases.
   static String? extractBannerUrl(dynamic data) {
     if (data == null) return null;
     if (data is String) {
       final s = data.trim();
-      return (s.isNotEmpty && s != 'null' && !s.contains('{{') && !s.contains('}}')) ? s : null;
+      if (s.isEmpty || s == 'null' || s.startsWith('{') || s.contains('{{') || s.contains('}}')) {
+        return null;
+      }
+      return s;
     }
     if (data is! Map) return null;
 
-    const directKeys = [
+    const explicitBannerKeys = [
       'banner_image_url',
       'cover_image_url',
+      'program_banner',
+      'program_banner_url',
+      'program_cover',
       'banner',
       'banner_url',
       'cover_image',
       'cover_url',
       'image_url',
+      'cover',
+      'poster',
+      'flyer',
       'image',
       'photo',
-      'file_url',
-      'file_path',
-      'url',
+      'picture',
     ];
 
-    for (final key in directKeys) {
-      final val = data[key]?.toString().trim();
-      if (val != null && val.isNotEmpty && val != 'null' && !val.contains('{{') && !val.contains('}}')) {
-        return val;
+    for (final key in explicitBannerKeys) {
+      final raw = data[key];
+      if (raw is Map) {
+        final extracted = extractBannerUrl(raw);
+        if (extracted != null && extracted.isNotEmpty) return extracted;
+      } else if (raw is String) {
+        final val = raw.trim();
+        if (val.isNotEmpty &&
+            val != 'null' &&
+            !val.startsWith('{') &&
+            !val.contains('{{') &&
+            !val.contains('}}')) {
+          return val;
+        }
       }
     }
 
     const nestedKeys = [
       'program_information',
-      'event_details',
       'program',
       'program_details',
+      'event_details',
       'submission_details',
       'application',
       'data',
@@ -140,6 +158,96 @@ class ApiConfig {
         final found = extractBannerUrl(nested);
         if (found != null && found.isNotEmpty) {
           return found;
+        }
+      }
+    }
+
+    // Inspect list items (materials, supporting_material, supporting_materials, files)
+    const listKeys = [
+      'materials',
+      'supporting_material',
+      'supporting_materials',
+      'files',
+      'attachments',
+      'media',
+      'documents',
+      'images',
+    ];
+
+    for (final listKey in listKeys) {
+      final listVal = data[listKey];
+      if (listVal is List) {
+        // Pass 1: explicit banner or cover in list
+        for (final item in listVal) {
+          if (item is Map) {
+            final isBanner = item['is_banner'] == true ||
+                item['is_banner'] == 1 ||
+                item['is_banner'] == '1' ||
+                item['type'] == 'banner' ||
+                item['type'] == 'cover' ||
+                item['category'] == 'banner';
+            final name = (item['name'] ?? item['file_name'] ?? item['title'] ?? '').toString().toLowerCase();
+            final url = (item['url'] ?? item['file_url'] ?? item['file_path'] ?? item['path'] ?? item['download_url'] ?? '').toString().trim();
+            if (isBanner || name.contains('banner') || name.contains('cover')) {
+              final candidate = url.isNotEmpty ? url : (name.contains('/') ? name : '');
+              if (candidate.isNotEmpty && !candidate.startsWith('{')) {
+                return candidate;
+              }
+            }
+          } else if (item is String) {
+            final s = item.trim().toLowerCase();
+            if (s.contains('banner') || s.contains('cover')) {
+              return item.trim();
+            }
+          }
+        }
+
+        // Pass 2: any image file in list
+        for (final item in listVal) {
+          if (item is Map) {
+            final name = (item['name'] ?? item['file_name'] ?? item['title'] ?? '').toString().toLowerCase();
+            final url = (item['url'] ?? item['file_url'] ?? item['file_path'] ?? item['path'] ?? '').toString().trim();
+            final candidate = url.isNotEmpty ? url : (name.contains('/') ? name : '');
+            final candidateLower = candidate.toLowerCase();
+            if (candidateLower.endsWith('.jpg') ||
+                candidateLower.endsWith('.jpeg') ||
+                candidateLower.endsWith('.png') ||
+                candidateLower.endsWith('.webp') ||
+                candidateLower.contains('/uploads/')) {
+              return candidate;
+            }
+          } else if (item is String) {
+            final s = item.trim().toLowerCase();
+            if (s.endsWith('.jpg') || s.endsWith('.jpeg') || s.endsWith('.png') || s.endsWith('.webp')) {
+              return item.trim();
+            }
+          }
+        }
+      }
+    }
+
+    // Generic file path / url keys (strictly validate they look like image paths)
+    const genericKeys = ['file_url', 'file_path', 'url', 'path'];
+    for (final key in genericKeys) {
+      final raw = data[key];
+      if (raw is String) {
+        final val = raw.trim();
+        final lower = val.toLowerCase();
+        if (val.isNotEmpty &&
+            val != 'null' &&
+            !val.startsWith('{') &&
+            !val.contains('{{') &&
+            !val.contains('}}')) {
+          final isImage = lower.endsWith('.jpg') ||
+              lower.endsWith('.jpeg') ||
+              lower.endsWith('.png') ||
+              lower.endsWith('.webp') ||
+              lower.endsWith('.gif') ||
+              lower.contains('/uploads/') ||
+              lower.contains('/images/') ||
+              lower.contains('banner') ||
+              lower.contains('cover');
+          if (isImage) return val;
         }
       }
     }

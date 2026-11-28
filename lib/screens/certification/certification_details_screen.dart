@@ -375,19 +375,12 @@ class _CertificationDetailsScreenState
               const SizedBox(height: 14),
             ],
 
-            // 7. Actions (Renew if renewable, Resubmit if rejected, Edit Application if editable/changes required)
+            // 7. Actions (Renew if renewable, Resubmit if editable/rejected/changes required)
             if (isRenewable) ...[
               _buildRenewButton(detail),
               const SizedBox(height: 20),
-            // Commented out edit & resubmit button for now as requested
-            // ] else if (isRejected) ...[
-            //   _buildResubmitButton(detail),
-            //   const SizedBox(height: 20),
-            ] else if (detail.editable ||
-                detail.status.toLowerCase().contains('change') ||
-                detail.displayStatus.toLowerCase().contains('change') ||
-                detail.reviewStatus.toLowerCase().contains('change')) ...[
-              _buildActionButtons(detail),
+            ] else if (detail.isEditableOrResubmittable) ...[
+              _buildResubmitButton(detail),
               const SizedBox(height: 20),
             ],
             const SizedBox(height: 14),
@@ -1938,68 +1931,67 @@ class _CertificationDetailsScreenState
                     height: 1.35,
                   ),
                 ),
-                // Commented out edit & resubmit button for now as requested
-                // if (isRejected) ...[
-                //   const SizedBox(height: 10),
-                //   SizedBox(
-                //     width: double.infinity,
-                //     height: 38,
-                //     child: OutlinedButton.icon(
-                //       onPressed: () {
-                //         final appId = detail.applicationId.isNotEmpty
-                //             ? detail.applicationId
-                //             : (detail.id > 0 ? detail.id.toString() : detail.applicationNo);
-                //         Navigator.of(context).push(
-                //           MaterialPageRoute(
-                //             builder: (_) => CertificationWizardScreen(
-                //               applicationId: appId,
-                //               initialModel: CertificationApplicationModel(
-                //                 id: detail.id,
-                //                 applicationId: detail.applicationId,
-                //                 applicationNo: detail.applicationNo,
-                //                 institutionName: detail.institution?.name ?? '',
-                //                 institutionTypeTitle: detail.institution?.category ?? '',
-                //                 address: (detail.institution?.address != null && detail.institution!.address.isNotEmpty)
-                //                     ? detail.institution!.address
-                //                     : (widget.certificateItem?.address ?? ''),
-                //                 country: (detail.institution?.country != null && detail.institution!.country.isNotEmpty)
-                //                     ? detail.institution!.country
-                //                     : (widget.certificateItem?.country ?? ''),
-                //                 regionState: (detail.institution?.region != null && detail.institution!.region.isNotEmpty)
-                //                     ? detail.institution!.region
-                //                     : (widget.certificateItem?.region ?? ''),
-                //                 city: (detail.institution?.city != null && detail.institution!.city.isNotEmpty)
-                //                     ? detail.institution!.city
-                //                     : (widget.certificateItem?.city ?? ''),
-                //                 pincode: (detail.institution?.pincode != null && detail.institution!.pincode.isNotEmpty)
-                //                     ? detail.institution!.pincode
-                //                     : (widget.certificateItem?.pincode ?? ''),
-                //                 contactPerson: detail.institution?.contactPerson ?? '',
-                //                 contactEmail: detail.institution?.contactEmail ?? '',
-                //                 contactPhone: detail.institution?.contactPhone ?? '',
-                //                 status: detail.status,
-                //               ),
-                //             ),
-                //           ),
-                //         ).then((_) => _fetchApplicationDetail());
-                //       },
-                //       icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFFDC2626)),
-                //       label: Text(
-                //         'Edit & Resubmit Application',
-                //         style: GoogleFonts.inter(
-                //           fontSize: 13,
-                //           fontWeight: FontWeight.w700,
-                //           color: const Color(0xFFDC2626),
-                //         ),
-                //       ),
-                //       style: OutlinedButton.styleFrom(
-                //         side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.2),
-                //         backgroundColor: Colors.white,
-                //         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                //       ),
-                //     ),
-                //   ),
-                // ],
+                if (detail.isEditableOrResubmittable) ...[
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 40,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        final appId = detail.editApplicationId;
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => CertificationWizardScreen(
+                              applicationId: appId,
+                              initialModel: detail.rawJson != null
+                                  ? CertificationApplicationModel.fromApplicationJson(detail.rawJson!)
+                                  : CertificationApplicationModel(
+                                      id: detail.id,
+                                      applicationId: detail.applicationId,
+                                      applicationNo: detail.applicationNo,
+                                      institutionName: detail.institution?.name ?? '',
+                                      institutionTypeTitle: detail.institution?.category ?? '',
+                                      address: (detail.institution?.address != null && detail.institution!.address.isNotEmpty)
+                                          ? detail.institution!.address
+                                          : (widget.certificateItem?.address ?? ''),
+                                      country: (detail.institution?.country != null && detail.institution!.country.isNotEmpty)
+                                          ? detail.institution!.country
+                                          : (widget.certificateItem?.country ?? ''),
+                                      regionState: (detail.institution?.region != null && detail.institution!.region.isNotEmpty)
+                                          ? detail.institution!.region
+                                          : (widget.certificateItem?.region ?? ''),
+                                      city: (detail.institution?.city != null && detail.institution!.city.isNotEmpty)
+                                          ? detail.institution!.city
+                                          : (widget.certificateItem?.city ?? ''),
+                                      pincode: (detail.institution?.pincode != null && detail.institution!.pincode.isNotEmpty)
+                                          ? detail.institution!.pincode
+                                          : (widget.certificateItem?.pincode ?? ''),
+                                      contactPerson: detail.institution?.contactPerson ?? '',
+                                      contactEmail: detail.institution?.contactEmail ?? '',
+                                      contactPhone: detail.institution?.contactPhone ?? '',
+                                      status: detail.status,
+                                    ),
+                            ),
+                          ),
+                        ).then((_) => _fetchApplicationDetail());
+                      },
+                      icon: const Icon(Icons.edit_note_rounded, size: 18, color: Color(0xFFDC2626)),
+                      label: Text(
+                        'Edit & Resubmit Application',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: const Color(0xFFDC2626),
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFFFCA5A5), width: 1.2),
+                        backgroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -2008,46 +2000,45 @@ class _CertificationDetailsScreenState
     );
   }
 
-  // ignore: unused_element
   Widget _buildResubmitButton(CertificationApplicationDetail detail) {
     return SizedBox(
       width: double.infinity,
       height: 48,
       child: ElevatedButton.icon(
         onPressed: () {
-          final appId = detail.applicationId.isNotEmpty
-              ? detail.applicationId
-              : (detail.id > 0 ? detail.id.toString() : detail.applicationNo);
+          final appId = detail.editApplicationId;
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => CertificationWizardScreen(
                 applicationId: appId,
-                initialModel: CertificationApplicationModel(
-                  id: detail.id,
-                  applicationId: detail.applicationId,
-                  applicationNo: detail.applicationNo,
-                  institutionName: detail.institution?.name ?? '',
-                  institutionTypeTitle: detail.institution?.category ?? '',
-                  address: (detail.institution?.address != null && detail.institution!.address.isNotEmpty)
-                      ? detail.institution!.address
-                      : (widget.certificateItem?.address ?? ''),
-                  country: (detail.institution?.country != null && detail.institution!.country.isNotEmpty)
-                      ? detail.institution!.country
-                      : (widget.certificateItem?.country ?? ''),
-                  regionState: (detail.institution?.region != null && detail.institution!.region.isNotEmpty)
-                      ? detail.institution!.region
-                      : (widget.certificateItem?.region ?? ''),
-                  city: (detail.institution?.city != null && detail.institution!.city.isNotEmpty)
-                      ? detail.institution!.city
-                      : (widget.certificateItem?.city ?? ''),
-                  pincode: (detail.institution?.pincode != null && detail.institution!.pincode.isNotEmpty)
-                      ? detail.institution!.pincode
-                      : (widget.certificateItem?.pincode ?? ''),
-                  contactPerson: detail.institution?.contactPerson ?? '',
-                  contactEmail: detail.institution?.contactEmail ?? '',
-                  contactPhone: detail.institution?.contactPhone ?? '',
-                  status: detail.status,
-                ),
+                initialModel: detail.rawJson != null
+                    ? CertificationApplicationModel.fromApplicationJson(detail.rawJson!)
+                    : CertificationApplicationModel(
+                        id: detail.id,
+                        applicationId: detail.applicationId,
+                        applicationNo: detail.applicationNo,
+                        institutionName: detail.institution?.name ?? '',
+                        institutionTypeTitle: detail.institution?.category ?? '',
+                        address: (detail.institution?.address != null && detail.institution!.address.isNotEmpty)
+                            ? detail.institution!.address
+                            : (widget.certificateItem?.address ?? ''),
+                        country: (detail.institution?.country != null && detail.institution!.country.isNotEmpty)
+                            ? detail.institution!.country
+                            : (widget.certificateItem?.country ?? ''),
+                        regionState: (detail.institution?.region != null && detail.institution!.region.isNotEmpty)
+                            ? detail.institution!.region
+                            : (widget.certificateItem?.region ?? ''),
+                        city: (detail.institution?.city != null && detail.institution!.city.isNotEmpty)
+                            ? detail.institution!.city
+                            : (widget.certificateItem?.city ?? ''),
+                        pincode: (detail.institution?.pincode != null && detail.institution!.pincode.isNotEmpty)
+                            ? detail.institution!.pincode
+                            : (widget.certificateItem?.pincode ?? ''),
+                        contactPerson: detail.institution?.contactPerson ?? '',
+                        contactEmail: detail.institution?.contactEmail ?? '',
+                        contactPhone: detail.institution?.contactPhone ?? '',
+                        status: detail.status,
+                      ),
               ),
             ),
           ).then((_) => _fetchApplicationDetail());
@@ -2062,64 +2053,6 @@ class _CertificationDetailsScreenState
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 1,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButtons(CertificationApplicationDetail detail) {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: ElevatedButton.icon(
-        onPressed: () {
-          // For Changes Required: Prefill existing application data for editing
-          final appId = detail.applicationId.isNotEmpty
-              ? detail.applicationId
-              : (detail.id > 0 ? detail.id.toString() : detail.applicationNo);
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => CertificationWizardScreen(
-                applicationId: appId,
-                initialModel: CertificationApplicationModel(
-                  id: detail.id,
-                  applicationId: detail.applicationId,
-                  applicationNo: detail.applicationNo,
-                  institutionName: detail.institution?.name ?? '',
-                  institutionTypeTitle: detail.institution?.category ?? '',
-                  address: (detail.institution?.address != null && detail.institution!.address.isNotEmpty)
-                      ? detail.institution!.address
-                      : (widget.certificateItem?.address ?? ''),
-                  country: (detail.institution?.country != null && detail.institution!.country.isNotEmpty)
-                      ? detail.institution!.country
-                      : (widget.certificateItem?.country ?? ''),
-                  regionState: (detail.institution?.region != null && detail.institution!.region.isNotEmpty)
-                      ? detail.institution!.region
-                      : (widget.certificateItem?.region ?? ''),
-                  city: (detail.institution?.city != null && detail.institution!.city.isNotEmpty)
-                      ? detail.institution!.city
-                      : (widget.certificateItem?.city ?? ''),
-                  pincode: (detail.institution?.pincode != null && detail.institution!.pincode.isNotEmpty)
-                      ? detail.institution!.pincode
-                      : (widget.certificateItem?.pincode ?? ''),
-                  contactPerson: detail.institution?.contactPerson ?? '',
-                  contactEmail: detail.institution?.contactEmail ?? '',
-                  contactPhone: detail.institution?.contactPhone ?? '',
-                  status: detail.status,
-                ),
-              ),
-            ),
-          ).then((_) => _fetchApplicationDetail());
-        },
-        icon: const Icon(Icons.edit_note_rounded, size: 20),
-        label: Text(
-          'Edit / Resubmit Application',
-          style: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w700),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primaryBlue,
-          foregroundColor: Colors.white,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       ),
     );

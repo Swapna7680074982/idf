@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../bloc/app_bloc.dart';
 import '../../../bloc/app_event.dart';
 import '../../../models/program_model.dart';
@@ -36,6 +37,7 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
   final int _totalSteps = 7;
   late final ProgramSubmissionModel _submissionModel;
   bool _isSubmitting = false;
+  bool _isLoadingData = false;
 
   final List<String> _stepTitles = [
     'Program Info',
@@ -51,6 +53,42 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
   void initState() {
     super.initState();
     _submissionModel = widget.initialModel?.copyWith() ?? ProgramSubmissionModel();
+    _submissionModel.applyUserOrgFallback();
+
+    final targetId = widget.applicationId ?? _submissionModel.referenceNumber;
+    if (targetId != null && targetId.toString().isNotEmpty) {
+      if (widget.applicationId != null ||
+          _submissionModel.description.trim().isEmpty ||
+          _submissionModel.organizingEntityName.trim().isEmpty ||
+          _submissionModel.venueAddress.trim().isEmpty) {
+        _loadProgramData(targetId);
+      }
+    }
+  }
+
+  Future<void> _loadProgramData(dynamic id) async {
+    setState(() {
+      _isLoadingData = true;
+    });
+
+    try {
+      final fullModel = await ProgramsService.getProgramModelForEdit(id);
+      if (mounted) {
+        setState(() {
+          _submissionModel.copyFrom(fullModel);
+          _submissionModel.applyUserOrgFallback();
+          _isLoadingData = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error prefilling program data: $e');
+      if (mounted) {
+        setState(() {
+          _submissionModel.applyUserOrgFallback();
+          _isLoadingData = false;
+        });
+      }
+    }
   }
 
   void _nextStep() {
@@ -144,54 +182,100 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
             : <Map<String, dynamic>>[]);
 
     try {
-      final res = await ProgramsService.submitProgramProposal(
-        title: _submissionModel.programName,
-        programTypeId: _submissionModel.programTypeId ?? 1,
-        organizerName: _submissionModel.organizingEntityName,
-        organizationType: _submissionModel.organizationType,
-        about: fullDesc,
-        venue: _submissionModel.venueAddress,
-        countryId: _submissionModel.countryId ?? 1,
-        cityText: _submissionModel.city,
-        countryText: _submissionModel.country,
-        regionText: _submissionModel.regionState,
-        pincode: _submissionModel.pincode,
-        startDate: startDateStr,
-        endDate: endDateStr,
-        contactPerson: _submissionModel.contactPerson,
-        contactPhone: _submissionModel.phone,
-        contactEmail: _submissionModel.email,
-        registrationInstructions: _submissionModel.registrationInstructions.trim().isNotEmpty
-            ? _submissionModel.registrationInstructions.trim()
-            : null,
-        registrationLink: _submissionModel.registrationLink.trim().isNotEmpty
-            ? _submissionModel.registrationLink.trim()
-            : null,
-        agenda: agendaPayload,
-        supportingFileIds: fileIds,
-        materials: materialsList,
-        bannerImageUrl: _submissionModel.bannerUrl,
-        coverImageUrl: _submissionModel.bannerUrl,
-        bannerFileId: _submissionModel.bannerFileId,
-        coverFileId: _submissionModel.bannerFileId,
-        submit: true,
-      );
+      final String programId;
+      if (widget.applicationId != null && widget.applicationId!.isNotEmpty) {
+        final updateRes = await ProgramsService.updateProgramProposal(
+          widget.applicationId!,
+          title: _submissionModel.programName,
+          programTypeId: _submissionModel.programTypeId ?? 1,
+          organizerName: _submissionModel.organizingEntityName,
+          organizationType: _submissionModel.organizationType,
+          about: fullDesc,
+          venue: _submissionModel.venueAddress,
+          countryId: _submissionModel.countryId ?? 1,
+          cityText: _submissionModel.city,
+          countryText: _submissionModel.country,
+          regionText: _submissionModel.regionState,
+          pincode: _submissionModel.pincode,
+          startDate: startDateStr,
+          endDate: endDateStr,
+          contactPerson: _submissionModel.contactPerson,
+          contactPhone: _submissionModel.phone,
+          contactEmail: _submissionModel.email,
+          registrationInstructions: _submissionModel.registrationInstructions.trim().isNotEmpty
+              ? _submissionModel.registrationInstructions.trim()
+              : null,
+          registrationLink: _submissionModel.registrationLink.trim().isNotEmpty
+              ? _submissionModel.registrationLink.trim()
+              : null,
+          agenda: agendaPayload,
+          supportingFileIds: fileIds,
+          materials: materialsList,
+          bannerImageUrl: _submissionModel.bannerUrl,
+          coverImageUrl: _submissionModel.bannerUrl,
+          bannerFileId: _submissionModel.bannerFileId,
+          coverFileId: _submissionModel.bannerFileId,
+          submit: true,
+        );
 
-      final programObj = res.program;
-      final programId = (programObj != null && programObj.id > 0)
-          ? programObj.id.toString()
-          : (res['data']?['program']?['id']?.toString() ??
-              res['data']?['id']?.toString() ??
-              '');
-      _submissionModel.referenceNumber = (programObj?.programNo.isNotEmpty ?? false)
-          ? programObj!.programNo
-          : (res['data']?['program']?['program_no']?.toString() ??
-              (programId.isNotEmpty ? programId : ''));
-      _submissionModel.status = (programObj?.reviewStatus.isNotEmpty ?? false)
-          ? programObj!.reviewStatus
-          : (res['data']?['program']?['review_status']?.toString() ??
-              res['data']?['program']?['status']?.toString() ??
-              'submitted');
+        programId = widget.applicationId!;
+        _submissionModel.referenceNumber = _submissionModel.referenceNumber ?? widget.applicationId!;
+        final programMap = updateRes['program'] is Map
+            ? updateRes['program'] as Map
+            : (updateRes['data'] is Map && (updateRes['data'] as Map)['program'] is Map
+                ? (updateRes['data'] as Map)['program'] as Map
+                : null);
+        _submissionModel.status = (programMap?['review_status'] ?? programMap?['status'] ?? 'submitted').toString();
+      } else {
+        final res = await ProgramsService.submitProgramProposal(
+          title: _submissionModel.programName,
+          programTypeId: _submissionModel.programTypeId ?? 1,
+          organizerName: _submissionModel.organizingEntityName,
+          organizationType: _submissionModel.organizationType,
+          about: fullDesc,
+          venue: _submissionModel.venueAddress,
+          countryId: _submissionModel.countryId ?? 1,
+          cityText: _submissionModel.city,
+          countryText: _submissionModel.country,
+          regionText: _submissionModel.regionState,
+          pincode: _submissionModel.pincode,
+          startDate: startDateStr,
+          endDate: endDateStr,
+          contactPerson: _submissionModel.contactPerson,
+          contactPhone: _submissionModel.phone,
+          contactEmail: _submissionModel.email,
+          registrationInstructions: _submissionModel.registrationInstructions.trim().isNotEmpty
+              ? _submissionModel.registrationInstructions.trim()
+              : null,
+          registrationLink: _submissionModel.registrationLink.trim().isNotEmpty
+              ? _submissionModel.registrationLink.trim()
+              : null,
+          agenda: agendaPayload,
+          supportingFileIds: fileIds,
+          materials: materialsList,
+          bannerImageUrl: _submissionModel.bannerUrl,
+          coverImageUrl: _submissionModel.bannerUrl,
+          bannerFileId: _submissionModel.bannerFileId,
+          coverFileId: _submissionModel.bannerFileId,
+          submit: true,
+        );
+
+        final programObj = res.program;
+        programId = (programObj != null && programObj.id > 0)
+            ? programObj.id.toString()
+            : (res['data']?['program']?['id']?.toString() ??
+                res['data']?['id']?.toString() ??
+                '');
+        _submissionModel.referenceNumber = (programObj?.programNo.isNotEmpty ?? false)
+            ? programObj!.programNo
+            : (res['data']?['program']?['program_no']?.toString() ??
+                (programId.isNotEmpty ? programId : ''));
+        _submissionModel.status = (programObj?.reviewStatus.isNotEmpty ?? false)
+            ? programObj!.reviewStatus
+            : (res['data']?['program']?['review_status']?.toString() ??
+                res['data']?['program']?['status']?.toString() ??
+                'submitted');
+      }
 
       _submissionModel.submissionDate = DateTime.now();
 
@@ -282,6 +366,36 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingData) {
+      return Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(
+                width: 38,
+                height: 38,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  color: Color(0xFF00529B),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Loading program details...',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: const Color(0xFF475569),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
       body: SafeArea(
@@ -319,39 +433,49 @@ class _SubmitProgramWizardScreenState extends State<SubmitProgramWizardScreen> {
   }
 
   Widget _buildCurrentStepWidget() {
+    final stepKey = ValueKey(
+      '${_submissionModel.referenceNumber ?? widget.applicationId ?? ''}_${_submissionModel.programName}_${_submissionModel.bannerUrl ?? ''}_${_submissionModel.bannerPath ?? ''}_$_currentStep',
+    );
     switch (_currentStep) {
       case 1:
         return Step1ProgramInfo(
+          key: stepKey,
           model: _submissionModel,
           onContinue: _nextStep,
         );
       case 2:
         return Step2Organizer(
+          key: stepKey,
           model: _submissionModel,
           onContinue: _nextStep,
         );
       case 3:
         return Step3DateLocation(
+          key: stepKey,
           model: _submissionModel,
           onContinue: _nextStep,
         );
       case 4:
         return Step4Content(
+          key: stepKey,
           model: _submissionModel,
           onContinue: _nextStep,
         );
       case 5:
         return Step5Registration(
+          key: stepKey,
           model: _submissionModel,
           onContinue: _nextStep,
         );
       case 6:
         return Step6Materials(
+          key: stepKey,
           model: _submissionModel,
           onContinue: _nextStep,
         );
       case 7:
         return Step7ReviewSubmit(
+          key: stepKey,
           model: _submissionModel,
           onEditStep: _jumpToStep,
           onSubmit: _submitProgram,

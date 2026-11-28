@@ -7,6 +7,7 @@ import '../../../../core/theme.dart';
 import '../../../../core/capitalization_formatter.dart';
 import '../../../../models/meta_models.dart';
 import '../../../../models/program_submission_model.dart';
+import '../../../../services/api_config.dart';
 import '../../../../services/files_service.dart';
 import '../../../../services/metadata_service.dart';
 import '../../../../widgets/custom_button.dart';
@@ -43,7 +44,11 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.model.programName);
-    _descriptionController = TextEditingController(text: widget.model.description);
+    _descriptionController = TextEditingController(
+      text: widget.model.description.isNotEmpty
+          ? widget.model.description
+          : widget.model.programDescription,
+    );
     _loadProgramTypes();
   }
 
@@ -82,6 +87,29 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
           _isLoadingTypes = false;
           _typesError = 'Failed to load program types: ${e.toString()}';
         });
+      }
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant Step1ProgramInfo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.model.programName != oldWidget.model.programName &&
+        _nameController.text != widget.model.programName) {
+      _nameController.text = widget.model.programName;
+    }
+    final newDesc = widget.model.description.isNotEmpty
+        ? widget.model.description
+        : widget.model.programDescription;
+    if (newDesc != _descriptionController.text) {
+      _descriptionController.text = newDesc;
+    }
+    if (widget.model.programTypeId != null &&
+        widget.model.programTypeId != oldWidget.model.programTypeId &&
+        _programTypes.isNotEmpty) {
+      final matches = _programTypes.where((t) => t.id == widget.model.programTypeId);
+      if (matches.isNotEmpty) {
+        setState(() => _selectedProgramType = matches.first);
       }
     }
   }
@@ -339,8 +367,26 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
 
   @override
   Widget build(BuildContext context) {
-    final hasBanner = (widget.model.bannerPath != null && widget.model.bannerPath!.isNotEmpty) ||
-        (widget.model.bannerUrl != null && widget.model.bannerUrl!.isNotEmpty);
+    final String? localPath = (widget.model.bannerPath != null &&
+            widget.model.bannerPath!.isNotEmpty &&
+            !widget.model.bannerPath!.startsWith('http') &&
+            !widget.model.bannerPath!.startsWith('/') &&
+            File(widget.model.bannerPath!).existsSync())
+        ? widget.model.bannerPath
+        : (widget.model.bannerPath != null && File(widget.model.bannerPath!).existsSync()
+            ? widget.model.bannerPath
+            : null);
+
+    final String? networkUrl = (widget.model.bannerUrl != null && widget.model.bannerUrl!.isNotEmpty)
+        ? widget.model.bannerUrl
+        : ((widget.model.bannerPath != null &&
+                (widget.model.bannerPath!.startsWith('http') || widget.model.bannerPath!.startsWith('/')) &&
+                !File(widget.model.bannerPath!).existsSync())
+            ? widget.model.bannerPath
+            : null);
+
+    final hasBanner = (localPath != null && localPath.isNotEmpty) ||
+        (networkUrl != null && networkUrl.isNotEmpty);
 
     return Form(
       key: _formKey,
@@ -566,15 +612,14 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
                     children: [
                       AspectRatio(
                         aspectRatio: 16 / 9,
-                        child: widget.model.bannerPath != null &&
-                                File(widget.model.bannerPath!).existsSync()
+                        child: (localPath != null && File(localPath).existsSync())
                             ? Image.file(
-                                File(widget.model.bannerPath!),
+                                File(localPath),
                                 fit: BoxFit.cover,
                               )
-                            : (widget.model.bannerUrl != null && widget.model.bannerUrl!.isNotEmpty)
+                            : (networkUrl != null && networkUrl.isNotEmpty)
                                 ? Image.network(
-                                    widget.model.bannerUrl!,
+                                    ApiConfig.resolveMediaUrl(networkUrl),
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) => Container(
                                       color: const Color(0xFF00377B),
@@ -636,7 +681,10 @@ class _Step1ProgramInfoState extends State<Step1ProgramInfo> {
                       children: [
                         Expanded(
                           child: Text(
-                            widget.model.bannerFileName ?? 'banner_image.png',
+                            widget.model.bannerFileName ??
+                                networkUrl?.split('/').last ??
+                                localPath?.split(Platform.pathSeparator).last ??
+                                'banner_image.png',
                             style: GoogleFonts.inter(
                               fontSize: 12.5,
                               fontWeight: FontWeight.w500,
