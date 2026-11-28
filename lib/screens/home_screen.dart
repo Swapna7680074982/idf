@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart' show CupertinoIcons;
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -312,9 +313,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(
+        border: const Border(
           top: BorderSide(
-            color: const Color(0xFFE2E8F0),
+            color: Color(0xFFE2E8F0),
             width: 1,
           ),
         ),
@@ -334,32 +335,32 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _buildWhatsAppNavItem(
                 index: 0,
-                icon: Icons.home_outlined,
-                activeIcon: Icons.home_rounded,
+                assetIcon: 'assets/icons/nav_home.png',
+                fallbackIcon: Icons.home_rounded,
                 label: 'Home',
               ),
               _buildWhatsAppNavItem(
                 index: 1,
-                icon: Icons.event_note_outlined,
-                activeIcon: Icons.event_note_rounded,
+                assetIcon: 'assets/icons/nav_programs.png',
+                fallbackIcon: Icons.layers_rounded,
                 label: 'Programs',
               ),
               _buildWhatsAppNavItem(
                 index: 2,
-                icon: Icons.star_outline_rounded,
-                activeIcon: Icons.star_rounded,
-                label: 'IDF Activate',
+                assetIcon: 'assets/icons/nav_idf_active.png',
+                fallbackIcon: CupertinoIcons.waveform_path_ecg,
+                label: 'IDF Active',
               ),
               _buildWhatsAppNavItem(
                 index: 3,
-                icon: Icons.description_outlined,
-                activeIcon: Icons.description_rounded,
+                assetIcon: 'assets/icons/nav_applications.png',
+                fallbackIcon: Icons.article_rounded,
                 label: 'Applications',
               ),
               _buildWhatsAppNavItem(
                 index: 4,
-                icon: Icons.person_outline_rounded,
-                activeIcon: Icons.person_rounded,
+                assetIcon: 'assets/icons/nav_account.png',
+                fallbackIcon: Icons.person_rounded,
                 label: 'Account',
               ),
             ],
@@ -371,51 +372,47 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildWhatsAppNavItem({
     required int index,
-    required IconData icon,
-    required IconData activeIcon,
+    required String assetIcon,
+    required IconData fallbackIcon,
     required String label,
   }) {
     final isSelected = _currentTabIndex == index;
     final activeColor = AppColors.primaryBlue;
-    final inactiveColor = const Color(0xFF475569);
+    final inactiveColor = const Color(0xFF8A93A8);
 
     return Expanded(
       child: InkWell(
         onTap: () => _switchTab(index),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         splashColor: AppColors.primaryBlue.withAlpha(20),
-        highlightColor: AppColors.primaryBlue.withAlpha(10),
+        highlightColor: Colors.transparent,
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 4),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? const Color(0xFFE0F2FE)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Icon(
-                  isSelected ? activeIcon : icon,
+              SizedBox(
+                height: 24,
+                width: 24,
+                child: Image.asset(
+                  assetIcon,
                   color: isSelected ? activeColor : inactiveColor,
-                  size: 22,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) => Icon(
+                    fallbackIcon,
+                    color: isSelected ? activeColor : inactiveColor,
+                    size: 24,
+                  ),
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 3),
               Text(
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: GoogleFonts.inter(
                   fontSize: 11,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
                   color: isSelected ? activeColor : inactiveColor,
                 ),
               ),

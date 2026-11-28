@@ -157,169 +157,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   // ==========================================
-  // SLIDE 1: HERO / BANNER
+  // SLIDE 1: HERO / BANNER (FULL SCREEN IMAGE)
   // ==========================================
   Widget _buildSlide1Hero() {
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 18.0, vertical: 8.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const SizedBox(height: 4),
-
-          // Main Hero Banner Image
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.12),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(18),
-              child: Image.asset(
-                'assets/images/activate_banner.jpg',
-                width: double.infinity,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(
-                  height: 180,
-                  color: const Color(0xFF0284C7),
-                  alignment: Alignment.center,
-                  child: Text(
-                    'ACTIVATE Initiative',
-                    style: GoogleFonts.inter(color: Colors.white, fontWeight: FontWeight.w700),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-
-          const SizedBox(height: 18),
-
-          // 4 Key Metrics Cards Line by Line
-          _buildStatLineItem(
-            value: '75',
-            valueColor: const Color(0xFF0F172A),
-            title: 'YEARS OF HISTORY',
-            subtitle: '(1950–2025)',
-            icon: Icons.history_rounded,
-            iconColor: const Color(0xFF2563EB),
-            iconBgColor: const Color(0xFFEFF6FF),
-          ),
-          _buildStatLineItem(
-            value: '200+',
-            valueColor: const Color(0xFF0284C7),
-            title: 'MEMBER COUNTRIES',
-            subtitle: 'Worldwide federation reach',
-            icon: Icons.public_rounded,
-            iconColor: const Color(0xFF0284C7),
-            iconBgColor: const Color(0xFFF0F9FF),
-          ),
-          _buildStatLineItem(
-            value: '4',
-            valueColor: const Color(0xFFEA580C),
-            title: 'ACTIVATE PRINCIPLES',
-            subtitle: 'Core structural framework',
-            icon: Icons.hub_outlined,
-            iconColor: const Color(0xFFEA580C),
-            iconBgColor: const Color(0xFFFFF7ED),
-          ),
-          _buildStatLineItem(
-            value: 'WHO GAPPA',
-            valueColor: const Color(0xFF0F172A),
-            title: 'ALIGNED 2018–2030',
-            subtitle: 'Global Action Plan physical activity',
-            icon: Icons.verified_rounded,
-            iconColor: const Color(0xFF16A34A),
-            iconBgColor: const Color(0xFFF0FDF4),
-          ),
-
-          const SizedBox(height: 32),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatLineItem({
-    required String value,
-    required Color valueColor,
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Color iconColor,
-    required Color iconBgColor,
-  }) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  value,
-                  style: GoogleFonts.inter(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: valueColor,
-                    letterSpacing: -0.4,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  title,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: const Color(0xFF0F172A),
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  subtitle,
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w400,
-                    color: const Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: iconBgColor,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, size: 20, color: iconColor),
-          ),
-        ],
+      height: double.infinity,
+      color: Colors.white,
+      alignment: Alignment.center,
+      child: Image.asset(
+        'assets/images/onboarding_hero.jpg',
+        width: double.infinity,
+        height: double.infinity,
+        fit: BoxFit.contain,
+        alignment: Alignment.center,
+        errorBuilder: (context, error, stackTrace) => Image.asset(
+          'assets/images/activate_banner.jpg',
+          width: double.infinity,
+          height: double.infinity,
+          fit: BoxFit.contain,
+        ),
       ),
     );
   }
