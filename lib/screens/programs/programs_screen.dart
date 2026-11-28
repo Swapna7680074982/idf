@@ -1072,11 +1072,13 @@ class _ProgramsScreenState extends State<ProgramsScreen> {
                   separatorBuilder: (context, index) => const SizedBox(height: 14),
                   itemBuilder: (context, index) {
                     final program = activeList[index];
+                    final rev = (program.reviewStatus ?? '').toLowerCase();
+                    final isApproved = rev == 'approved' || rev == 'complete' || rev == 'completed';
                     return ProgramCard(
                       program: program,
                       isMyPrograms: _selectedTab == 1,
                       onTap: () => _openProgramItem(program),
-                      onViewParticipants: (_selectedTab == 1 && program.isOrganizer)
+                      onViewParticipants: (_selectedTab == 1 && program.isOrganizer && isApproved)
                           ? () => _showProgramParticipants(program)
                           : null,
                     );

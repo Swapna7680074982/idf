@@ -171,11 +171,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         height: double.infinity,
         fit: BoxFit.contain,
         alignment: Alignment.center,
+        filterQuality: FilterQuality.high,
         errorBuilder: (context, error, stackTrace) => Image.asset(
           'assets/images/activate_banner.jpg',
           width: double.infinity,
           height: double.infinity,
           fit: BoxFit.contain,
+          filterQuality: FilterQuality.high,
         ),
       ),
     );
@@ -641,12 +643,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Widget _buildSlide5Certification() {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 10.0),
+      padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _buildSectionTag('CERTIFICATION'),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
 
           Text(
             'Get recognised as an IDF ACTIVE institution',
@@ -657,7 +659,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               height: 1.25,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 10),
 
           Text(
             'Any institution promoting physical activity within its premises can apply for \'IDF ACTIVE\' Certification, valid for two years. Applicants commit to creating an environment that encourages regular physical activity among their members, staff or students.',
@@ -669,7 +671,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 22),
 
           // 3 Metric Highlights
           Row(
@@ -682,7 +684,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   desc: 'Renewable every 2 years',
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: _buildMetricBox(
                   icon: Icons.percent_rounded,
@@ -691,7 +693,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   desc: 'To qualify for status',
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
                 child: _buildMetricBox(
                   icon: Icons.category_outlined,
@@ -703,11 +705,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ],
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 22),
 
           // Who can apply container
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               color: const Color(0xFF0F172A),
               borderRadius: BorderRadius.circular(16),
@@ -718,12 +720,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 Text(
                   'Who can apply?',
                   style: GoogleFonts.inter(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 14),
                 _buildApplicantRow('Workplaces / worksites / offices / hospitals'),
                 _buildApplicantRow('Community organisations and NGOs'),
                 _buildApplicantRow('Schools'),
@@ -733,7 +735,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 32),
         ],
       ),
     );
@@ -746,7 +748,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     required String desc,
   }) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(12),
@@ -756,7 +758,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, color: color, size: 20),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             title,
             style: GoogleFonts.inter(
@@ -765,7 +767,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               color: const Color(0xFF0F172A),
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
             desc,
             style: GoogleFonts.inter(
@@ -781,18 +783,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildApplicantRow(String text) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6.0),
+      padding: const EdgeInsets.only(bottom: 12.0),
       child: Row(
         children: [
-          const Icon(Icons.check_circle_rounded, color: Color(0xFF38BDF8), size: 16),
-          const SizedBox(width: 8),
+          const Icon(Icons.check_circle_rounded, color: Color(0xFF38BDF8), size: 17),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
               style: GoogleFonts.inter(
-                fontSize: 12,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w500,
                 color: const Color(0xFFE2E8F0),
+                height: 1.3,
               ),
             ),
           ),

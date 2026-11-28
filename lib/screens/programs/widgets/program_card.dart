@@ -188,63 +188,65 @@ class ProgramCard extends StatelessWidget {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              if (onViewParticipants != null) ...[
-                                InkWell(
-                                  onTap: onViewParticipants,
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFEFF6FF),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: const Color(0xFFBFDBFE)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.people_alt_outlined,
-                                          size: 13,
-                                          color: AppColors.primaryBlue,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          'Participants',
-                                          style: GoogleFonts.inter(
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.primaryBlue,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                              Text(
+                                isUnapproved ? 'View audit & details' : 'View details',
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primaryBlue,
                                 ),
-                                const SizedBox(width: 10),
-                              ],
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    isUnapproved ? 'View audit & details' : 'View details',
-                                    style: GoogleFonts.inter(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.primaryBlue,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  const Icon(
-                                    Icons.arrow_forward_rounded,
-                                    size: 12,
-                                    color: AppColors.primaryBlue,
-                                  ),
-                                ],
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 12,
+                                color: AppColors.primaryBlue,
                               ),
                             ],
                           ),
                         ],
                       ),
+                      // ONLY for Approved programs, show Participants button in next line
+                      if ((rev == 'approved' || rev == 'complete' || rev == 'completed') &&
+                          onViewParticipants != null) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            InkWell(
+                              onTap: onViewParticipants,
+                              borderRadius: BorderRadius.circular(6),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.people_alt_outlined,
+                                      size: 13,
+                                      color: AppColors.primaryBlue,
+                                    ),
+                                    const SizedBox(width: 5),
+                                    Text(
+                                      'Participants',
+                                      style: GoogleFonts.inter(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppColors.primaryBlue,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
                   ],
                 ),
